@@ -41,6 +41,8 @@ public:
     }
     [[nodiscard]] Piece capturedPiece() const;
 
+    [[nodiscard]] bool operator==(const Move &other) const;
+
     [[nodiscard]] std::string debugName() const;
 
 private:

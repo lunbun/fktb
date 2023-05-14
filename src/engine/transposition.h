@@ -5,6 +5,7 @@
 
 #include "move.h"
 #include "piece.h"
+#include "lock.h"
 
 class ZobristHash {
 public:
@@ -41,18 +42,25 @@ public:
         std::optional<Move> bestMove;
         int32_t bestScore;
 
-        Entry() = delete;
+        Entry(const ZobristHash &hash, int32_t depth, Flag flag, std::optional<Move> bestMove, int32_t bestScore);
+        Entry(const Entry &other) = delete;
+        Entry &operator=(const Entry &other) = delete;
+        Entry(Entry &&other) = delete;
+        Entry &operator=(Entry &&other) = delete;
     };
 
     explicit TranspositionTable(uint32_t size);
     ~TranspositionTable();
 
+    [[nodiscard]] inline SpinLock &lock() { return this->lock_; }
+
     // Will only return a valid entry, nullptr otherwise.
     [[nodiscard]] Entry *load(const ZobristHash &hash) const;
 
-    void store(const ZobristHash &hash, Entry entry);
+    void store(const ZobristHash &hash, int32_t depth, Flag flag, std::optional<Move> bestMove, int32_t bestScore);
 
 private:
+    SpinLock lock_;
     uint32_t sizeMask_;
     Entry *entries_;
 };

@@ -2,7 +2,7 @@
 
 #include "board.h"
 #include "move.h"
-#include "sync_transposition.h"
+#include "transposition.h"
 
 namespace MoveSort {
     // Heuristically sorts moves to improve alpha-beta pruning.
@@ -10,5 +10,5 @@ namespace MoveSort {
 
     // Heuristically sorts moves to improve alpha-beta pruning.
     // Also uses the previous iteration's transposition table to better score moves.
-    void sort(Board &board, MoveListStack &moves, SynchronizedTranspositionTable &previousIterationTable);
+    void sort(Board &board, MoveListStack &moves, TranspositionTable &previousIterationTable);
 }

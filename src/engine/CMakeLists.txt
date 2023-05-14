@@ -1,10 +1,12 @@
 target_sources(chess PRIVATE
         board.cc
         board.h
-        engine.cc
-        engine.h
         fen.cc
         fen.h
+        iterative_search.cc
+        iterative_search.h
+        lock.cc
+        lock.h
         move.cc
         move.h
         movegen.cc
@@ -15,7 +17,5 @@ target_sources(chess PRIVATE
         piece.h
         search.cc
         search.h
-        sync_transposition.cc
-        sync_transposition.h
         transposition.cc
         transposition.h)

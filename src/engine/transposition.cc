@@ -77,7 +77,11 @@ void ZobristHash::move(Move move) {
 
 
 
-TranspositionTable::TranspositionTable(uint32_t size) {
+TranspositionTable::Entry::Entry(const ZobristHash &hash, int32_t depth, Flag flag, std::optional<Move> bestMove,
+    int32_t bestScore) : isValid(true), key(hash.hash()), depth(depth), flag(flag), bestMove(bestMove),
+                         bestScore(bestScore) { }
+
+TranspositionTable::TranspositionTable(uint32_t size) : lock_() {
     bool powerOfTwo = (size != 0) && !(size & (size - 1));
     if (!powerOfTwo) {
         throw std::invalid_argument("size must be a power of two");
@@ -104,13 +108,15 @@ TranspositionTable::Entry *TranspositionTable::load(const ZobristHash &hash) con
     }
 }
 
-void TranspositionTable::store(const ZobristHash &hash, Entry entry) {
+void TranspositionTable::store(const ZobristHash &hash, int32_t depth, Flag flag, std::optional<Move> bestMove,
+    int32_t bestScore) {
     uint64_t key = hash.hash();
 
     Entry *pointer = this->entries_ + (key & this->sizeMask_);
 
     // Only overwrite an existing entry if the new entry has a higher depth
-    if (!pointer->isValid || entry.depth > pointer->depth) {
-        *pointer = entry;
+    if (!pointer->isValid || depth > pointer->depth) {
+        // Emplace the new entry
+        new(pointer) Entry(hash, depth, flag, bestMove, bestScore);
     }
 }

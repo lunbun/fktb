@@ -1,4 +1,4 @@
-#include "sync_transposition.h"
+#include "lock.h"
 
 SpinLock::SpinLock() : lock_(false) { }
 
@@ -27,7 +27,3 @@ SpinLockGuard::SpinLockGuard(SpinLock &lock) : lock_(lock) {
 SpinLockGuard::~SpinLockGuard() {
     this->lock_.unlock();
 }
-
-
-
-SynchronizedTranspositionTable::SynchronizedTranspositionTable(uint32_t size) : lock_(), table_(size) { }

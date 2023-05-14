@@ -1,6 +1,7 @@
 #include "move.h"
 
 #include <stdexcept>
+#include <cstring>
 
 #include "board.h"
 
@@ -66,6 +67,10 @@ Piece Move::capturedPiece() const {
         static_cast<PieceColor>(this->capturedPieceColor_),
         this->to()
     };
+}
+
+bool Move::operator==(const Move &other) const {
+    return !memcmp(this, &other, sizeof(Move));
 }
 
 std::string Move::debugName() const {
