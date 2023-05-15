@@ -4,6 +4,8 @@
 #include <cstring>
 
 #include "board.h"
+#include "movesort.h"
+#include "search.h"
 
 Move Move::fromString(const std::string &string, const Board &board) {
     if (string.length() != 4) {
@@ -92,55 +94,59 @@ std::string Move::debugName() const {
 
 
 
-MoveListStack::MoveListStack(uint32_t stackCapacity, uint32_t listCapacity) : stackCapacity_(stackCapacity),
-                                                                              stackSize_(0),
-                                                                              listCapacity_(listCapacity), listSize_(0),
-                                                                              listStart_(0) {
-    this->listSizes_ = static_cast<uint32_t *>(malloc(sizeof(uint32_t) * stackCapacity));
-    this->moves_ = static_cast<Move *>(malloc(sizeof(Move) * listCapacity));
-}
+MovePriorityQueue::MovePriorityQueue() : moves_() { }
 
-MoveListStack::~MoveListStack() {
-    free(this->listSizes_);
-    free(this->moves_);
-}
-
-void MoveListStack::push() {
-    if (this->stackSize_ >= this->stackCapacity_) {
-        throw std::runtime_error("MoveListStack::push() called when stack is full");
-    }
-
-    this->listSizes_[this->stackSize_] = this->listSize_;
-    this->stackSize_++;
-
-    this->listStart_ += this->listSize_;
-    this->listSize_ = 0;
-}
-
-void MoveListStack::pop() {
-    if (this->stackSize_ <= 0) {
-        throw std::runtime_error("MoveListStack::pop() called when stack is empty");
-    }
-
-    this->stackSize_--;
-
-    this->listSize_ = this->listSizes_[this->stackSize_];
-    this->listStart_ -= this->listSize_;
-}
-
-void MoveListStack::append(Square to, Piece piece) {
+void MovePriorityQueue::append(Square to, Piece piece) {
     this->append(Move(to, piece));
 }
 
-void MoveListStack::append(Square to, Piece piece, Piece capturedPiece) {
+void MovePriorityQueue::append(Square to, Piece piece, Piece capturedPiece) {
     this->append(Move(to, piece, capturedPiece));
 }
 
-void MoveListStack::append(Move move) {
-    if (this->listStart_ + this->listSize_ >= this->listCapacity_) {
-        throw std::runtime_error("MoveListStack::append() called when list is full");
+void MovePriorityQueue::append(Move move) {
+    if (move == this->hashMove_) {
+        // The hash move is special and should not be added to the queue
+        return;
     }
 
-    this->moves_[this->listStart_ + this->listSize_] = move;
-    this->listSize_++;
+    this->moves_.push_back({ move, MoveSort::scoreMove(move) });
+}
+
+// Loads the hash move from the previous iteration if the previous iteration is not nullptr.
+void MovePriorityQueue::maybeLoadHashMoveFromPreviousIteration(Board &board, FixedDepthSearcher *previousIteration) {
+    if (previousIteration == nullptr) {
+        return;
+    }
+
+    TranspositionTable::Entry *entry = previousIteration->table().load(board.hash());
+
+    if (entry == nullptr) {
+        return;
+    }
+
+    this->hashMove_ = entry->bestMove.value();
+}
+
+Move MovePriorityQueue::pop() {
+    if (this->hashMove_.has_value()) {
+        // Always search the hash move first
+        Move move = this->hashMove_.value();
+        this->hashMove_ = std::nullopt;
+        return move;
+    }
+
+    // Find the move with the highest score
+    auto bestMove = this->moves_.begin();
+    for (auto it = this->moves_.begin(); it != this->moves_.end(); it++) {
+        if (it->score > bestMove->score) {
+            bestMove = it;
+        }
+    }
+
+    // Remove the move from the queue
+    Move move = bestMove->move;
+    this->moves_.erase(bestMove);
+
+    return move;
 }

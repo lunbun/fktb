@@ -8,6 +8,7 @@
 #include "transposition.h"
 
 struct SearchNode {
+    std::optional<Move> move;
     int32_t score;
     uint32_t nodeCount;
     uint32_t transpositionHits;
@@ -15,26 +16,18 @@ struct SearchNode {
     SearchNode() = delete;
 };
 
-struct FixedDepthSearchResult {
-    std::optional<Move> move;
-    int32_t score;
-    uint32_t nodeCount;
-    uint32_t transpositionHits;
-
-    FixedDepthSearchResult() = delete;
-};
-
 class FixedDepthSearcher {
 public:
     FixedDepthSearcher(const Board &board, int32_t depth);
     FixedDepthSearcher(const Board &board, int32_t depth, FixedDepthSearcher *previousIteration);
 
-    [[nodiscard]] FixedDepthSearchResult searchRoot();
+    [[nodiscard]] SearchNode searchRoot();
+
+    [[nodiscard]] inline TranspositionTable &table() { return this->table_; }
 
 private:
     Board board_;
     int32_t depth_;
-    MoveListStack moves_;
     TranspositionTable table_;
 
     // Used for iterative deepening

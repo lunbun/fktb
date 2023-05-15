@@ -18,7 +18,7 @@ void IterativeSearcher::startSearch() {
 
         auto start = std::chrono::high_resolution_clock::now();
 
-        FixedDepthSearchResult result = currentIteration->searchRoot();
+        SearchNode result = currentIteration->searchRoot();
 
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

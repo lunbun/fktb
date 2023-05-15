@@ -3,7 +3,7 @@
 #include <optional>
 #include <cstdint>
 #include <string>
-#include <stdexcept>
+#include <vector>
 
 #include "piece.h"
 
@@ -60,47 +60,30 @@ private:
     uint32_t capturedPieceColor_ : 1;
 };
 
+class FixedDepthSearcher;
 
-
-// A stack of lists.
-class MoveListStack {
+class MovePriorityQueue {
 public:
-    explicit MoveListStack(uint32_t stackCapacity, uint32_t listCapacity);
-    ~MoveListStack();
+    struct Entry {
+        Move move;
+        // The score of the move, used for sorting.
+        int32_t score;
+    };
 
-    MoveListStack(const MoveListStack &other) = delete;
-    MoveListStack &operator=(const MoveListStack &other) = delete;
-    MoveListStack(MoveListStack &&other) = default;
-    MoveListStack &operator=(MoveListStack &&other) = default;
-
-    [[nodiscard]] inline uint32_t size() const { return this->listSize_; }
-
-    void push();
-    void pop();
+    MovePriorityQueue();
 
     void append(Square to, Piece piece);
     void append(Square to, Piece piece, Piece capturedPiece);
     void append(Move move);
 
-    // Returns the move at the given index without checking if the index is valid. Only use this if you know the index
-    // is valid (e.g. in loops).
-    [[nodiscard]] inline Move unsafeAt(uint32_t index) const { return this->moves_[this->listStart_ + index]; }
+    // Loads the hash move from the previous iteration if the previous iteration is not nullptr.
+    void maybeLoadHashMoveFromPreviousIteration(Board &board, FixedDepthSearcher *previousIteration);
 
-    // Sets the move at the given index without checking if the index is valid. Only use this if you know the index is
-    // valid (e.g. in loops). Also, it is a bad idea to manually modify the move list, so the only time this should be
-    // used is for move sorting.
-    inline void unsafeSet(uint32_t index, Move move) {
-        this->moves_[this->listStart_ + index] = move;
-    }
+    [[nodiscard]] inline bool empty() const { return !this->hashMove_.has_value() && this->moves_.empty(); }
+
+    [[nodiscard]] Move pop();
 
 private:
-    uint32_t stackCapacity_;
-    uint32_t stackSize_;
-
-    uint32_t listCapacity_;
-    uint32_t listSize_;
-    uint32_t listStart_;
-    uint32_t *listSizes_;
-
-    Move *moves_;
+    std::optional<Move> hashMove_;
+    std::vector<Entry> moves_;
 };

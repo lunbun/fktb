@@ -1,7 +1,7 @@
 #include "movegen.h"
 
 // Generates all legal diagonal moves from a square.
-inline void generateDiagonalMoves(Piece piece, const Board &board, MoveListStack &moves) {
+inline void generateDiagonalMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
     // Generate moves to the top-right.
     {
         auto file = static_cast<int8_t>(piece.file() + 1);
@@ -88,7 +88,7 @@ inline void generateDiagonalMoves(Piece piece, const Board &board, MoveListStack
 }
 
 // Generates all legal orthogonal moves from a square.
-inline void generateOrthogonalMoves(Piece piece, const Board &board, MoveListStack &moves) {
+inline void generateOrthogonalMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
     // Generate moves to the right.
     for (auto file = static_cast<int8_t>(piece.file() + 1); file < 8; ++file) {
         Piece *pieceAtTo = board.getPieceAt({ file, piece.rank() });
@@ -147,7 +147,7 @@ inline void generateOrthogonalMoves(Piece piece, const Board &board, MoveListSta
 // Generates a forward pawn move if the destination square is empty. Returns true if a move was generated (i.e. the
 // square was empty).
 inline bool maybeGeneratePawnForwardMove(Square to, Piece piece, int8_t promotionRank, const Board &board,
-    MoveListStack &moves) {
+    MovePriorityQueue &moves) {
     if (!to.isInBounds()) {
         return false;
     }
@@ -170,7 +170,7 @@ inline bool maybeGeneratePawnForwardMove(Square to, Piece piece, int8_t promotio
 
 // Generates a pawn capture move if the destination square is occupied by an enemy piece.
 inline void maybeGeneratePawnCaptureMove(Square to, Piece piece, int8_t promotionRank, const Board &board,
-    MoveListStack &moves) {
+    MovePriorityQueue &moves) {
     if (!to.isInBounds()) {
         return;
     }
@@ -189,7 +189,7 @@ inline void maybeGeneratePawnCaptureMove(Square to, Piece piece, int8_t promotio
 }
 
 // Generates all legal pawn moves from a square.
-inline void generatePawnMoves(Piece piece, const Board &board, MoveListStack &moves) {
+inline void generatePawnMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
     int8_t direction = getPawnDirection(piece.color());
     auto promotionRank = static_cast<int8_t>(piece.color() == PieceColor::White ? 7 : 0);
 
@@ -212,7 +212,7 @@ inline void generatePawnMoves(Piece piece, const Board &board, MoveListStack &mo
 
 
 // Generates a move to a square if the square is in bounds, and is empty or contains an enemy piece.
-inline void maybeGenerateKnightMoveToSquare(Square to, Piece piece, const Board &board, MoveListStack &moves) {
+inline void maybeGenerateKnightMoveToSquare(Square to, Piece piece, const Board &board, MovePriorityQueue &moves) {
     if (!to.isInBounds()) {
         return;
     }
@@ -226,7 +226,7 @@ inline void maybeGenerateKnightMoveToSquare(Square to, Piece piece, const Board 
 }
 
 // Generates all legal knight moves from a square.
-inline void generateKnightMoves(Piece piece, const Board &board, MoveListStack &moves) {
+inline void generateKnightMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
     maybeGenerateKnightMoveToSquare(piece.square().offset(1, 2), piece, board, moves);
     maybeGenerateKnightMoveToSquare(piece.square().offset(2, 1), piece, board, moves);
     maybeGenerateKnightMoveToSquare(piece.square().offset(2, -1), piece, board, moves);
@@ -240,21 +240,21 @@ inline void generateKnightMoves(Piece piece, const Board &board, MoveListStack &
 
 
 // Generates all legal bishop moves from a square.
-inline void generateBishopMoves(Piece piece, const Board &board, MoveListStack &moves) {
+inline void generateBishopMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
     generateDiagonalMoves(piece, board, moves);
 }
 
 
 
 // Generates all legal rook moves from a square.
-inline void generateRookMoves(Piece piece, const Board &board, MoveListStack &moves) {
+inline void generateRookMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
     generateOrthogonalMoves(piece, board, moves);
 }
 
 
 
 // Generates all legal queen moves from a square.
-inline void generateQueenMoves(Piece piece, const Board &board, MoveListStack &moves) {
+inline void generateQueenMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
     generateDiagonalMoves(piece, board, moves);
     generateOrthogonalMoves(piece, board, moves);
 }
@@ -262,7 +262,7 @@ inline void generateQueenMoves(Piece piece, const Board &board, MoveListStack &m
 
 
 // Generates a king move to a square if it is legal.
-inline void maybeGenerateKingMoveToSquare(Square to, Piece piece, const Board &board, MoveListStack &moves) {
+inline void maybeGenerateKingMoveToSquare(Square to, Piece piece, const Board &board, MovePriorityQueue &moves) {
     if (!to.isInBounds()) {
         return;
     }
@@ -276,7 +276,7 @@ inline void maybeGenerateKingMoveToSquare(Square to, Piece piece, const Board &b
 }
 
 // Generates all legal king moves from a square.
-inline void generateKingMoves(Piece piece, const Board &board, MoveListStack &moves) {
+inline void generateKingMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
     maybeGenerateKingMoveToSquare(piece.square().offset(1, 0), piece, board, moves);
     maybeGenerateKingMoveToSquare(piece.square().offset(1, 1), piece, board, moves);
     maybeGenerateKingMoveToSquare(piece.square().offset(0, 1), piece, board, moves);
@@ -289,7 +289,7 @@ inline void generateKingMoves(Piece piece, const Board &board, MoveListStack &mo
 
 
 
-void MoveGenerator::generate(const Board &board, MoveListStack &moves) {
+void MoveGenerator::generate(const Board &board, MovePriorityQueue &moves) {
     for (const auto &pawn : board.pawns()[board.turn()]) {
         generatePawnMoves(*pawn, board, moves);
     }
