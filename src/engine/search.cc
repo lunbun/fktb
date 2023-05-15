@@ -11,7 +11,8 @@ FixedDepthSearcher::FixedDepthSearcher(const Board &board, int32_t depth) : Fixe
     nullptr) { }
 
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, int32_t depth, FixedDepthSearcher *previousIteration)
-    : board_(board.copy()), depth_(depth), table_(524288), previousIteration_(previousIteration) { }
+    : board_(board.copy()), depth_(depth), moves_(depth, 64 * depth), table_(524288),
+      previousIteration_(previousIteration) { }
 
 int32_t evaluate(const Board &board) {
     return board.material(board.turn()) - board.material(~board.turn());
@@ -52,7 +53,11 @@ SearchNode FixedDepthSearcher::search(int32_t depth, int32_t alpha, int32_t beta
     int32_t originalAlpha = alpha;
 
     // Move search
-    MovePriorityQueue moves;
+    MovePriorityQueueStack &moves = this->moves_;
+
+    // Creating a MovePriorityQueueStackGuard pushes a stack frame onto the MovePriorityQueueStack
+    MovePriorityQueueStackGuard movesStackGuard(moves);
+
     moves.maybeLoadHashMoveFromPreviousIteration(board, this->previousIteration_);
     MoveGenerator::generate(board, moves);
 
@@ -67,7 +72,7 @@ SearchNode FixedDepthSearcher::search(int32_t depth, int32_t alpha, int32_t beta
     uint32_t transpositionHits = 0;
 
     while (!moves.empty()) {
-        Move move = moves.pop();
+        Move move = moves.dequeue();
         board.makeMove(move);
 
         SearchNode node = search(depth - 1, -beta, -alpha);

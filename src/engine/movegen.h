@@ -4,5 +4,5 @@
 #include "board.h"
 
 namespace MoveGenerator {
-    void generate(const Board &board, MovePriorityQueue &moves);
+    void generate(const Board &board, MovePriorityQueueStack &moves);
 }

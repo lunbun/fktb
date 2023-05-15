@@ -94,27 +94,72 @@ std::string Move::debugName() const {
 
 
 
-MovePriorityQueue::MovePriorityQueue() : moves_() { }
+MovePriorityQueueStack::MovePriorityQueueStack(uint32_t stackCapacity, uint32_t capacity) {
+    this->stackCapacity_ = stackCapacity;
+    this->stackSize_ = 0;
+    this->stack_ = static_cast<QueueStackFrame *>(malloc(sizeof(QueueStackFrame) * stackCapacity));
 
-void MovePriorityQueue::append(Square to, Piece piece) {
-    this->append(Move(to, piece));
+    this->capacity_ = capacity;
+    this->moves_ = static_cast<QueueEntry *>(malloc(sizeof(QueueEntry) * capacity));
+
+    this->queueStart_ = this->moves_;
+    this->queueSize_ = 0;
+    this->hashMove_ = std::nullopt;
 }
 
-void MovePriorityQueue::append(Square to, Piece piece, Piece capturedPiece) {
-    this->append(Move(to, piece, capturedPiece));
+MovePriorityQueueStack::~MovePriorityQueueStack() {
+    free(this->stack_);
+    free(this->moves_);
 }
 
-void MovePriorityQueue::append(Move move) {
+void MovePriorityQueueStack::push() {
+    if (this->stackSize_ >= this->stackCapacity_) {
+        throw std::runtime_error("MovePriorityQueueStack stack is full");
+    }
+
+    this->stack_[this->stackSize_++] = { this->queueStart_, this->hashMove_ };
+
+    this->queueStart_ += this->queueSize_;
+    this->queueSize_ = 0;
+    this->hashMove_ = std::nullopt;
+}
+
+void MovePriorityQueueStack::pop() {
+    if (this->stackSize_ <= 0) {
+        throw std::runtime_error("MovePriorityQueueStack stack is empty");
+    }
+
+    // The end of the previous queue is the start of the current queue
+    QueueEntry *queueEnd = this->queueStart_;
+
+    QueueStackFrame top = this->stack_[--this->stackSize_];
+    this->queueStart_ = top.queueStart;
+    this->queueSize_ = queueEnd - top.queueStart;
+    this->hashMove_ = top.hashMove;
+}
+
+void MovePriorityQueueStack::enqueue(Square to, Piece piece) {
+    this->enqueue(Move(to, piece));
+}
+
+void MovePriorityQueueStack::enqueue(Square to, Piece piece, Piece capturedPiece) {
+    this->enqueue(Move(to, piece, capturedPiece));
+}
+
+void MovePriorityQueueStack::enqueue(Move move) {
+    if (this->queueSize_ >= this->capacity_) {
+        throw std::runtime_error("MovePriorityQueueStack queue is full");
+    }
+
     if (move == this->hashMove_) {
-        // The hash move is special and should not be added to the queue
         return;
     }
 
-    this->moves_.push_back({ move, MoveSort::scoreMove(move) });
+    this->queueStart_[this->queueSize_++] = { move, MoveSort::scoreMove(move) };
 }
 
 // Loads the hash move from the previous iteration if the previous iteration is not nullptr.
-void MovePriorityQueue::maybeLoadHashMoveFromPreviousIteration(Board &board, FixedDepthSearcher *previousIteration) {
+void MovePriorityQueueStack::maybeLoadHashMoveFromPreviousIteration(Board &board, FixedDepthSearcher *previousIteration) {
     if (previousIteration == nullptr) {
         return;
     }
@@ -128,7 +173,7 @@ void MovePriorityQueue::maybeLoadHashMoveFromPreviousIteration(Board &board, Fix
     this->hashMove_ = entry->bestMove.value();
 }
 
-Move MovePriorityQueue::pop() {
+Move MovePriorityQueueStack::dequeue() {
     if (this->hashMove_.has_value()) {
         // Always search the hash move first
         Move move = this->hashMove_.value();
@@ -137,16 +182,37 @@ Move MovePriorityQueue::pop() {
     }
 
     // Find the move with the highest score
-    auto bestMove = this->moves_.begin();
-    for (auto it = this->moves_.begin(); it != this->moves_.end(); it++) {
-        if (it->score > bestMove->score) {
-            bestMove = it;
+    QueueEntry *bestMove;
+    int32_t bestScore = -INT32_MAX;
+
+    QueueEntry *queueEnd = this->queueStart_ + this->queueSize_;
+    for (QueueEntry *entry = this->queueStart_; entry < queueEnd; entry++) {
+        if (entry->score > bestScore) {
+            bestMove = entry;
+            bestScore = entry->score;
         }
     }
 
-    // Remove the move from the queue
     Move move = bestMove->move;
-    this->moves_.erase(bestMove);
+
+    // Because order does not matter in the buffer (since we sort it anyway), we can quickly remove a move from the
+    // queue by copying the move at the end of the queue into its place and decrementing the queue size.
+    *bestMove = *(queueEnd - 1);
+    this->queueSize_--;
 
     return move;
+}
+
+bool MovePriorityQueueStack::empty() const {
+    return !this->hashMove_.has_value() && this->queueSize_ == 0;
+}
+
+
+
+MovePriorityQueueStackGuard::MovePriorityQueueStackGuard(MovePriorityQueueStack &stack) : stack_(stack) {
+    this->stack_.push();
+}
+
+MovePriorityQueueStackGuard::~MovePriorityQueueStackGuard() {
+    this->stack_.pop();
 }

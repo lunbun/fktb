@@ -1,7 +1,7 @@
 #include "movegen.h"
 
 // Generates all legal diagonal moves from a square.
-inline void generateDiagonalMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void generateDiagonalMoves(Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     // Generate moves to the top-right.
     {
         auto file = static_cast<int8_t>(piece.file() + 1);
@@ -10,9 +10,9 @@ inline void generateDiagonalMoves(Piece piece, const Board &board, MovePriorityQ
             Square to = { file, rank };
             Piece *pieceAtTo = board.getPieceAt(to);
             if (pieceAtTo == nullptr) { // Move to an empty square
-                moves.append(to, piece);
+                moves.enqueue(to, piece);
             } else if (pieceAtTo->color() != piece.color()) { // Capture an enemy piece
-                moves.append(to, piece, *pieceAtTo);
+                moves.enqueue(to, piece, *pieceAtTo);
                 break;
             } else { // Blocked by a friendly piece
                 break;
@@ -31,9 +31,9 @@ inline void generateDiagonalMoves(Piece piece, const Board &board, MovePriorityQ
             Square to = { file, rank };
             Piece *pieceAtTo = board.getPieceAt(to);
             if (pieceAtTo == nullptr) { // Move to an empty square
-                moves.append(to, piece);
+                moves.enqueue(to, piece);
             } else if (pieceAtTo->color() != piece.color()) { // Capture an enemy piece
-                moves.append(to, piece, *pieceAtTo);
+                moves.enqueue(to, piece, *pieceAtTo);
                 break;
             } else { // Blocked by a friendly piece
                 break;
@@ -52,9 +52,9 @@ inline void generateDiagonalMoves(Piece piece, const Board &board, MovePriorityQ
             Square to = { file, rank };
             Piece *pieceAtTo = board.getPieceAt(to);
             if (pieceAtTo == nullptr) { // Move to an empty square
-                moves.append(to, piece);
+                moves.enqueue(to, piece);
             } else if (pieceAtTo->color() != piece.color()) { // Capture an enemy piece
-                moves.append(to, piece, *pieceAtTo);
+                moves.enqueue(to, piece, *pieceAtTo);
                 break;
             } else { // Blocked by a friendly piece
                 break;
@@ -73,9 +73,9 @@ inline void generateDiagonalMoves(Piece piece, const Board &board, MovePriorityQ
             Square to = { file, rank };
             Piece *pieceAtTo = board.getPieceAt(to);
             if (pieceAtTo == nullptr) { // Move to an empty square
-                moves.append(to, piece);
+                moves.enqueue(to, piece);
             } else if (pieceAtTo->color() != piece.color()) { // Capture an enemy piece
-                moves.append(to, piece, *pieceAtTo);
+                moves.enqueue(to, piece, *pieceAtTo);
                 break;
             } else { // Blocked by a friendly piece
                 break;
@@ -88,14 +88,14 @@ inline void generateDiagonalMoves(Piece piece, const Board &board, MovePriorityQ
 }
 
 // Generates all legal orthogonal moves from a square.
-inline void generateOrthogonalMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void generateOrthogonalMoves(Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     // Generate moves to the right.
     for (auto file = static_cast<int8_t>(piece.file() + 1); file < 8; ++file) {
         Piece *pieceAtTo = board.getPieceAt({ file, piece.rank() });
         if (pieceAtTo == nullptr) { // Move to an empty square
-            moves.append({ file, piece.rank() }, piece);
+            moves.enqueue({ file, piece.rank() }, piece);
         } else if (pieceAtTo->color() != piece.color()) { // Capture an enemy piece
-            moves.append({ file, piece.rank() }, piece, *pieceAtTo);
+            moves.enqueue({ file, piece.rank() }, piece, *pieceAtTo);
             break;
         } else { // Blocked by a friendly piece
             break;
@@ -106,9 +106,9 @@ inline void generateOrthogonalMoves(Piece piece, const Board &board, MovePriorit
     for (auto file = static_cast<int8_t>(piece.file() - 1); file >= 0; --file) {
         Piece *pieceAtTo = board.getPieceAt({ file, piece.rank() });
         if (pieceAtTo == nullptr) { // Move to an empty square
-            moves.append({ file, piece.rank() }, piece);
+            moves.enqueue({ file, piece.rank() }, piece);
         } else if (pieceAtTo->color() != piece.color()) { // Capture an enemy piece
-            moves.append({ file, piece.rank() }, piece, *pieceAtTo);
+            moves.enqueue({ file, piece.rank() }, piece, *pieceAtTo);
             break;
         } else { // Blocked by a friendly piece
             break;
@@ -119,9 +119,9 @@ inline void generateOrthogonalMoves(Piece piece, const Board &board, MovePriorit
     for (auto rank = static_cast<int8_t>(piece.rank() + 1); rank < 8; ++rank) {
         Piece *pieceAtTo = board.getPieceAt({ piece.file(), rank });
         if (pieceAtTo == nullptr) { // Move to an empty square
-            moves.append({ piece.file(), rank }, piece);
+            moves.enqueue({ piece.file(), rank }, piece);
         } else if (pieceAtTo->color() != piece.color()) { // Capture an enemy piece
-            moves.append({ piece.file(), rank }, piece, *pieceAtTo);
+            moves.enqueue({ piece.file(), rank }, piece, *pieceAtTo);
             break;
         } else { // Blocked by a friendly piece
             break;
@@ -132,9 +132,9 @@ inline void generateOrthogonalMoves(Piece piece, const Board &board, MovePriorit
     for (auto rank = static_cast<int8_t>(piece.rank() - 1); rank >= 0; --rank) {
         Piece *pieceAtTo = board.getPieceAt({ piece.file(), rank });
         if (pieceAtTo == nullptr) { // Move to an empty square
-            moves.append({ piece.file(), rank }, piece);
+            moves.enqueue({ piece.file(), rank }, piece);
         } else if (pieceAtTo->color() != piece.color()) { // Capture an enemy piece
-            moves.append({ piece.file(), rank }, piece, *pieceAtTo);
+            moves.enqueue({ piece.file(), rank }, piece, *pieceAtTo);
             break;
         } else { // Blocked by a friendly piece
             break;
@@ -147,7 +147,7 @@ inline void generateOrthogonalMoves(Piece piece, const Board &board, MovePriorit
 // Generates a forward pawn move if the destination square is empty. Returns true if a move was generated (i.e. the
 // square was empty).
 inline bool maybeGeneratePawnForwardMove(Square to, Piece piece, int8_t promotionRank, const Board &board,
-    MovePriorityQueue &moves) {
+    MovePriorityQueueStack &moves) {
     if (!to.isInBounds()) {
         return false;
     }
@@ -155,12 +155,12 @@ inline bool maybeGeneratePawnForwardMove(Square to, Piece piece, int8_t promotio
     Piece *pieceAtTo = board.getPieceAt(to);
     if (pieceAtTo == nullptr) {
         if (to.rank == promotionRank) {
-//            moves.append(Move(to, piece, std::nullopt, PieceType::Queen));
-//            moves.append(Move(to, piece, std::nullopt, PieceType::Rook));
-//            moves.append(Move(to, piece, std::nullopt, PieceType::Bishop));
-//            moves.append(Move(to, piece, std::nullopt, PieceType::Knight));
+//            moves.enqueue(Move(to, piece, std::nullopt, PieceType::Queen));
+//            moves.enqueue(Move(to, piece, std::nullopt, PieceType::Rook));
+//            moves.enqueue(Move(to, piece, std::nullopt, PieceType::Bishop));
+//            moves.enqueue(Move(to, piece, std::nullopt, PieceType::Knight));
         } else {
-            moves.append(to, piece);
+            moves.enqueue(to, piece);
         }
         return true;
     }
@@ -170,7 +170,7 @@ inline bool maybeGeneratePawnForwardMove(Square to, Piece piece, int8_t promotio
 
 // Generates a pawn capture move if the destination square is occupied by an enemy piece.
 inline void maybeGeneratePawnCaptureMove(Square to, Piece piece, int8_t promotionRank, const Board &board,
-    MovePriorityQueue &moves) {
+    MovePriorityQueueStack &moves) {
     if (!to.isInBounds()) {
         return;
     }
@@ -178,18 +178,18 @@ inline void maybeGeneratePawnCaptureMove(Square to, Piece piece, int8_t promotio
     Piece *pieceAtTo = board.getPieceAt(to);
     if (pieceAtTo != nullptr && pieceAtTo->color() != piece.color()) {
         if (to.rank == promotionRank) {
-//            moves.append(Move(to, piece, *pieceAtTo, PieceType::Queen));
-//            moves.append(Move(to, piece, *pieceAtTo, PieceType::Rook));
-//            moves.append(Move(to, piece, *pieceAtTo, PieceType::Bishop));
-//            moves.append(Move(to, piece, *pieceAtTo, PieceType::Knight));
+//            moves.enqueue(Move(to, piece, *pieceAtTo, PieceType::Queen));
+//            moves.enqueue(Move(to, piece, *pieceAtTo, PieceType::Rook));
+//            moves.enqueue(Move(to, piece, *pieceAtTo, PieceType::Bishop));
+//            moves.enqueue(Move(to, piece, *pieceAtTo, PieceType::Knight));
         } else {
-            moves.append(to, piece, *pieceAtTo);
+            moves.enqueue(to, piece, *pieceAtTo);
         }
     }
 }
 
 // Generates all legal pawn moves from a square.
-inline void generatePawnMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void generatePawnMoves(Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     int8_t direction = getPawnDirection(piece.color());
     auto promotionRank = static_cast<int8_t>(piece.color() == PieceColor::White ? 7 : 0);
 
@@ -212,21 +212,21 @@ inline void generatePawnMoves(Piece piece, const Board &board, MovePriorityQueue
 
 
 // Generates a move to a square if the square is in bounds, and is empty or contains an enemy piece.
-inline void maybeGenerateKnightMoveToSquare(Square to, Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void maybeGenerateKnightMoveToSquare(Square to, Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     if (!to.isInBounds()) {
         return;
     }
 
     Piece *pieceAtTo = board.getPieceAt(to);
     if (pieceAtTo == nullptr) {
-        moves.append(to, piece);
+        moves.enqueue(to, piece);
     } else if (pieceAtTo->color() != piece.color()) {
-        moves.append(to, piece, *pieceAtTo);
+        moves.enqueue(to, piece, *pieceAtTo);
     }
 }
 
 // Generates all legal knight moves from a square.
-inline void generateKnightMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void generateKnightMoves(Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     maybeGenerateKnightMoveToSquare(piece.square().offset(1, 2), piece, board, moves);
     maybeGenerateKnightMoveToSquare(piece.square().offset(2, 1), piece, board, moves);
     maybeGenerateKnightMoveToSquare(piece.square().offset(2, -1), piece, board, moves);
@@ -240,21 +240,21 @@ inline void generateKnightMoves(Piece piece, const Board &board, MovePriorityQue
 
 
 // Generates all legal bishop moves from a square.
-inline void generateBishopMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void generateBishopMoves(Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     generateDiagonalMoves(piece, board, moves);
 }
 
 
 
 // Generates all legal rook moves from a square.
-inline void generateRookMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void generateRookMoves(Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     generateOrthogonalMoves(piece, board, moves);
 }
 
 
 
 // Generates all legal queen moves from a square.
-inline void generateQueenMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void generateQueenMoves(Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     generateDiagonalMoves(piece, board, moves);
     generateOrthogonalMoves(piece, board, moves);
 }
@@ -262,21 +262,21 @@ inline void generateQueenMoves(Piece piece, const Board &board, MovePriorityQueu
 
 
 // Generates a king move to a square if it is legal.
-inline void maybeGenerateKingMoveToSquare(Square to, Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void maybeGenerateKingMoveToSquare(Square to, Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     if (!to.isInBounds()) {
         return;
     }
 
     Piece *pieceAtTo = board.getPieceAt(to);
     if (pieceAtTo == nullptr) {
-        moves.append(to, piece);
+        moves.enqueue(to, piece);
     } else if (pieceAtTo->color() != piece.color()) {
-        moves.append(to, piece, *pieceAtTo);
+        moves.enqueue(to, piece, *pieceAtTo);
     }
 }
 
 // Generates all legal king moves from a square.
-inline void generateKingMoves(Piece piece, const Board &board, MovePriorityQueue &moves) {
+inline void generateKingMoves(Piece piece, const Board &board, MovePriorityQueueStack &moves) {
     maybeGenerateKingMoveToSquare(piece.square().offset(1, 0), piece, board, moves);
     maybeGenerateKingMoveToSquare(piece.square().offset(1, 1), piece, board, moves);
     maybeGenerateKingMoveToSquare(piece.square().offset(0, 1), piece, board, moves);
@@ -289,7 +289,7 @@ inline void generateKingMoves(Piece piece, const Board &board, MovePriorityQueue
 
 
 
-void MoveGenerator::generate(const Board &board, MovePriorityQueue &moves) {
+void MoveGenerator::generate(const Board &board, MovePriorityQueueStack &moves) {
     for (const auto &pawn : board.pawns()[board.turn()]) {
         generatePawnMoves(*pawn, board, moves);
     }

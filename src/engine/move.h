@@ -62,28 +62,57 @@ private:
 
 class FixedDepthSearcher;
 
-class MovePriorityQueue {
+class MovePriorityQueueStack {
 public:
-    struct Entry {
+    MovePriorityQueueStack(uint32_t stackCapacity, uint32_t capacity);
+    ~MovePriorityQueueStack();
+
+    // Pushes/pops a move priority queue onto the top of the stack.
+    void push();
+    void pop();
+
+    // Enqueues/dequeues a move onto the top of the stack.
+    void enqueue(Square to, Piece piece);
+    void enqueue(Square to, Piece piece, Piece capturedPiece);
+    void enqueue(Move move);
+    [[nodiscard]] Move dequeue();
+    [[nodiscard]] bool empty() const;
+
+    // Loads the hash move from the previous iteration if the previous iteration is not nullptr.
+    void maybeLoadHashMoveFromPreviousIteration(Board &board, FixedDepthSearcher *previousIteration);
+
+private:
+    struct QueueEntry {
         Move move;
         // The score of the move, used for sorting.
         int32_t score;
     };
 
-    MovePriorityQueue();
+    struct QueueStackFrame {
+        QueueEntry *queueStart;
+        std::optional<Move> hashMove;
 
-    void append(Square to, Piece piece);
-    void append(Square to, Piece piece, Piece capturedPiece);
-    void append(Move move);
+        QueueStackFrame() = delete;
+    };
 
-    // Loads the hash move from the previous iteration if the previous iteration is not nullptr.
-    void maybeLoadHashMoveFromPreviousIteration(Board &board, FixedDepthSearcher *previousIteration);
+    QueueEntry *queueStart_;
+    uint32_t queueSize_;
+    std::optional<Move> hashMove_;
 
-    [[nodiscard]] inline bool empty() const { return !this->hashMove_.has_value() && this->moves_.empty(); }
+    uint32_t stackCapacity_;
+    uint32_t stackSize_;
+    QueueStackFrame *stack_;
 
-    [[nodiscard]] Move pop();
+    uint32_t capacity_;
+    QueueEntry *moves_;
+};
+
+// This class is used to ensure that the move priority queue stack is popped at the end of the function.
+class MovePriorityQueueStackGuard {
+public:
+    explicit MovePriorityQueueStackGuard(MovePriorityQueueStack &stack);
+    ~MovePriorityQueueStackGuard();
 
 private:
-    std::optional<Move> hashMove_;
-    std::vector<Entry> moves_;
+    MovePriorityQueueStack &stack_;
 };

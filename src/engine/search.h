@@ -28,6 +28,7 @@ public:
 private:
     Board board_;
     int32_t depth_;
+    MovePriorityQueueStack moves_;
     TranspositionTable table_;
 
     // Used for iterative deepening
