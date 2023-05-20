@@ -2,13 +2,17 @@
 
 #include <string>
 
-std::string Square::debugName() const {
+std::string Square::uci() const {
     std::string name;
 
     name += static_cast<char>(this->file + 'a');
     name += static_cast<char>(this->rank + '1');
 
     return name;
+}
+
+std::string Square::debugName() const {
+    return this->uci();
 }
 
 
@@ -22,12 +26,12 @@ Piece::Piece(PieceType type, PieceColor color, Square square) {
 
 int32_t Piece::material() const {
     switch (this->type()) {
-        case PieceType::Pawn: return 100;
-        case PieceType::Knight: return 300;
-        case PieceType::Bishop: return 300;
-        case PieceType::Rook: return 500;
-        case PieceType::Queen: return 900;
-        case PieceType::King: return 1000000;
+        case PieceType::Pawn: return PieceMaterial::Pawn;
+        case PieceType::Knight: return PieceMaterial::Knight;
+        case PieceType::Bishop: return PieceMaterial::Bishop;
+        case PieceType::Rook: return PieceMaterial::Rook;
+        case PieceType::Queen: return PieceMaterial::Queen;
+        case PieceType::King: return PieceMaterial::King;
         default: return 0;
     }
 }

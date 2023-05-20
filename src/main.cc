@@ -2,26 +2,21 @@
 #include <chrono>
 
 #include "engine/board.h"
-#include "engine/search.h"
-#include "engine/iterative_search.h"
+#include "engine/fixed_search.h"
+
+// White Pawn from a2 to a3 5507187 127784 2505
 
 int main() {
-    Board board = Board::fromFen("2k5/8/8/8/8/8/5p2/5QK1 b - - 0 1");
+    Board board = Board::startingPosition();
 
-    IterativeSearcher searcher(board);
+    FixedDepthSearcher searcher(board, 6);
 
-    searcher.startSearch();
+    auto start = std::chrono::high_resolution_clock::now();
 
-//    FixedDepthSearcher searcher(board, 6);
-//
-//    auto start = std::chrono::high_resolution_clock::now();
-//
-//    SearchNode node = searcher.searchRoot();
-//
-//    auto end = std::chrono::high_resolution_clock::now();
-//    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-//    std::cout << node.move->debugName() << " " << node.score << " "
-//              << node.nodeCount << " " << node.transpositionHits << " " << duration << std::endl;
+    SearchResult result = searcher.searchRoot();
 
-    return 0;
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << result.bestLine[0].debugName() << " " << result.nodeCount << " " << result.transpositionHits << " " << duration << std::endl;
 }

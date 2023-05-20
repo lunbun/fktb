@@ -5,17 +5,17 @@
 
 #include "board.h"
 #include "movesort.h"
-#include "search.h"
+#include "fixed_search.h"
 
-Move Move::fromString(const std::string &string, const Board &board) {
-    if (string.length() != 4) {
+Move Move::fromUci(const std::string &uci, const Board &board) {
+    if (uci.length() != 4) {
         throw std::invalid_argument("Move string must be 4 characters long");
     }
 
-    auto fromFile = static_cast<int8_t>(string[0] - 'a');
-    auto fromRank = static_cast<int8_t>(string[1] - '1');
-    auto toFile = static_cast<int8_t>(string[2] - 'a');
-    auto toRank = static_cast<int8_t>(string[3] - '1');
+    auto fromFile = static_cast<int8_t>(uci[0] - 'a');
+    auto fromRank = static_cast<int8_t>(uci[1] - '1');
+    auto toFile = static_cast<int8_t>(uci[2] - 'a');
+    auto toRank = static_cast<int8_t>(uci[3] - '1');
 
     Piece *piece = board.getPieceAt({ fromFile, fromRank });
     Piece *capturedPiece = board.getPieceAt({ toFile, toRank });
@@ -75,6 +75,15 @@ bool Move::operator==(const Move &other) const {
     return !memcmp(this, &other, sizeof(Move));
 }
 
+std::string Move::uci() const {
+    std::string uci;
+
+    uci += this->from().uci();
+    uci += this->to().uci();
+
+    return uci;
+}
+
 std::string Move::debugName() const {
     std::string name;
 
@@ -94,7 +103,7 @@ std::string Move::debugName() const {
 
 
 
-MovePriorityQueueStack::MovePriorityQueueStack(uint32_t stackCapacity, uint32_t capacity) {
+MovePriorityQueueStack::MovePriorityQueueStack(uint16_t stackCapacity, uint16_t capacity) {
     this->stackCapacity_ = stackCapacity;
     this->stackSize_ = 0;
     this->stack_ = static_cast<QueueStackFrame *>(malloc(sizeof(QueueStackFrame) * stackCapacity));

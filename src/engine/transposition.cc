@@ -77,7 +77,7 @@ void ZobristHash::move(Move move) {
 
 
 
-TranspositionTable::Entry::Entry(const ZobristHash &hash, int32_t depth, Flag flag, std::optional<Move> bestMove,
+TranspositionTable::Entry::Entry(const ZobristHash &hash, uint16_t depth, Flag flag, std::optional<Move> bestMove,
     int32_t bestScore) : isValid(true), key(hash.hash()), depth(depth), flag(flag), bestMove(bestMove),
                          bestScore(bestScore) { }
 
@@ -108,7 +108,7 @@ TranspositionTable::Entry *TranspositionTable::load(const ZobristHash &hash) con
     }
 }
 
-void TranspositionTable::store(const ZobristHash &hash, int32_t depth, Flag flag, std::optional<Move> bestMove,
+void TranspositionTable::store(const ZobristHash &hash, uint16_t depth, Flag flag, std::optional<Move> bestMove,
     int32_t bestScore) {
     uint64_t key = hash.hash();
 

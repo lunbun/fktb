@@ -12,6 +12,8 @@
 
 class Board {
 public:
+    static constexpr const char *STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
     explicit Board(PieceColor turn);
     ~Board();
 
@@ -20,6 +22,7 @@ public:
     Board(Board &&other) = default;
     Board &operator=(Board &&other) = default;
 
+    static Board startingPosition();
     static Board fromFen(const std::string &fen);
 
     [[nodiscard]] std::string toFen() const;

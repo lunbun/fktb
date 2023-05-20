@@ -8,6 +8,7 @@ struct Square {
     int8_t file;
     int8_t rank;
 
+    [[nodiscard]] static inline uint8_t index(int8_t file, int8_t rank) { return file + rank * 8; }
     [[nodiscard]] inline uint8_t index() const { return this->file + this->rank * 8; }
 
     [[nodiscard]] inline bool isInBounds() const {
@@ -18,6 +19,7 @@ struct Square {
         return { static_cast<int8_t>(this->file + offsetFile), static_cast<int8_t>(this->rank + offsetRank) };
     }
 
+    [[nodiscard]] std::string uci() const;
     [[nodiscard]] std::string debugName() const;
 };
 
@@ -34,6 +36,17 @@ enum class PieceType {
     Queen  = 4,
     King   = 5
 };
+
+namespace PieceMaterial {
+    constexpr int32_t Pawn   = 100;
+    constexpr int32_t Knight = 300;
+    constexpr int32_t Bishop = 325;
+    constexpr int32_t Rook   = 500;
+    constexpr int32_t Queen  = 950;
+    constexpr int32_t King   = 1000000;
+
+    constexpr int32_t BishopPair = 50;
+}
 
 enum class PieceColor {
     White  = 0,

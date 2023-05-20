@@ -1,28 +1,85 @@
-#include "search.h"
+#include "fixed_search.h"
 
-#include <thread>
 #include <vector>
 #include <optional>
 
+#include "piece.h"
 #include "move.h"
 #include "movegen.h"
 
-FixedDepthSearcher::FixedDepthSearcher(const Board &board, int32_t depth) : FixedDepthSearcher(board, depth,
+SearchNode SearchNode::invalid() {
+    return { std::nullopt, 0, 0, 0 };
+}
+
+SearchResult SearchResult::invalid() {
+    return { false, 0, {}, 0, 0, 0 };
+}
+
+
+
+FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth) : FixedDepthSearcher(board, depth,
     nullptr) { }
 
-FixedDepthSearcher::FixedDepthSearcher(const Board &board, int32_t depth, FixedDepthSearcher *previousIteration)
-    : board_(board.copy()), depth_(depth), moves_(depth, 64 * depth), table_(524288),
+FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, FixedDepthSearcher *previousIteration)
+    : board_(board.copy()), depth_(depth), moves_(depth, 64 * depth), table_(1048576),
       previousIteration_(previousIteration) { }
 
-int32_t evaluate(const Board &board) {
-    return board.material(board.turn()) - board.material(~board.turn());
+void FixedDepthSearcher::halt() {
+    this->isHalted_ = true;
 }
 
-SearchNode FixedDepthSearcher::searchRoot() {
-    return this->search(this->depth_, -INT32_MAX, INT32_MAX);
+
+
+inline int32_t evaluate(const Board &board, PieceColor color) {
+    int32_t score = 0;
+
+    score += board.material(color);
+
+    // Bonus for having a bishop pair
+    score += PieceMaterial::BishopPair * (board.bishops()[color].size() >= 2);
+
+    return score;
 }
 
-SearchNode FixedDepthSearcher::search(int32_t depth, int32_t alpha, int32_t beta) {
+inline int32_t evaluate(const Board &board) {
+    return evaluate(board, board.turn()) - evaluate(board, ~board.turn());
+}
+
+SearchResult FixedDepthSearcher::searchRoot() {
+    SearchNode node = this->search(this->depth_, -INT32_MAX, INT32_MAX);
+
+    if (this->isHalted_) {
+        return SearchResult::invalid();
+    }
+
+    // Find the best line using the transposition table
+    std::vector<Move> bestLine;
+
+    Board board = this->board_.copy();
+    uint16_t depth = this->depth_;
+    std::optional<Move> move = node.move;
+    while (move.has_value()) {
+        bestLine.push_back(move.value());
+
+        board.makeMove(move.value());
+
+        // Find the next best move in the line
+        depth--;
+        TranspositionTable::Entry *entry = this->table_.load(board.hash());
+        if (entry == nullptr || entry->depth < depth || entry->flag != TranspositionTable::Flag::Exact) {
+            break;
+        }
+        move = entry->bestMove;
+    }
+
+    return { true, this->depth_, std::move(bestLine), node.score, node.nodeCount, node.transpositionHits };
+}
+
+SearchNode FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) {
+    if (this->isHalted_) {
+        return SearchNode::invalid();
+    }
+
     Board &board = this->board_;
     TranspositionTable &table = this->table_;
 
@@ -62,8 +119,8 @@ SearchNode FixedDepthSearcher::search(int32_t depth, int32_t alpha, int32_t beta
     MoveGenerator::generate(board, moves);
 
     if (moves.empty()) {
-        // TODO: Stalemate
-        return { std::nullopt, -INT32_MAX + depth, 1, 0 };
+        // TODO: Checkmate detection
+        return { std::nullopt, 0, 1, 0 };
     }
 
     std::optional<Move> bestMove = std::nullopt;

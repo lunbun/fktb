@@ -3,6 +3,8 @@ target_sources(chess PRIVATE
         board.h
         fen.cc
         fen.h
+        fixed_search.cc
+        fixed_search.h
         iterative_search.cc
         iterative_search.h
         lock.cc
@@ -15,7 +17,5 @@ target_sources(chess PRIVATE
         movesort.h
         piece.cc
         piece.h
-        search.cc
-        search.h
         transposition.cc
         transposition.h)

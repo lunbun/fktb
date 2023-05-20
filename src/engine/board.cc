@@ -13,6 +13,10 @@ Board::Board(PieceColor turn) : material_(), turn_(turn), hash_(turn), pawns_(),
 
 Board::~Board() = default;
 
+Board Board::startingPosition() {
+    return Board::fromFen(Board::STARTING_FEN);
+}
+
 Board Board::fromFen(const std::string &fen) {
     FenReader reader(fen);
     Board board(reader.turn());
@@ -88,6 +92,8 @@ void Board::addPieceNoHashUpdate(Piece piece) {
 
 void Board::removePieceNoHashUpdate(Piece *piece) {
     this->material_[piece->color()] -= piece->material();
+
+    this->squares_[piece->square().index()] = nullptr;
 
     // Find the piece in the list and remove it.
     auto &pieces = this->getPieceList(*piece);

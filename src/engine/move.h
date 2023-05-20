@@ -11,7 +11,7 @@ class Board;
 
 class Move {
 public:
-    static Move fromString(const std::string &string, const Board &board);
+    static Move fromUci(const std::string &uci, const Board &board);
 
     Move(Square to, Piece piece);
     Move(Square to, Piece piece, Piece capturedPiece);
@@ -43,6 +43,7 @@ public:
 
     [[nodiscard]] bool operator==(const Move &other) const;
 
+    [[nodiscard]] std::string uci() const;
     [[nodiscard]] std::string debugName() const;
 
 private:
@@ -64,7 +65,7 @@ class FixedDepthSearcher;
 
 class MovePriorityQueueStack {
 public:
-    MovePriorityQueueStack(uint32_t stackCapacity, uint32_t capacity);
+    MovePriorityQueueStack(uint16_t stackCapacity, uint16_t capacity);
     ~MovePriorityQueueStack();
 
     // Pushes/pops a move priority queue onto the top of the stack.
@@ -96,14 +97,14 @@ private:
     };
 
     QueueEntry *queueStart_;
-    uint32_t queueSize_;
+    uint16_t queueSize_;
     std::optional<Move> hashMove_;
 
-    uint32_t stackCapacity_;
-    uint32_t stackSize_;
+    uint16_t stackCapacity_;
+    uint16_t stackSize_;
     QueueStackFrame *stack_;
 
-    uint32_t capacity_;
+    uint16_t capacity_;
     QueueEntry *moves_;
 };
 

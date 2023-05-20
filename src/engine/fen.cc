@@ -4,16 +4,18 @@
 #include <optional>
 #include <sstream>
 
-std::vector<std::string> split(const std::string &s, char delim) {
-    std::vector<std::string> result;
-    std::stringstream ss(s);
-    std::string item;
+namespace {
+    std::vector<std::string> split(const std::string &s, char delim) {
+        std::vector<std::string> result;
+        std::stringstream ss(s);
+        std::string item;
 
-    while (getline(ss, item, delim)) {
-        result.push_back(item);
+        while (getline(ss, item, delim)) {
+            result.push_back(item);
+        }
+
+        return result;
     }
-
-    return result;
 }
 
 FenReader::FenReader(const std::string &fen) : file_(0), rank_(7) {

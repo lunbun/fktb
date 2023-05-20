@@ -36,13 +36,13 @@ public:
     struct Entry {
         bool isValid;
         uint64_t key;
-        int32_t depth;
+        uint16_t depth;
         Flag flag;
 
         std::optional<Move> bestMove;
         int32_t bestScore;
 
-        Entry(const ZobristHash &hash, int32_t depth, Flag flag, std::optional<Move> bestMove, int32_t bestScore);
+        Entry(const ZobristHash &hash, uint16_t depth, Flag flag, std::optional<Move> bestMove, int32_t bestScore);
         Entry(const Entry &other) = delete;
         Entry &operator=(const Entry &other) = delete;
         Entry(Entry &&other) = delete;
@@ -57,7 +57,7 @@ public:
     // Will only return a valid entry, nullptr otherwise.
     [[nodiscard]] Entry *load(const ZobristHash &hash) const;
 
-    void store(const ZobristHash &hash, int32_t depth, Flag flag, std::optional<Move> bestMove, int32_t bestScore);
+    void store(const ZobristHash &hash, uint16_t depth, Flag flag, std::optional<Move> bestMove, int32_t bestScore);
 
 private:
     SpinLock lock_;
