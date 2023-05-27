@@ -19,8 +19,16 @@ private:
     Bitboard friendlyKnightAttacks_;
 
     Bitboard enemyKnights_;
+    Bitboard enemyBishops_;
     Bitboard enemyRooks_;
+    Bitboard enemyQueens_;
+
     Bitboard enemyPawnAttacks_;
+    Bitboard enemyKnightAttacks_;
+    Bitboard enemyBishopAttacks_;
+
+    Bitboard enemyRookOrHigher_; // Rooks, queens, or kings
     Bitboard enemyBishopOrLowerAttacks_; // Bishop, knight, or pawn attacks
     Bitboard enemyRookOrLowerAttacks_; // Rook, bishop, knight, or pawn attacks
+    Bitboard enemyQueenOrLowerAttacks_; // Queen, rook, bishop, knight, or pawn attacks
 };

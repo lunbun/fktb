@@ -9,6 +9,7 @@ target_sources(chess PRIVATE
         fen.h
         fixed_search.cc
         fixed_search.h
+        init.h
         inline.h
         iterative_search.cc
         iterative_search.h

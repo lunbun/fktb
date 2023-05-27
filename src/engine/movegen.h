@@ -10,6 +10,7 @@
 template<Color Side, bool ExcludeQuiet>
 class MoveGenerator {
 public:
+    MoveGenerator() = delete;
     MoveGenerator(const Board &board, MovePriorityQueueStack &moves);
 
     void generate();

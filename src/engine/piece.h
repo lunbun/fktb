@@ -80,20 +80,21 @@ INLINE constexpr Color operator~(Color color) {
 template<typename T>
 class ColorMap {
 public:
-    ColorMap() = default;
+    constexpr ColorMap() = default;
+    constexpr ColorMap(const T &white, const T &black) : values_{ white, black } { }
 
     ColorMap(const ColorMap &other) = default;
     ColorMap &operator=(const ColorMap &other) = default;
     ColorMap(ColorMap &&other) noexcept = default;
     ColorMap &operator=(ColorMap &&other) noexcept = default;
 
-    [[nodiscard]] INLINE auto &operator[](Color color) { return this->values_[color]; }
-    [[nodiscard]] INLINE const auto &operator[](Color color) const { return this->values_[color]; }
+    [[nodiscard]] INLINE constexpr T &operator[](Color color) { return this->values_[color]; }
+    [[nodiscard]] INLINE constexpr const T &operator[](Color color) const { return this->values_[color]; }
 
-    [[nodiscard]] INLINE auto &white() { return this->values_[0]; }
-    [[nodiscard]] INLINE auto &black() { return this->values_[1]; }
-    [[nodiscard]] INLINE const auto &white() const { return this->values_[0]; }
-    [[nodiscard]] INLINE const auto &black() const { return this->values_[1]; }
+    [[nodiscard]] INLINE constexpr T &white() { return this->values_[0]; }
+    [[nodiscard]] INLINE constexpr T &black() { return this->values_[1]; }
+    [[nodiscard]] INLINE constexpr const T &white() const { return this->values_[0]; }
+    [[nodiscard]] INLINE constexpr const T &black() const { return this->values_[1]; }
 
 private:
     std::array<T, 2> values_;

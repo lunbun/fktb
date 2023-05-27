@@ -26,7 +26,7 @@ private:
     };
 
 public:
-    explicit IterativeSearchThread();
+    IterativeSearchThread();
 
     void addIterationCallback(IterationCallback callback);
 

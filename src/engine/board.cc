@@ -6,6 +6,7 @@
 #include "piece.h"
 #include "fen.h"
 #include "transposition.h"
+#include "inline.h"
 
 Board::Board(Color turn) : material_(), turn_(turn), hash_(0), pieces_(), bitboards_() {
     this->pieces_.fill(Piece::empty());
@@ -64,21 +65,31 @@ Board Board::copy() const {
 
 
 
-void Board::addPiece(Piece piece, Square square) {
+INLINE void Board::addPieceNoHashUpdate(Piece piece, Square square) {
     this->pieces_[square] = piece;
     this->bitboard(piece.type(), piece.color()).set(square);
     this->material_[piece.color()] += piece.material();
+}
+
+INLINE void Board::removePieceNoHashUpdate(Piece piece, Square square) {
+    this->pieces_[square] = Piece::empty();
+    this->bitboard(piece.type(), piece.color()).clear(square);
+    this->material_[piece.color()] -= piece.material();
+}
+
+void Board::addPiece(Piece piece, Square square) {
+    this->addPieceNoHashUpdate(piece, square);
     this->hash_ ^= Zobrist::piece(piece, square);
 }
 
 void Board::removePiece(Piece piece, Square square) {
-    this->pieces_[square] = Piece::empty();
-    this->bitboard(piece.type(), piece.color()).clear(square);
-    this->material_[piece.color()] -= piece.material();
+    this->removePieceNoHashUpdate(piece, square);
     this->hash_ ^= Zobrist::piece(piece, square);
 }
 
 MakeMoveInfo Board::makeMoveNoTurnUpdate(Move move) {
+    uint64_t oldHash = this->hash_;
+
     // Remove captured piece
     Piece captured = Piece::empty();
 
@@ -113,7 +124,7 @@ MakeMoveInfo Board::makeMoveNoTurnUpdate(Move move) {
     // Switch the turn
     this->hash_ ^= Zobrist::blackToMove();
 
-    return { captured };
+    return { oldHash, captured };
 }
 
 void Board::unmakeMoveNoTurnUpdate(Move move, MakeMoveInfo info) {
@@ -121,10 +132,10 @@ void Board::unmakeMoveNoTurnUpdate(Move move, MakeMoveInfo info) {
     Piece piece = this->pieceAt(move.to());
     if (move.isPromotion()) {
         // Remove the promoted piece
-        this->removePiece(piece, move.to());
+        this->removePieceNoHashUpdate(piece, move.to());
 
         // Add the pawn
-        this->addPiece(Piece::pawn(piece.color()), move.from());
+        this->addPieceNoHashUpdate(Piece::pawn(piece.color()), move.from());
     } else {
         // Unmove the piece
         this->pieces_[move.to()] = Piece::empty();
@@ -133,18 +144,15 @@ void Board::unmakeMoveNoTurnUpdate(Move move, MakeMoveInfo info) {
         Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
         bitboard.clear(move.to());
         bitboard.set(move.from());
-
-        this->hash_ ^= Zobrist::piece(piece, move.to());
-        this->hash_ ^= Zobrist::piece(piece, move.from());
     }
 
     // Add captured piece
     if (!info.captured.isEmpty()) {
-        this->addPiece(info.captured, move.to());
+        this->addPieceNoHashUpdate(info.captured, move.to());
     }
 
-    // Switch the turn
-    this->hash_ ^= Zobrist::blackToMove();
+    // Restore the old hash
+    this->hash_ = info.oldHash;
 }
 
 MakeMoveInfo Board::makeMove(Move move) {

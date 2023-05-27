@@ -14,12 +14,17 @@
 #include "inline.h"
 
 struct MakeMoveInfo {
+    uint64_t oldHash;
     Piece captured;
+
+    MakeMoveInfo() = delete;
 };
 
 class Board {
 public:
     constexpr static const char *StartingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    constexpr static const char *KiwiPeteFen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
+    constexpr static const char *EnPassantPinFen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
 
     explicit Board(Color turn);
     ~Board();
@@ -80,4 +85,7 @@ private:
 
     std::array<Piece, 64> pieces_;
     ColorMap<std::array<Bitboard, 6>> bitboards_;
+
+    void addPieceNoHashUpdate(Piece piece, Square square);
+    void removePieceNoHashUpdate(Piece piece, Square square);
 };
