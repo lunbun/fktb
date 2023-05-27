@@ -20,6 +20,9 @@ namespace {
 
 FenReader::FenReader(const std::string &fen) : file_(0), rank_(7) {
     this->fields_ = split(fen, ' ');
+    if (this->fields_.empty()) {
+        throw std::runtime_error("Invalid FEN string");
+    }
 
     this->pieceField_ = this->fields_[0];
     this->pieceIndex_ = 0;
@@ -41,11 +44,11 @@ PieceType fenCharToPieceType(char c) {
 }
 // @formatter:on
 
-Piece fenCharToPiece(char c, Square square) {
+FenReader::Entry fenCharToPiece(char c, Square square) {
     if (isupper(c)) {
-        return { fenCharToPieceType(static_cast<char>(tolower(c))), PieceColor::White, square };
+        return { Piece::white(fenCharToPieceType(static_cast<char>(tolower(c)))), square };
     } else {
-        return { fenCharToPieceType(c), PieceColor::Black, square };
+        return { Piece::black(fenCharToPieceType(c)), square };
     }
 }
 
@@ -53,11 +56,11 @@ bool FenReader::hasNext() const {
     return this->nextPiece_.has_value();
 }
 
-Piece FenReader::next() {
+FenReader::Entry FenReader::next() {
     if (!this->nextPiece_.has_value()) {
         throw std::runtime_error("No next entry in FEN string");
     }
-    Piece entry = this->nextPiece_.value();
+    Entry entry = this->nextPiece_.value();
 
     this->readNextPiece();
 
@@ -76,7 +79,7 @@ void FenReader::readNextPiece() {
         } else if (isdigit(c)) {
             this->file_ += static_cast<int8_t>(c - '0');
         } else {
-            this->nextPiece_ = fenCharToPiece(c, { this->file_, this->rank_ });
+            this->nextPiece_ = fenCharToPiece(c, Square(this->file_, this->rank_ ));
             this->file_++;
         }
 
@@ -84,16 +87,16 @@ void FenReader::readNextPiece() {
     }
 }
 
-PieceColor FenReader::turn() const {
+Color FenReader::turn() const {
     if (this->fields_.size() < 2) {
-        return PieceColor::White;
+        return Color::White;
     }
 
     const std::string &turn = this->fields_[1];
     if (turn == "w") {
-        return PieceColor::White;
+        return Color::White;
     } else if (turn == "b") {
-        return PieceColor::Black;
+        return Color::Black;
     } else {
         throw std::runtime_error("Invalid turn in FEN string");
     }
@@ -118,7 +121,7 @@ char pieceTypeToFenChar(PieceType type) {
 // @formatter:on
 
 char pieceToFenChar(Piece piece) {
-    if (piece.color() == PieceColor::White) {
+    if (piece.color() == Color::White) {
         return static_cast<char>(toupper(pieceTypeToFenChar(piece.type())));
     } else {
         return static_cast<char>(tolower(pieceTypeToFenChar(piece.type())));
@@ -149,9 +152,9 @@ void FenWriter::nextRank() {
     this->rank_--;
 }
 
-void FenWriter::setTurn(PieceColor color) {
+void FenWriter::setTurn(Color color) {
     this->fen_ += ' ';
-    if (color == PieceColor::White) {
+    if (color == Color::White) {
         this->fen_ += 'w';
     } else {
         this->fen_ += 'b';

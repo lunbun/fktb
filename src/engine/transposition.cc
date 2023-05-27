@@ -4,119 +4,109 @@
 #include <cstdint>
 #include <random>
 #include <array>
-#include <stdexcept>
+#include <cassert>
+#include <cstring>
 
 #include "piece.h"
 #include "move.h"
 
-namespace ZobristHashNumbers {
-    const uint64_t seed = 0;
-
+namespace {
     bool isInitialized = false;
 
-    uint64_t blackToMoveNumber;
+    uint64_t blackToMoveNumber = 0;
     ColorMap<std::array<std::array<uint64_t, 64>, 6>> pieceNumbers;
+}
 
-    // Initializes the random numbers used for the Zobrist hash, if not already initialized.
-    void maybeInitialize() {
-        if (isInitialized) {
-            return;
+void Zobrist::maybeInit() {
+    constexpr uint64_t seed = 0;
+
+    if (isInitialized) {
+        return;
+    }
+
+    isInitialized = true;
+
+    std::mt19937_64 generator(seed);
+
+    blackToMoveNumber = generator();
+    for (uint8_t piece = 0; piece < 6; piece++) {
+        for (uint8_t square = 0; square < 64; square++) {
+            pieceNumbers.white()[piece][square] = generator();
+            pieceNumbers.black()[piece][square] = generator();
         }
-
-        isInitialized = true;
-
-        std::mt19937_64 generator(seed);
-
-        blackToMoveNumber = generator();
-        for (uint8_t pieceType = 0; pieceType < 6; ++pieceType) {
-            for (uint8_t square = 0; square < 64; ++square) {
-                pieceNumbers.white()[pieceType][square] = generator();
-                pieceNumbers.black()[pieceType][square] = generator();
-            }
-        }
-    }
-
-    uint64_t getPieceNumber(PieceType type, PieceColor color, Square square) {
-        return pieceNumbers[color][static_cast<uint8_t>(type)][square.index()];
-    }
-
-    uint64_t getPieceNumber(Piece piece) {
-        return getPieceNumber(piece.type(), piece.color(), piece.square());
     }
 }
 
-
-
-ZobristHash::ZobristHash(PieceColor turn) : hash_(0) {
-    ZobristHashNumbers::maybeInitialize();
-
-    if (turn == PieceColor::Black) {
-        this->hash_ ^= ZobristHashNumbers::blackToMoveNumber;
-    }
+uint64_t Zobrist::blackToMove() {
+    return blackToMoveNumber;
 }
 
-void ZobristHash::piece(Piece piece) {
-    this->hash_ ^= ZobristHashNumbers::getPieceNumber(piece);
-}
-
-void ZobristHash::move(Move move) {
-    // Remove the piece from its old square
-    this->hash_ ^= ZobristHashNumbers::getPieceNumber(move.piece());
-
-    // Add the piece to its new square
-    this->hash_ ^= ZobristHashNumbers::getPieceNumber(move.pieceType(), move.pieceColor(), move.to());
-
-    if (move.isCapture()) {
-        // Remove the captured piece from its square
-        this->hash_ ^= ZobristHashNumbers::getPieceNumber(move.capturedPiece());
-    }
-
-    // Switch the turn
-    this->hash_ ^= ZobristHashNumbers::blackToMoveNumber;
+uint64_t Zobrist::piece(Piece piece, Square square) {
+    return pieceNumbers[piece.color()][piece.type()][square];
 }
 
 
-
-TranspositionTable::Entry::Entry(const ZobristHash &hash, uint16_t depth, Flag flag, std::optional<Move> bestMove,
-    int32_t bestScore) : isValid(true), key(hash.hash()), depth(depth), flag(flag), bestMove(bestMove),
-                         bestScore(bestScore) { }
 
 TranspositionTable::TranspositionTable(uint32_t size) : lock_() {
     bool powerOfTwo = (size != 0) && !(size & (size - 1));
-    if (!powerOfTwo) {
-        throw std::invalid_argument("size must be a power of two");
-    }
+    assert(powerOfTwo && "Transposition table size must be a power of two.");
 
     this->sizeMask_ = size - 1;
 
-    this->entries_ = static_cast<Entry *>(calloc(size, sizeof(Entry)));
+    this->entries_ = static_cast<Entry *>(std::calloc(size, sizeof(Entry)));
 }
 
 TranspositionTable::~TranspositionTable() {
-    free(this->entries_);
+    std::free(this->entries_);
 }
 
-TranspositionTable::Entry *TranspositionTable::load(const ZobristHash &hash) const {
-    uint64_t key = hash.hash();
+TranspositionTable::TranspositionTable(TranspositionTable &&other) noexcept : lock_() {
+    this->sizeMask_ = other.sizeMask_;
+    this->entries_ = other.entries_;
 
+    other.entries_ = nullptr;
+}
+
+TranspositionTable &TranspositionTable::operator=(TranspositionTable &&other) noexcept {
+    new(&this->lock_) SpinLock();
+    this->sizeMask_ = other.sizeMask_;
+    this->entries_ = other.entries_;
+
+    other.entries_ = nullptr;
+
+    return *this;
+}
+
+TranspositionTable TranspositionTable::copy() const {
+    uint32_t size = this->sizeMask_ + 1;
+
+    TranspositionTable copy(size);
+
+    std::memcpy(copy.entries_, this->entries_, size * sizeof(Entry));
+
+    return copy;
+}
+
+ReadonlyTranspositionTable TranspositionTable::readonlyCopy() const {
+    return ReadonlyTranspositionTable(this->copy());
+}
+
+TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {
     Entry *entry = this->entries_ + (key & this->sizeMask_);
 
-    if (entry->isValid && entry->key == key) {
+    if (entry->isValid() && entry->key() == key) {
         return entry;
     } else {
         return nullptr;
     }
 }
 
-void TranspositionTable::store(const ZobristHash &hash, uint16_t depth, Flag flag, std::optional<Move> bestMove,
-    int32_t bestScore) {
-    uint64_t key = hash.hash();
-
+void TranspositionTable::store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
     Entry *pointer = this->entries_ + (key & this->sizeMask_);
 
     // Only overwrite an existing entry if the new entry has a higher depth
-    if (!pointer->isValid || depth > pointer->depth) {
+    if (!pointer->isValid() || depth > pointer->depth()) {
         // Emplace the new entry
-        new(pointer) Entry(hash, depth, flag, bestMove, bestScore);
+        new(pointer) Entry(key, depth, flag, bestMove, bestScore);
     }
 }

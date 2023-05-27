@@ -6,23 +6,28 @@
 #include "piece.h"
 #include "move.h"
 #include "movegen.h"
+#include "evaluation.h"
 
 SearchNode SearchNode::invalid() {
-    return { std::nullopt, 0, 0, 0 };
+    return { 0, 0, 0 };
+}
+
+SearchRootNode SearchRootNode::invalid() {
+    return { Move::invalid(), 0, 0, 0 };
 }
 
 SearchResult SearchResult::invalid() {
-    return { false, 0, {}, 0, 0, 0 };
+    return { false, 0, { }, 0, 0, 0 };
 }
 
 
 
-FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth) : FixedDepthSearcher(board, depth,
-    nullptr) { }
+FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table)
+    : FixedDepthSearcher(board, depth, table, nullptr) { }
 
-FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, FixedDepthSearcher *previousIteration)
-    : board_(board.copy()), depth_(depth), moves_(depth, 64 * depth), table_(1048576),
-      previousIteration_(previousIteration) { }
+FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table,
+    ReadonlyTranspositionTable *previousTable) : board_(board.copy()), depth_(depth), moves_(depth, 64 * depth),
+                                                 table_(table), previousTable_(previousTable) { }
 
 void FixedDepthSearcher::halt() {
     this->isHalted_ = true;
@@ -30,23 +35,13 @@ void FixedDepthSearcher::halt() {
 
 
 
-inline int32_t evaluate(const Board &board, PieceColor color) {
-    int32_t score = 0;
-
-    score += board.material(color);
-
-    // Bonus for having a bishop pair
-    score += PieceMaterial::BishopPair * (board.bishops()[color].size() >= 2);
-
-    return score;
-}
-
-inline int32_t evaluate(const Board &board) {
-    return evaluate(board, board.turn()) - evaluate(board, ~board.turn());
-}
-
-SearchResult FixedDepthSearcher::searchRoot() {
-    SearchNode node = this->search(this->depth_, -INT32_MAX, INT32_MAX);
+SearchResult FixedDepthSearcher::search() {
+    SearchRootNode node = SearchRootNode::invalid();
+    if (this->board_.turn() == Color::White) {
+        node = this->searchRoot<Color::White>();
+    } else {
+        node = this->searchRoot<Color::Black>();
+    }
 
     if (this->isHalted_) {
         return SearchResult::invalid();
@@ -57,57 +52,33 @@ SearchResult FixedDepthSearcher::searchRoot() {
 
     Board board = this->board_.copy();
     uint16_t depth = this->depth_;
-    std::optional<Move> move = node.move;
-    while (move.has_value()) {
-        bestLine.push_back(move.value());
+    Move move = node.move;
+    while (move.isValid()) {
+        bestLine.push_back(move);
 
-        board.makeMove(move.value());
+        board.makeMove(move);
 
         // Find the next best move in the line
         depth--;
         TranspositionTable::Entry *entry = this->table_.load(board.hash());
-        if (entry == nullptr || entry->depth < depth || entry->flag != TranspositionTable::Flag::Exact) {
+        if (entry == nullptr || entry->depth() < depth || entry->flag() != TranspositionTable::Flag::Exact) {
             break;
         }
-        move = entry->bestMove;
+        move = entry->bestMove();
     }
 
     return { true, this->depth_, std::move(bestLine), node.score, node.nodeCount, node.transpositionHits };
 }
 
-SearchNode FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) {
+template<Color Turn>
+SearchRootNode FixedDepthSearcher::searchRoot() {
     if (this->isHalted_) {
-        return SearchNode::invalid();
+        return SearchRootNode::invalid();
     }
 
+    uint16_t depth = this->depth_;
     Board &board = this->board_;
     TranspositionTable &table = this->table_;
-
-    if (depth == 0) {
-        return { std::nullopt, evaluate(board), 1, 0 };
-    }
-
-    // Transposition table lookup
-    {
-        SpinLockGuard lock(table.lock());
-
-        TranspositionTable::Entry *entry = table.load(board.hash());
-        if (entry != nullptr && entry->depth >= depth) {
-            if (entry->flag == TranspositionTable::Flag::Exact) {
-                return { entry->bestMove, entry->bestScore, 0, 1 };
-            } else if (entry->flag == TranspositionTable::Flag::LowerBound) {
-                alpha = std::max(alpha, entry->bestScore);
-            } else if (entry->flag == TranspositionTable::Flag::UpperBound) {
-                beta = std::min(beta, entry->bestScore);
-            }
-
-            if (alpha >= beta) {
-                return { entry->bestMove, entry->bestScore, 0, 1 };
-            }
-        }
-    }
-
-    int32_t originalAlpha = alpha;
 
     // Move search
     MovePriorityQueueStack &moves = this->moves_;
@@ -115,24 +86,84 @@ SearchNode FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t bet
     // Creating a MovePriorityQueueStackGuard pushes a stack frame onto the MovePriorityQueueStack
     MovePriorityQueueStackGuard movesStackGuard(moves);
 
-    moves.maybeLoadHashMoveFromPreviousIteration(board, this->previousIteration_);
-    MoveGenerator::generate(board, moves);
+    moves.maybeLoadHashMoveFromPreviousIteration(board, this->previousTable_);
+    MoveGenerator<Turn> generator(board, moves);
+    generator.generate();
 
     if (moves.empty()) {
         // TODO: Checkmate detection
-        return { std::nullopt, 0, 1, 0 };
+        return { Move::invalid(), 0, 1, 0 };
     }
 
-    std::optional<Move> bestMove = std::nullopt;
+    moves.score<Turn>(board);
+
+    Move bestMove = Move::invalid();
+    int32_t alpha = -INT32_MAX; // In the root node, alpha is the same thing as the best score
+    uint32_t nodeCount = 0;
+    uint32_t transpositionHits = 0;
+
+    while (!moves.empty()) {
+        Move move = moves.dequeue();
+        MakeMoveInfo moveInfo = board.makeMove(move);
+
+        SearchNode node = search<~Turn>(depth - 1, -INT32_MAX, -alpha);
+        nodeCount += node.nodeCount;
+        transpositionHits += node.transpositionHits;
+
+        int32_t score = -node.score;
+        if (score > alpha) {
+            bestMove = move;
+            alpha = score;
+        }
+
+        board.unmakeMove(move, moveInfo);
+    }
+
+    // Transposition table store
+    {
+        SpinLockGuard lock(table.lock());
+        table.store(board.hash(), depth, TranspositionTable::Flag::Exact, bestMove, alpha);
+    }
+
+    return { bestMove, alpha, nodeCount, transpositionHits };
+}
+
+
+
+template<Color Turn>
+INLINE SearchNode FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_t depth, int32_t &alpha, int32_t beta) {
+    Board &board = this->board_;
+
+    if (depth == 0) {
+        return { Evaluation::evaluate<Turn>(board), 1, 0 };
+    }
+
+    // Move search
+    MovePriorityQueueStack &moves = this->moves_;
+
+    // Creating a MovePriorityQueueStackGuard pushes a stack frame onto the MovePriorityQueueStack
+    MovePriorityQueueStackGuard movesStackGuard(moves);
+
+    moves.maybeLoadHashMoveFromPreviousIteration(board, this->previousTable_);
+    MoveGenerator<Turn> generator(board, moves);
+    generator.generate();
+
+    if (moves.empty()) {
+        // TODO: Checkmate detection
+        return { 0, 1, 0 };
+    }
+
+    moves.score<Turn>(board);
+
     int32_t bestScore = -INT32_MAX;
     uint32_t nodeCount = 0;
     uint32_t transpositionHits = 0;
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
-        board.makeMove(move);
+        MakeMoveInfo moveInfo = board.makeMove(move);
 
-        SearchNode node = search(depth - 1, -beta, -alpha);
+        SearchNode node = search<~Turn>(depth - 1, -beta, -alpha);
         nodeCount += node.nodeCount;
         transpositionHits += node.transpositionHits;
 
@@ -142,27 +173,64 @@ SearchNode FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t bet
             bestScore = score;
         }
 
-        board.unmakeMove(move);
+        board.unmakeMove(move, moveInfo);
 
-        if (alpha > beta) {
+        if (score >= beta) {
             break;
         }
         alpha = std::max(alpha, score);
     }
 
+    return { bestScore, nodeCount, transpositionHits };
+}
+
+template<Color Turn>
+SearchNode FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) {
+    if (this->isHalted_) {
+        return SearchNode::invalid();
+    }
+
+    Board &board = this->board_;
+    TranspositionTable &table = this->table_;
+
+    // Transposition table lookup
+    {
+        SpinLockGuard lock(table.lock());
+
+        TranspositionTable::Entry *entry = table.load(board.hash());
+        if (entry != nullptr && entry->depth() >= depth) {
+            if (entry->flag() == TranspositionTable::Flag::Exact) {
+                return { entry->bestScore(), 0, 1 };
+            } else if (entry->flag() == TranspositionTable::Flag::LowerBound) {
+                alpha = std::max(alpha, entry->bestScore());
+            } else if (entry->flag() == TranspositionTable::Flag::UpperBound) {
+                beta = std::min(beta, entry->bestScore());
+            }
+
+            if (alpha >= beta) {
+                return { entry->bestScore(), 0, 1 };
+            }
+        }
+    }
+
+    int32_t originalAlpha = alpha;
+
+    Move bestMove = Move::invalid();
+    SearchNode node = this->searchNoTransposition<Turn>(bestMove, depth, alpha, beta);
+
     // Transposition table store
     TranspositionTable::Flag flag;
-    if (bestScore <= originalAlpha) {
+    if (node.score <= originalAlpha) {
         flag = TranspositionTable::Flag::UpperBound;
-    } else if (bestScore >= beta) {
+    } else if (node.score >= beta) {
         flag = TranspositionTable::Flag::LowerBound;
     } else {
         flag = TranspositionTable::Flag::Exact;
     }
     {
         SpinLockGuard lock(table.lock());
-        table.store(board.hash(), depth, flag, bestMove, bestScore);
+        table.store(board.hash(), depth, flag, bestMove, node.score);
     }
 
-    return { bestMove, bestScore, nodeCount, transpositionHits };
+    return node;
 }

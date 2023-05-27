@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <optional>
 #include <memory>
 
 #include "engine/board.h"
@@ -12,25 +13,33 @@ class TokenStream {
 public:
     explicit TokenStream(const std::string &input);
 
-    [[nodiscard]] inline bool isEnd() const { return this->index_ >= this->tokens_.size(); }
+    [[nodiscard]] bool isEnd() const { return this->index_ >= this->tokens_.size(); }
     [[nodiscard]] const std::string &next();
-    [[nodiscard]] inline const std::string &peek() const { return this->tokens_[this->index_]; }
+    [[nodiscard]] const std::string &peek() const { return this->tokens_[this->index_]; }
 
 private:
     uint32_t index_;
     std::vector<std::string> tokens_;
 };
 
+struct SearchOptions {
+    bool infinite = false;
+    std::optional<int32_t> depth;
+    std::optional<int32_t> moveTime;
+};
+
 class UciHandler {
 public:
     UciHandler(std::string name, std::string author);
 
-    [[noreturn]] void loop();
+    [[noreturn]] void run();
 
 private:
     std::string name_, author_;
     bool isDebug_ = true;
 
+    bool isSearching_ = false;
+    std::optional<SearchOptions> searchOptions_;
     uint64_t nodeCount_ = 0;
     std::chrono::time_point<std::chrono::steady_clock> startTime_;
 
@@ -53,5 +62,7 @@ private:
 
 
 
-    void sendIterationResult(const SearchResult &result);
+    void startSearch(const SearchOptions &options);
+    void stopSearch();
+    void iterationCallback(const SearchResult &result);
 };

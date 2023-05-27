@@ -11,12 +11,22 @@
 struct SearchNode {
     static SearchNode invalid();
 
-    std::optional<Move> move;
     int32_t score;
     uint32_t nodeCount;
     uint32_t transpositionHits;
 
     SearchNode() = delete;
+};
+
+struct SearchRootNode {
+    static SearchRootNode invalid();
+
+    Move move;
+    int32_t score;
+    uint32_t nodeCount;
+    uint32_t transpositionHits;
+
+    SearchRootNode() = delete;
 };
 
 struct SearchResult {
@@ -34,12 +44,10 @@ struct SearchResult {
 
 class FixedDepthSearcher {
 public:
-    FixedDepthSearcher(const Board &board, uint16_t depth);
-    FixedDepthSearcher(const Board &board, uint16_t depth, FixedDepthSearcher *previousIteration);
+    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table);
+    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, ReadonlyTranspositionTable *previousTable);
 
-    [[nodiscard]] SearchResult searchRoot();
-
-    [[nodiscard]] inline TranspositionTable &table() { return this->table_; }
+    [[nodiscard]] SearchResult search();
 
     // Tells the searcher to stop searching as soon as possible. This is not guaranteed to stop the search immediately,
     // but it will stop the search as soon as possible. Nodes returned from the search will be invalid, and the
@@ -55,10 +63,16 @@ private:
     Board board_;
     uint16_t depth_;
     MovePriorityQueueStack moves_;
-    TranspositionTable table_;
+    TranspositionTable &table_;
 
-    // Used for iterative deepening
-    FixedDepthSearcher *previousIteration_;
+    // Previous iteration table, used for iterative deepening.
+    ReadonlyTranspositionTable *previousTable_;
 
+    template<Color Turn>
+    [[nodiscard]] SearchRootNode searchRoot();
+
+    template<Color Turn>
+    [[nodiscard]] SearchNode searchNoTransposition(Move &bestMove, uint16_t depth, int32_t &alpha, int32_t beta);
+    template<Color Turn>
     [[nodiscard]] SearchNode search(uint16_t depth, int32_t alpha, int32_t beta);
 };

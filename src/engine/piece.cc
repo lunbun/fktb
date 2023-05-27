@@ -5,8 +5,8 @@
 std::string Square::uci() const {
     std::string name;
 
-    name += static_cast<char>(this->file + 'a');
-    name += static_cast<char>(this->rank + '1');
+    name += static_cast<char>(this->file() + 'a');
+    name += static_cast<char>(this->rank() + '1');
 
     return name;
 }
@@ -17,13 +17,7 @@ std::string Square::debugName() const {
 
 
 
-Piece::Piece(PieceType type, PieceColor color, Square square) {
-    this->type_ = static_cast<uint8_t>(type);
-    this->color_ = static_cast<uint8_t>(color);
-    this->file_ = static_cast<uint8_t>(square.file);
-    this->rank_ = static_cast<uint8_t>(square.rank);
-}
-
+// @formatter:off
 int32_t Piece::material() const {
     switch (this->type()) {
         case PieceType::Pawn: return PieceMaterial::Pawn;
@@ -35,10 +29,11 @@ int32_t Piece::material() const {
         default: return 0;
     }
 }
+// @formatter:on
 
 std::string Piece::debugName() const {
     std::string name;
-    if (this->color() == PieceColor::White) {
+    if (this->color() == Color::White) {
         name += "White ";
     } else {
         name += "Black ";

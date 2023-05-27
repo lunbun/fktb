@@ -9,14 +9,21 @@
 
 class FenReader {
 public:
+    struct Entry {
+        Piece piece;
+        Square square;
+
+        Entry() = delete;
+    };
+
     explicit FenReader(const std::string &fen);
 
     // Returns true if there are more pieces in the FEN string.
     [[nodiscard]] bool hasNext() const;
     // Moves to the next piece in the FEN string.
-    Piece next();
+    Entry next();
 
-    [[nodiscard]] PieceColor turn() const;
+    [[nodiscard]] Color turn() const;
 
 private:
     std::vector<std::string> fields_;
@@ -25,7 +32,7 @@ private:
     int pieceIndex_;
     int8_t file_, rank_;
 
-    std::optional<Piece> nextPiece_;
+    std::optional<Entry> nextPiece_;
 
     void readNextPiece();
 };
@@ -41,7 +48,7 @@ public:
     // Moves to the next rank.
     void nextRank();
 
-    void setTurn(PieceColor color);
+    void setTurn(Color color);
 
     // Returns the FEN string.
     [[nodiscard]] const std::string &fen() const { return this->fen_; }

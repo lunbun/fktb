@@ -4,6 +4,8 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <optional>
+#include <thread>
 
 TokenStream::TokenStream(const std::string &input) : index_(0), tokens_() {
     std::stringstream ss(input);
@@ -24,17 +26,21 @@ UciHandler::UciHandler(std::string name, std::string author) : name_(std::move(n
                                                                board_(nullptr) {
     this->searchThread_ = std::make_unique<IterativeSearchThread>();
     this->searchThread_->addIterationCallback([this](const SearchResult &result) {
-        this->sendIterationResult(result);
+        this->iterationCallback(result);
     });
 }
 
-void UciHandler::loop() {
+void UciHandler::run() {
     while (true) {
         std::string input;
 
         std::getline(std::cin, input);
 
-        this->handleInput(input);
+        try {
+            this->handleInput(input);
+        } catch (const std::exception &e) {
+            this->error(std::string("Uncaught exception: ") + e.what());
+        }
     }
 }
 
@@ -43,7 +49,7 @@ void UciHandler::error(const std::string &message) {
         return;
     }
 
-    std::cout << message << std::endl;
+    std::cerr << message << std::endl;
 }
 
 void UciHandler::handleInput(const std::string &input) {
@@ -153,7 +159,7 @@ void UciHandler::handlePosition(TokenStream &tokens) {
 
         while (!tokens.isEnd()) {
             const std::string &move = tokens.next();
-            this->board_->makeMove(Move::fromUci(move, *this->board_));
+            this->board_->makeMove(Move::fromUci(move));
         }
     }
 }
@@ -163,14 +169,25 @@ void UciHandler::handleGo(TokenStream &tokens) {
         return this->error("go command requires arguments");
     }
 
-    if (tokens.peek() != "infinite") {
-        return this->error("Only 'go infinite' is supported");
+    SearchOptions options;
+
+    while (!tokens.isEnd()) {
+        const std::string &command = tokens.next();
+
+        if (command == "infinite") {
+            options.infinite = true;
+        } else if (command == "depth") {
+            if (tokens.isEnd()) return this->error("depth command requires an argument");
+            options.depth = std::stoi(tokens.next());
+        } else if (command == "movetime") {
+            if (tokens.isEnd()) return this->error("movetime command requires an argument");
+            options.moveTime = std::stoi(tokens.next());
+        } else {
+            this->error("Unknown/unsupported command: " + command);
+        }
     }
 
-    this->nodeCount_ = 0;
-    this->startTime_ = std::chrono::steady_clock::now();
-
-    this->searchThread_->start(*this->board_);
+    this->startSearch(options);
 }
 
 void UciHandler::handleStop(TokenStream &tokens) {
@@ -178,13 +195,7 @@ void UciHandler::handleStop(TokenStream &tokens) {
         return this->error("stop command does not take arguments");
     }
 
-    SearchResult result = this->searchThread_->stop();
-
-    if (!result.isValid || result.bestLine.empty()) {
-        return this->error("stop command called before search finished");
-    }
-
-    std::cout << "bestmove " << result.bestLine[0].uci() << std::endl;
+    this->stopSearch();
 }
 
 void UciHandler::handleQuit(TokenStream &tokens) {
@@ -195,14 +206,72 @@ void UciHandler::handleQuit(TokenStream &tokens) {
     std::exit(0);
 }
 
-void UciHandler::sendIterationResult(const SearchResult &result) {
+
+
+void UciHandler::startSearch(const SearchOptions &options) {
+    if (this->isSearching_) {
+        return this->error("Already searching");
+    }
+
+    if (this->board_ == nullptr) {
+        return this->error("No board set");
+    }
+
+    this->isSearching_ = true;
+    this->searchOptions_ = options;
+    this->nodeCount_ = 0;
+    this->startTime_ = std::chrono::steady_clock::now();
+
+    this->searchThread_->start(*this->board_);
+
+    if (options.moveTime.has_value()) {
+        int32_t moveTime = options.moveTime.value();
+
+        // Start a new thread to stop the search after the given time
+        // It's possible that we may run into thread safety issues here
+        std::thread([this, moveTime]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(moveTime));
+            this->stopSearch();
+        }).detach();
+    }
+}
+
+void UciHandler::stopSearch() {
+    if (!this->isSearching_) {
+        return this->error("Not searching");
+    }
+
+    this->isSearching_ = false;
+    this->searchOptions_ = std::nullopt;
+
+    SearchResult result = this->searchThread_->stop();
+
+    if (!result.isValid || result.bestLine.empty()) {
+        return this->error("Search stopped before it could find a move");
+    }
+
+    std::cout << "bestmove " << result.bestLine[0].uci() << std::endl;
+}
+
+void UciHandler::iterationCallback(const SearchResult &result) {
+    if (!this->isSearching_ || !this->searchOptions_.has_value()) {
+        return this->error("Iteration callback somehow called when not searching");
+    }
+
     this->nodeCount_ += result.nodeCount;
 
+    // Calculate nodes per second
     auto duration = std::chrono::steady_clock::now() - this->startTime_;
     uint32_t millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
-    uint64_t nps = this->nodeCount_ * 1000 / millis;
+    uint64_t nps;
+    if (millis == 0) {
+        nps = this->nodeCount_ * 1000;
+    } else {
+        nps = this->nodeCount_ * 1000 / millis;
+    }
 
+    // Print the search result
     std::cout << "info depth " << result.depth;
     std::cout << " score cp " << result.score;
     std::cout << " time " << millis;
@@ -213,4 +282,13 @@ void UciHandler::sendIterationResult(const SearchResult &result) {
         std::cout << move.uci() << " ";
     }
     std::cout << std::endl;
+
+    // Check if we should stop searching based on search depth
+    if (this->searchOptions_->depth.has_value() && result.depth >= this->searchOptions_->depth.value()) {
+        // Spawn a new thread to stop the search (cannot stop it from this thread because this thread IS the search
+        // thread, since we are in the search callback). Trying to stop it from this thread would cause a deadlock.
+        std::thread([this]() {
+            this->stopSearch();
+        }).detach();
+    }
 }

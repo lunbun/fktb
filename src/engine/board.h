@@ -1,20 +1,27 @@
 #pragma once
 
 #include <array>
+#include <optional>
 #include <vector>
 #include <memory>
 #include <cstdint>
 #include <string>
+#include <cassert>
 
 #include "piece.h"
 #include "move.h"
-#include "transposition.h"
+#include "bitboard.h"
+#include "inline.h"
+
+struct MakeMoveInfo {
+    Piece captured;
+};
 
 class Board {
 public:
-    static constexpr const char *STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    constexpr static const char *StartingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-    explicit Board(PieceColor turn);
+    explicit Board(Color turn);
     ~Board();
 
     Board(const Board &other) = delete;
@@ -29,42 +36,39 @@ public:
 
     [[nodiscard]] Board copy() const;
 
-    [[nodiscard]] inline int32_t material(PieceColor color) const { return this->material_[color]; }
-    [[nodiscard]] inline PieceColor turn() const { return this->turn_; }
-    [[nodiscard]] inline ZobristHash &hash() { return this->hash_; }
+    template<Color Side>
+    [[nodiscard]] INLINE int32_t material() const { return this->material_[Side]; }
+    [[nodiscard]] INLINE Color turn() const { return this->turn_; }
+    [[nodiscard]] INLINE uint64_t &hash() { return this->hash_; }
 
-    [[nodiscard]] inline const ColorMap<std::vector<std::unique_ptr<Piece>>> &pawns() const { return this->pawns_; }
-    [[nodiscard]] inline const ColorMap<std::vector<std::unique_ptr<Piece>>> &knights() const { return this->knights_; }
-    [[nodiscard]] inline const ColorMap<std::vector<std::unique_ptr<Piece>>> &bishops() const { return this->bishops_; }
-    [[nodiscard]] inline const ColorMap<std::vector<std::unique_ptr<Piece>>> &rooks() const { return this->rooks_; }
-    [[nodiscard]] inline const ColorMap<std::vector<std::unique_ptr<Piece>>> &queens() const { return this->queens_; }
-    [[nodiscard]] inline const ColorMap<std::vector<std::unique_ptr<Piece>>> &kings() const { return this->kings_; }
+    [[nodiscard]] INLINE Piece pieceAt(Square square) const { return this->pieces_[square]; }
 
-    void addPiece(Piece piece);
-    void removePiece(Piece *piece);
+    // Returns the bitboard with all given pieces.
+    [[nodiscard]] INLINE Bitboard &bitboard(PieceType pieceType, Color color) {
+        return this->bitboards_[color][pieceType];
+    }
+    template<Color Side>
+    [[nodiscard]] Bitboard bitboard(PieceType pieceType) const { return this->bitboards_[Side][pieceType]; }
 
-    [[nodiscard]] Piece *getPieceAt(Square square) const;
+    // Returns the composite bitboard with all pieces of the given color.
+    template<Color Side>
+    [[nodiscard]] Bitboard composite() const;
+    // Returns the bitboard of all occupied squares.
+    [[nodiscard]] Bitboard occupied() const;
+    // Returns the bitboard of all empty squares.
+    [[nodiscard]] Bitboard empty() const;
 
-    void makeMove(Move move);
-    void unmakeMove(Move move);
+    void addPiece(Piece piece, Square square);
+    void removePiece(Piece piece, Square square);
+
+    MakeMoveInfo makeMove(Move move);
+    void unmakeMove(Move move, MakeMoveInfo info);
 
 private:
     ColorMap<int32_t> material_;
-    PieceColor turn_;
-    ZobristHash hash_;
+    Color turn_;
+    uint64_t hash_;
 
-    ColorMap<std::vector<std::unique_ptr<Piece>>> pawns_;
-    ColorMap<std::vector<std::unique_ptr<Piece>>> knights_;
-    ColorMap<std::vector<std::unique_ptr<Piece>>> bishops_;
-    ColorMap<std::vector<std::unique_ptr<Piece>>> rooks_;
-    ColorMap<std::vector<std::unique_ptr<Piece>>> queens_;
-    ColorMap<std::vector<std::unique_ptr<Piece>>> kings_;
-
-    // For quick lookup to pieces by square. This does not own the pointers.
-    std::array<Piece *, 64> squares_;
-
-    std::vector<std::unique_ptr<Piece>> &getPieceList(Piece piece);
-
-    void addPieceNoHashUpdate(Piece piece);
-    void removePieceNoHashUpdate(Piece *piece);
+    std::array<Piece, 64> pieces_;
+    ColorMap<std::array<Bitboard, 6>> bitboards_;
 };

@@ -3,13 +3,16 @@
 #include <optional>
 #include <stdexcept>
 #include <thread>
+#include <condition_variable>
 
 #include "fixed_search.h"
 
 IterativeSearchThread::SearchData::SearchData(Board board) : depth(1), result(SearchResult::invalid()),
-                                                             board(std::move(board)) { }
+                                                             board(std::move(board)), previousTable(nullptr),
+                                                             table(2097152), currentIteration(nullptr) { }
 
-IterativeSearchThread::IterativeSearchThread() : dataMutex_(), searchMutex_(), iterationCallbacks_(), data_(nullptr) {
+IterativeSearchThread::IterativeSearchThread() : dataMutex_(), searchMutex_(), isSearchingCondition_(),
+                                                 iterationCallbacks_(), data_(nullptr) {
     this->thread_ = std::thread(&IterativeSearchThread::loop, this);
     this->thread_.detach();
 }
@@ -24,6 +27,13 @@ void IterativeSearchThread::notifyCallbacks(const SearchResult &result) {
     }
 }
 
+void IterativeSearchThread::awaitSearchStart() {
+    std::unique_lock<std::mutex> lock(this->dataMutex_);
+    this->isSearchingCondition_.wait(lock, [this]() {
+        return this->isSearching();
+    });
+}
+
 void IterativeSearchThread::start(const Board &board) {
     std::lock_guard<std::mutex> lock(this->dataMutex_);
 
@@ -32,6 +42,8 @@ void IterativeSearchThread::start(const Board &board) {
     }
 
     this->data_ = std::make_unique<SearchData>(board.copy());
+
+    this->isSearchingCondition_.notify_all();
 }
 
 SearchResult IterativeSearchThread::stop() {
@@ -46,7 +58,8 @@ SearchResult IterativeSearchThread::stop() {
     // Stop the current search
     data.currentIteration->halt();
 
-    // Wait for the search to stop
+    // Wait for the search to stop by waiting for the search mutex to be released (will be released when the searcher
+    // is done)
     std::lock_guard<std::mutex> searchLock(this->searchMutex_);
 
     SearchResult result = std::move(data.result);
@@ -65,7 +78,7 @@ void IterativeSearchThread::loop() {
         }
 
         if (!isSearching) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            this->awaitSearchStart();
             continue;
         }
 
@@ -74,10 +87,14 @@ void IterativeSearchThread::loop() {
             std::lock_guard<std::mutex> lock(this->dataMutex_);
             SearchData &data = this->data();
 
+            // If we have a previous iteration, make a readonly copy of the table and store it
+            if (data.currentIteration != nullptr) {
+                data.previousTable = std::make_unique<ReadonlyTranspositionTable>(data.table.readonlyCopy());
+            }
+
             // Start a new search
-            data.previousIteration = std::move(data.currentIteration);
-            data.currentIteration = std::make_unique<FixedDepthSearcher>(data.board, data.depth,
-                data.previousIteration.get());
+            data.currentIteration = std::make_unique<FixedDepthSearcher>(data.board, data.depth, data.table,
+                data.previousTable.get());
 
             currentIteration = data.currentIteration.get();
         }
@@ -85,7 +102,7 @@ void IterativeSearchThread::loop() {
         std::optional<SearchResult> result;
         {
             std::lock_guard<std::mutex> lock(this->searchMutex_);
-            result = currentIteration->searchRoot();
+            result = currentIteration->search();
         }
 
         if (result.has_value() && result->isValid) {

@@ -2,12 +2,13 @@
 
 #include <stdexcept>
 #include <cstring>
+#include <cstdlib>
 
 #include "board.h"
-#include "movesort.h"
-#include "fixed_search.h"
+#include "move_score.h"
+#include "transposition.h"
 
-Move Move::fromUci(const std::string &uci, const Board &board) {
+Move Move::fromUci(const std::string &uci) {
     if (uci.length() != 4) {
         throw std::invalid_argument("Move string must be 4 characters long");
     }
@@ -17,62 +18,13 @@ Move Move::fromUci(const std::string &uci, const Board &board) {
     auto toFile = static_cast<int8_t>(uci[2] - 'a');
     auto toRank = static_cast<int8_t>(uci[3] - '1');
 
-    Piece *piece = board.getPieceAt({ fromFile, fromRank });
-    Piece *capturedPiece = board.getPieceAt({ toFile, toRank });
-
-    if (capturedPiece == nullptr) {
-        return Move({ toFile, toRank }, *piece);
-    } else {
-        return Move({ toFile, toRank }, *piece, *capturedPiece);
-    }
-}
-
-Move::Move(Square to, Piece piece) {
-    this->fromFile_ = static_cast<uint8_t>(piece.file());
-    this->fromRank_ = static_cast<uint8_t>(piece.rank());
-
-    this->toFile_ = static_cast<uint8_t>(to.file);
-    this->toRank_ = static_cast<uint8_t>(to.rank);
-
-    this->pieceType_ = static_cast<uint8_t>(piece.type());
-    this->pieceColor_ = static_cast<uint8_t>(piece.color());
-
-    this->isCapture_ = false;
-    this->capturedPieceType_ = 0;
-    this->capturedPieceColor_ = 0;
-}
-
-Move::Move(Square to, Piece piece, Piece capturedPiece) {
-    this->fromFile_ = static_cast<uint8_t>(piece.file());
-    this->fromRank_ = static_cast<uint8_t>(piece.rank());
-
-    this->toFile_ = static_cast<uint8_t>(to.file);
-    this->toRank_ = static_cast<uint8_t>(to.rank);
-
-    this->pieceType_ = static_cast<uint8_t>(piece.type());
-    this->pieceColor_ = static_cast<uint8_t>(piece.color());
-
-    this->isCapture_ = true;
-    this->capturedPieceType_ = static_cast<uint8_t>(capturedPiece.type());
-    this->capturedPieceColor_ = static_cast<uint8_t>(capturedPiece.color());
+    return { Square(fromFile, fromRank), Square(toFile, toRank), MoveFlag::Quiet };
 }
 
 
-
-Piece Move::piece() const {
-    return { static_cast<PieceType>(this->pieceType_), static_cast<PieceColor>(this->pieceColor_), this->from() };
-}
-
-Piece Move::capturedPiece() const {
-    return {
-        static_cast<PieceType>(this->capturedPieceType_),
-        static_cast<PieceColor>(this->capturedPieceColor_),
-        this->to()
-    };
-}
 
 bool Move::operator==(const Move &other) const {
-    return !memcmp(this, &other, sizeof(Move));
+    return !std::memcmp(this, &other, sizeof(Move));
 }
 
 std::string Move::uci() const {
@@ -84,18 +36,20 @@ std::string Move::uci() const {
     return uci;
 }
 
-std::string Move::debugName() const {
+std::string Move::debugName(const Board &board) const {
     std::string name;
 
-    name += this->piece().debugName();
+    Piece piece = board.pieceAt(this->from());
+    name += piece.debugName();
     name += " from ";
     name += this->from().debugName();
     name += " to ";
     name += this->to().debugName();
 
-    if (this->isCapture()) {
+    Piece captured = board.pieceAt(this->to());
+    if (!captured.isEmpty()) {
         name += " capturing ";
-        name += this->capturedPiece().debugName();
+        name += captured.debugName();
     }
 
     return name;
@@ -103,60 +57,48 @@ std::string Move::debugName() const {
 
 
 
-MovePriorityQueueStack::MovePriorityQueueStack(uint16_t stackCapacity, uint16_t capacity) {
-    this->stackCapacity_ = stackCapacity;
-    this->stackSize_ = 0;
-    this->stack_ = static_cast<QueueStackFrame *>(malloc(sizeof(QueueStackFrame) * stackCapacity));
+MovePriorityQueueStack::MovePriorityQueueStack(uint16_t stackCapacity, uint16_t capacity) : hashMove_(Move::invalid()) {
+    this->stackStart_ = static_cast<QueueStackFrame *>(std::malloc(sizeof(QueueStackFrame) * stackCapacity));
+    this->stackIndex_ = this->stackStart_;
+    this->stackEnd_ = this->stackStart_ + stackCapacity;
 
-    this->capacity_ = capacity;
-    this->moves_ = static_cast<QueueEntry *>(malloc(sizeof(QueueEntry) * capacity));
+    this->movesStart_ = static_cast<QueueEntry *>(std::malloc(sizeof(QueueEntry) * capacity));
+    this->movesEnd_ = this->movesStart_ + capacity;
 
-    this->queueStart_ = this->moves_;
-    this->queueSize_ = 0;
-    this->hashMove_ = std::nullopt;
+    this->queueStart_ = this->movesStart_;
+    this->queueEnd_ = this->movesStart_;
 }
 
 MovePriorityQueueStack::~MovePriorityQueueStack() {
-    free(this->stack_);
-    free(this->moves_);
+    std::free(this->stackStart_);
+    std::free(this->movesStart_);
 }
 
 void MovePriorityQueueStack::push() {
-    if (this->stackSize_ >= this->stackCapacity_) {
+    if (this->stackIndex_ >= this->stackEnd_) {
         throw std::runtime_error("MovePriorityQueueStack stack is full");
     }
 
-    this->stack_[this->stackSize_++] = { this->queueStart_, this->hashMove_ };
+    *(this->stackIndex_++) = { this->queueStart_, this->hashMove_ };
 
-    this->queueStart_ += this->queueSize_;
-    this->queueSize_ = 0;
-    this->hashMove_ = std::nullopt;
+    this->queueStart_ = this->queueEnd_;
+    this->hashMove_ = Move::invalid();
 }
 
 void MovePriorityQueueStack::pop() {
-    if (this->stackSize_ <= 0) {
+    if (this->stackIndex_ <= this->stackStart_) {
         throw std::runtime_error("MovePriorityQueueStack stack is empty");
     }
 
-    // The end of the previous queue is the start of the current queue
-    QueueEntry *queueEnd = this->queueStart_;
+    this->stackIndex_--;
 
-    QueueStackFrame top = this->stack_[--this->stackSize_];
-    this->queueStart_ = top.queueStart;
-    this->queueSize_ = queueEnd - top.queueStart;
-    this->hashMove_ = top.hashMove;
-}
-
-void MovePriorityQueueStack::enqueue(Square to, Piece piece) {
-    this->enqueue(Move(to, piece));
-}
-
-void MovePriorityQueueStack::enqueue(Square to, Piece piece, Piece capturedPiece) {
-    this->enqueue(Move(to, piece, capturedPiece));
+    this->queueEnd_ = this->queueStart_;
+    this->queueStart_ = this->stackIndex_->queueStart;
+    this->hashMove_ = this->stackIndex_->hashMove;
 }
 
 void MovePriorityQueueStack::enqueue(Move move) {
-    if (this->queueSize_ >= this->capacity_) {
+    if (this->queueEnd_ >= this->movesEnd_) {
         throw std::runtime_error("MovePriorityQueueStack queue is full");
     }
 
@@ -164,29 +106,14 @@ void MovePriorityQueueStack::enqueue(Move move) {
         return;
     }
 
-    this->queueStart_[this->queueSize_++] = { move, MoveSort::scoreMove(move) };
-}
-
-// Loads the hash move from the previous iteration if the previous iteration is not nullptr.
-void MovePriorityQueueStack::maybeLoadHashMoveFromPreviousIteration(Board &board, FixedDepthSearcher *previousIteration) {
-    if (previousIteration == nullptr) {
-        return;
-    }
-
-    TranspositionTable::Entry *entry = previousIteration->table().load(board.hash());
-
-    if (entry == nullptr) {
-        return;
-    }
-
-    this->hashMove_ = entry->bestMove.value();
+    *(this->queueEnd_++) = { move, 0 };
 }
 
 Move MovePriorityQueueStack::dequeue() {
-    if (this->hashMove_.has_value()) {
+    if (this->hashMove_.isValid()) {
         // Always search the hash move first
-        Move move = this->hashMove_.value();
-        this->hashMove_ = std::nullopt;
+        Move move = this->hashMove_;
+        this->hashMove_ = Move::invalid();
         return move;
     }
 
@@ -194,8 +121,7 @@ Move MovePriorityQueueStack::dequeue() {
     QueueEntry *bestMove;
     int32_t bestScore = -INT32_MAX;
 
-    QueueEntry *queueEnd = this->queueStart_ + this->queueSize_;
-    for (QueueEntry *entry = this->queueStart_; entry < queueEnd; entry++) {
+    for (QueueEntry *entry = this->queueStart_; entry < this->queueEnd_; entry++) {
         if (entry->score > bestScore) {
             bestMove = entry;
             bestScore = entry->score;
@@ -206,22 +132,39 @@ Move MovePriorityQueueStack::dequeue() {
 
     // Because order does not matter in the buffer (since we sort it anyway), we can quickly remove a move from the
     // queue by copying the move at the end of the queue into its place and decrementing the queue size.
-    *bestMove = *(queueEnd - 1);
-    this->queueSize_--;
+    *bestMove = *(--this->queueEnd_);
 
     return move;
 }
 
 bool MovePriorityQueueStack::empty() const {
-    return !this->hashMove_.has_value() && this->queueSize_ == 0;
+    return !this->hashMove_.isValid() && this->queueEnd_ == this->queueStart_;
 }
 
+// Loads the hash move from the previous iteration if the previous iteration is not nullptr.
+void MovePriorityQueueStack::maybeLoadHashMoveFromPreviousIteration(Board &board, ReadonlyTranspositionTable *previousTable) {
+    if (previousTable == nullptr) {
+        return;
+    }
 
+    TranspositionTable::Entry *entry = previousTable->load(board.hash());
 
-MovePriorityQueueStackGuard::MovePriorityQueueStackGuard(MovePriorityQueueStack &stack) : stack_(stack) {
-    this->stack_.push();
+    if (entry == nullptr) {
+        return;
+    }
+
+    this->hashMove_ = entry->bestMove();
 }
 
-MovePriorityQueueStackGuard::~MovePriorityQueueStackGuard() {
-    this->stack_.pop();
+// Scores the moves in the queue.
+template<Color Side>
+void MovePriorityQueueStack::score(const Board &board) {
+    MoveScorer<Side> scorer(board);
+
+    for (QueueEntry *entry = this->queueStart_; entry < this->queueEnd_; entry++) {
+        entry->score = scorer.score(entry->move);
+    }
 }
+
+template void MovePriorityQueueStack::score<Color::White>(const Board &board);
+template void MovePriorityQueueStack::score<Color::Black>(const Board &board);

@@ -5,16 +5,22 @@
 
 #include "piece.h"
 #include "fen.h"
+#include "transposition.h"
 
-Board::Board(PieceColor turn) : material_(), turn_(turn), hash_(turn), pawns_(), knights_(), bishops_(), rooks_(),
-                                queens_(), kings_(), squares_() {
-    this->squares_.fill(nullptr);
+Board::Board(Color turn) : material_(), turn_(turn), hash_(0), pieces_(), bitboards_() {
+    this->pieces_.fill(Piece::empty());
+    this->bitboards_.white().fill(0);
+    this->bitboards_.black().fill(0);
+
+    if (turn == Color::Black) {
+        this->hash_ ^= Zobrist::blackToMove();
+    }
 }
 
 Board::~Board() = default;
 
 Board Board::startingPosition() {
-    return Board::fromFen(Board::STARTING_FEN);
+    return Board::fromFen(Board::StartingFen);
 }
 
 Board Board::fromFen(const std::string &fen) {
@@ -22,9 +28,9 @@ Board Board::fromFen(const std::string &fen) {
     Board board(reader.turn());
 
     while (reader.hasNext()) {
-        Piece piece = reader.next();
+        auto entry = reader.next();
 
-        board.addPiece(piece);
+        board.addPiece(entry.piece, entry.square);
     }
 
     return board;
@@ -35,11 +41,12 @@ std::string Board::toFen() const {
 
     for (int8_t rank = 7; rank >= 0; rank--) {
         for (int8_t file = 0; file < 8; file++) {
-            Piece *piece = this->getPieceAt({ file, rank });
-            if (piece == nullptr) {
+            auto piece = this->pieceAt(Square(file, rank));
+
+            if (piece.isEmpty()) {
                 writer.empty();
             } else {
-                writer.piece(*piece);
+                writer.piece(piece);
             }
         }
 
@@ -55,103 +62,79 @@ Board Board::copy() const {
     return Board::fromFen(this->toFen());
 }
 
-std::vector<std::unique_ptr<Piece>> &Board::getPieceList(Piece piece) {
-    ColorMap<std::vector<std::unique_ptr<Piece>>> *list = nullptr;
-    switch (piece.type()) {
-        case PieceType::Pawn:
-            list = &this->pawns_;
-            break;
-        case PieceType::Knight:
-            list = &this->knights_;
-            break;
-        case PieceType::Bishop:
-            list = &this->bishops_;
-            break;
-        case PieceType::Rook:
-            list = &this->rooks_;
-            break;
-        case PieceType::Queen:
-            list = &this->queens_;
-            break;
-        case PieceType::King:
-            list = &this->kings_;
-            break;
-    }
-
-    return (*list)[piece.color()];
+template<Color Side>
+Bitboard Board::composite() const {
+    const auto &bitboards = this->bitboards_[Side];
+    return bitboards[0] | bitboards[1] | bitboards[2] | bitboards[3] | bitboards[4] | bitboards[5];
 }
 
-void Board::addPieceNoHashUpdate(Piece piece) {
-    auto &pieces = this->getPieceList(piece);
+Bitboard Board::occupied() const {
+    return this->composite<Color::White>() | this->composite<Color::Black>();
+}
 
-    pieces.push_back(std::make_unique<Piece>(piece));
-    this->squares_[piece.square().index()] = pieces.back().get();
+Bitboard Board::empty() const {
+    return ~this->occupied();
+}
 
+
+
+void Board::addPiece(Piece piece, Square square) {
+    this->pieces_[square] = piece;
+    this->bitboard(piece.type(), piece.color()).set(square);
     this->material_[piece.color()] += piece.material();
+    this->hash_ ^= Zobrist::piece(piece, square);
 }
 
-void Board::removePieceNoHashUpdate(Piece *piece) {
-    this->material_[piece->color()] -= piece->material();
-
-    this->squares_[piece->square().index()] = nullptr;
-
-    // Find the piece in the list and remove it.
-    auto &pieces = this->getPieceList(*piece);
-
-    for (auto it = pieces.begin(); it != pieces.end(); it++) {
-        if (it->get() == piece) {
-            pieces.erase(it);
-            break;
-        }
-    }
+void Board::removePiece(Piece piece, Square square) {
+    this->pieces_[square] = Piece::empty();
+    this->bitboard(piece.type(), piece.color()).clear(square);
+    this->material_[piece.color()] -= piece.material();
+    this->hash_ ^= Zobrist::piece(piece, square);
 }
 
-void Board::addPiece(Piece piece) {
-    this->addPieceNoHashUpdate(piece);
-    this->hash_.piece(piece);
-}
-
-void Board::removePiece(Piece *piece) {
-    this->hash_.piece(*piece);
-    this->removePieceNoHashUpdate(piece);
-}
-
-Piece *Board::getPieceAt(Square square) const {
-    return this->squares_[square.index()];
-}
-
-void Board::makeMove(Move move) {
+MakeMoveInfo Board::makeMove(Move move) {
     // Remove captured piece
-    Piece *capturedPiece = this->getPieceAt(move.to());
-    if (capturedPiece != nullptr) {
-        this->removePieceNoHashUpdate(capturedPiece);
+    Piece captured = this->pieceAt(move.to());
+    if (!captured.isEmpty()) {
+        this->removePiece(captured, move.to());
     }
 
-    Piece *piece = this->getPieceAt(move.from());
+    // Move piece
+    Piece piece = this->pieceAt(move.from());
+    this->pieces_[move.from()] = Piece::empty();
+    this->pieces_[move.to()] = piece;
 
-    piece->setSquare(move.to());
+    Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
+    bitboard.clear(move.from());
+    bitboard.set(move.to());
 
-    this->squares_[move.from().index()] = nullptr;
-    this->squares_[move.to().index()] = piece;
+    this->hash_ ^= Zobrist::piece(piece, move.from());
+    this->hash_ ^= Zobrist::piece(piece, move.to());
 
     this->turn_ = ~this->turn_;
+    this->hash_ ^= Zobrist::blackToMove();
 
-    this->hash_.move(move);
+    return { captured };
 }
 
-void Board::unmakeMove(Move move) {
-    Piece *piece = this->getPieceAt(move.to());
+void Board::unmakeMove(Move move, MakeMoveInfo info) {
+    // Unmove piece
+    Piece piece = this->pieceAt(move.to());
+    this->pieces_[move.to()] = Piece::empty();
+    this->pieces_[move.from()] = piece;
 
-    piece->setSquare(move.from());
+    Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
+    bitboard.clear(move.to());
+    bitboard.set(move.from());
 
-    this->squares_[move.from().index()] = piece;
-    this->squares_[move.to().index()] = nullptr;
+    this->hash_ ^= Zobrist::piece(piece, move.to());
+    this->hash_ ^= Zobrist::piece(piece, move.from());
 
-    if (move.isCapture()) {
-        this->addPieceNoHashUpdate(move.capturedPiece());
+    // Add captured piece
+    if (!info.captured.isEmpty()) {
+        this->addPiece(info.captured, move.to());
     }
 
     this->turn_ = ~this->turn_;
-
-    this->hash_.move(move);
+    this->hash_ ^= Zobrist::blackToMove();
 }
