@@ -5,7 +5,6 @@
 #include <random>
 #include <array>
 #include <cassert>
-#include <cstring>
 
 #include "piece.h"
 #include "move.h"
@@ -58,37 +57,6 @@ TranspositionTable::TranspositionTable(uint32_t size) : lock_() {
 
 TranspositionTable::~TranspositionTable() {
     std::free(this->entries_);
-}
-
-TranspositionTable::TranspositionTable(TranspositionTable &&other) noexcept : lock_() {
-    this->sizeMask_ = other.sizeMask_;
-    this->entries_ = other.entries_;
-
-    other.entries_ = nullptr;
-}
-
-TranspositionTable &TranspositionTable::operator=(TranspositionTable &&other) noexcept {
-    new(&this->lock_) SpinLock();
-    this->sizeMask_ = other.sizeMask_;
-    this->entries_ = other.entries_;
-
-    other.entries_ = nullptr;
-
-    return *this;
-}
-
-TranspositionTable TranspositionTable::copy() const {
-    uint32_t size = this->sizeMask_ + 1;
-
-    TranspositionTable copy(size);
-
-    std::memcpy(copy.entries_, this->entries_, size * sizeof(Entry));
-
-    return copy;
-}
-
-ReadonlyTranspositionTable TranspositionTable::readonlyCopy() const {
-    return ReadonlyTranspositionTable(this->copy());
 }
 
 TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {

@@ -6,7 +6,7 @@
 #include "piece.h"
 #include "board.h"
 
-class ReadonlyTranspositionTable;
+class TranspositionTable;
 
 // A stack of move priority queues.
 //
@@ -31,8 +31,8 @@ public:
     [[nodiscard]] Move dequeue();
     [[nodiscard]] bool empty() const;
 
-    // Loads the hash move from the previous table if the previous table is not nullptr.
-    void maybeLoadHashMoveFromPreviousIteration(Board &board, ReadonlyTranspositionTable *previousTable);
+    // Loads the hash move from the transposition table.
+    void loadHashMove(Board &board, TranspositionTable &table);
 
     // Scores the moves in the queue.
     template<Color Side>

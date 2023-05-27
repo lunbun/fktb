@@ -47,7 +47,6 @@ struct SearchResult {
 class FixedDepthSearcher {
 public:
     FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table);
-    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, ReadonlyTranspositionTable *previousTable);
 
     [[nodiscard]] SearchResult search();
 
@@ -66,9 +65,6 @@ private:
     uint16_t depth_;
     MovePriorityQueueStack moves_;
     TranspositionTable &table_;
-
-    // Previous iteration table, used for iterative deepening.
-    ReadonlyTranspositionTable *previousTable_;
 
     template<Color Turn>
     [[nodiscard]] SearchRootNode searchRoot();

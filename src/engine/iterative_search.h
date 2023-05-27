@@ -18,7 +18,6 @@ private:
         uint16_t depth;
         SearchResult result;
         Board board;
-        std::unique_ptr<ReadonlyTranspositionTable> previousTable;
         TranspositionTable table;
         std::unique_ptr<FixedDepthSearcher> currentIteration;
 

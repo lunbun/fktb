@@ -24,14 +24,11 @@ SearchResult SearchResult::invalid() {
 
 
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table)
-    : FixedDepthSearcher(board, depth, table, nullptr) { }
-
-FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table,
-    ReadonlyTranspositionTable *previousTable) : board_(board.copy()), depth_(depth),
+    : board_(board.copy()), depth_(depth),
     // TODO: MovePriorityQueueStack does not work well with quiescence search. We should probably replace it with a
     //  different data structure, but for now, just make it large enough to not cause any issues.
                                                  moves_(depth * 20, 64 * (depth * 10)),
-                                                 table_(table), previousTable_(previousTable) { }
+                                                 table_(table) { }
 
 void FixedDepthSearcher::halt() {
     this->isHalted_ = true;
@@ -91,7 +88,7 @@ SearchRootNode FixedDepthSearcher::searchRoot() {
     // Creating a MovePriorityQueueStackGuard pushes a stack frame onto the MovePriorityQueueStack
     MovePriorityQueueStackGuard movesStackGuard(moves);
 
-    moves.maybeLoadHashMoveFromPreviousIteration(board, this->previousTable_);
+    moves.loadHashMove(board, this->table_);
     MoveGenerator<Turn, false> generator(board, moves);
     generator.generate();
 
@@ -202,7 +199,7 @@ FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_t depth, int32_
     // Creating a MovePriorityQueueStackGuard pushes a stack frame onto the MovePriorityQueueStack
     MovePriorityQueueStackGuard movesStackGuard(moves);
 
-    moves.maybeLoadHashMoveFromPreviousIteration(board, this->previousTable_);
+    moves.loadHashMove(board, this->table_);
     MoveGenerator<Turn, false> generator(board, moves);
     generator.generate();
 

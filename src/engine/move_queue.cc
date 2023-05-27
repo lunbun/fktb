@@ -95,12 +95,10 @@ bool MovePriorityQueueStack::empty() const {
 }
 
 // Loads the hash move from the previous iteration if the previous iteration is not nullptr.
-void MovePriorityQueueStack::maybeLoadHashMoveFromPreviousIteration(Board &board, ReadonlyTranspositionTable *previousTable) {
-    if (previousTable == nullptr) {
-        return;
-    }
+void MovePriorityQueueStack::loadHashMove(Board &board, TranspositionTable &table) {
+    SpinLockGuard lock(table.lock());
 
-    TranspositionTable::Entry *entry = previousTable->load(board.hash());
+    TranspositionTable::Entry *entry = table.load(board.hash());
 
     if (entry == nullptr) {
         return;

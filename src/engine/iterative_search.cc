@@ -8,8 +8,8 @@
 #include "fixed_search.h"
 
 IterativeSearchThread::SearchData::SearchData(Board board) : depth(1), result(SearchResult::invalid()),
-                                                             board(std::move(board)), previousTable(nullptr),
-                                                             table(2097152), currentIteration(nullptr) { }
+                                                             board(std::move(board)), table(2097152),
+                                                             currentIteration(nullptr) { }
 
 IterativeSearchThread::IterativeSearchThread() : dataMutex_(), searchMutex_(), isSearchingCondition_(),
                                                  iterationCallbacks_(), data_(nullptr) {
@@ -82,29 +82,33 @@ void IterativeSearchThread::loop() {
             continue;
         }
 
+        // Start a new iteration
         FixedDepthSearcher *currentIteration;
         {
             std::lock_guard<std::mutex> lock(this->dataMutex_);
             SearchData &data = this->data();
 
-            // If we have a previous iteration, make a readonly copy of the table and store it
-            if (data.currentIteration != nullptr) {
-                data.previousTable = std::make_unique<ReadonlyTranspositionTable>(data.table.readonlyCopy());
-            }
+            // No need to create a new transposition table here.
+            //
+            // The same transposition table is reused between iterations because it contains the hash moves from the
+            // previous iterations. Additionally, if we are using Lazy SMP, some entries in the transposition table will
+            // actually have a higher depth than the current iteration (because Lazy SMP spawns some helper threads with
+            // a higher depth), so we want to keep those entries.
 
             // Start a new search
-            data.currentIteration = std::make_unique<FixedDepthSearcher>(data.board, data.depth, data.table,
-                data.previousTable.get());
+            data.currentIteration = std::make_unique<FixedDepthSearcher>(data.board, data.depth, data.table);
 
             currentIteration = data.currentIteration.get();
         }
 
+        // Search the iteration
         std::optional<SearchResult> result;
         {
             std::lock_guard<std::mutex> lock(this->searchMutex_);
             result = currentIteration->search();
         }
 
+        // Notify callbacks that we have a new result
         if (result.has_value() && result->isValid) {
             std::lock_guard<std::mutex> lock(this->dataMutex_);
             SearchData &data = this->data();
