@@ -39,11 +39,11 @@ void moveGenTest() {
     MovePriorityQueueStack moves(1, 64);
     moves.push();
     if (board.turn() == Color::White) {
-        MoveGenerator<Color::White> generator(board, moves);
+        MoveGenerator<Color::White, false> generator(board, moves);
         generator.generate();
         moves.score<Color::White>(board);
     } else {
-        MoveGenerator<Color::Black> generator(board, moves);
+        MoveGenerator<Color::Black, false> generator(board, moves);
         generator.generate();
         moves.score<Color::Black>(board);
     }
@@ -109,10 +109,10 @@ int main() {
     init();
 
 //    moveGenTest();
-//    fixedDepthTest();
+    fixedDepthTest();
 //    fixedDepthBenchmark(10);
 
-    uci();
+//    uci();
 
 //    return 0;
 }

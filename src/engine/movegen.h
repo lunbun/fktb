@@ -3,10 +3,11 @@
 #include <array>
 
 #include "move.h"
+#include "move_queue.h"
 #include "bitboard.h"
 #include "board.h"
 
-template<Color Side>
+template<Color Side, bool ExcludeQuiet>
 class MoveGenerator {
 public:
     MoveGenerator(const Board &board, MovePriorityQueueStack &moves);
@@ -22,7 +23,12 @@ private:
     Bitboard occupied_;
     Bitboard empty_;
 
+    void serializeQuiet(Square from, Bitboard quiet);
+    void serializeCaptures(Square from, Bitboard captures);
+    void serializePromotions(Square from, Bitboard promotions);
+    // Serializes all moves in a bitboard, both quiet and captures (will not serialize quiet if in ExcludeQuiet mode)
     void serializeBitboard(Square from, Bitboard bitboard);
+
     void generatePawnMoves(Square square);
     void generateAllPawnMoves();
 

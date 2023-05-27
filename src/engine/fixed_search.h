@@ -6,6 +6,8 @@
 
 #include "board.h"
 #include "piece.h"
+#include "move.h"
+#include "move_queue.h"
 #include "transposition.h"
 
 struct SearchNode {

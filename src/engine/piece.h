@@ -33,7 +33,7 @@ static_assert(sizeof(Square) == 1, "Square must be 1 byte");
 
 // @formatter:off
 namespace PieceTypeNamespace {
-    enum PieceType {
+    enum PieceType : uint8_t {
         Pawn        = 0,
         Knight      = 1,
         Bishop      = 2,
@@ -43,6 +43,8 @@ namespace PieceTypeNamespace {
 
         Empty       = 7
     };
+
+    [[nodiscard]] std::string debugName(PieceType pieceType);
 }
 using PieceType = PieceTypeNamespace::PieceType;
 
@@ -58,13 +60,17 @@ namespace PieceMaterial {
     constexpr int32_t BishopPair    = 50;
 
     constexpr int32_t RookOn7th     = 100;
+
+    INLINE constexpr int32_t material(PieceType pieceType) { return PieceMaterial::Values[pieceType]; }
 }
 
 namespace ColorNamespace {
-    enum Color {
+    enum Color : uint8_t {
         White       = 0,
         Black       = 1
     };
+
+    [[nodiscard]] std::string debugName(Color color);
 }
 using Color = ColorNamespace::Color;
 // @formatter:on
@@ -116,7 +122,7 @@ struct Piece {
     [[nodiscard]] INLINE constexpr PieceType type() const { return static_cast<PieceType>(this->bits_ & 7); }
     [[nodiscard]] INLINE constexpr bool isEmpty() const { return this->type() == PieceType::Empty; }
 
-    [[nodiscard]] INLINE constexpr int32_t material() const { return PieceMaterial::Values[this->type()]; }
+    [[nodiscard]] INLINE constexpr int32_t material() const { return PieceMaterial::material(this->type()); }
 
     [[nodiscard]] std::string debugName() const;
 

@@ -80,46 +80,70 @@ void Board::removePiece(Piece piece, Square square) {
 
 MakeMoveInfo Board::makeMoveNoTurnUpdate(Move move) {
     // Remove captured piece
-    Piece captured = this->pieceAt(move.to());
-    if (!captured.isEmpty()) {
+    Piece captured = Piece::empty();
+
+    if (move.isCapture()) {
+        // Check if the move is a capture before getting the captured piece to avoid unnecessary calls to pieceAt
+        // (avoids unnecessary memory reads)
+        captured = this->pieceAt(move.to());
         this->removePiece(captured, move.to());
     }
 
-    // Move piece
     Piece piece = this->pieceAt(move.from());
-    this->pieces_[move.from()] = Piece::empty();
-    this->pieces_[move.to()] = piece;
+    if (move.isPromotion()) {
+        // Remove the old pawn
+        this->removePiece(piece, move.from());
 
-    Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
-    bitboard.clear(move.from());
-    bitboard.set(move.to());
+        // Add the new piece
+        Piece promotion = Piece(move.promotion(), piece.color());
+        this->addPiece(promotion, move.to());
+    } else {
+        // Move the piece
+        this->pieces_[move.from()] = Piece::empty();
+        this->pieces_[move.to()] = piece;
 
-    this->hash_ ^= Zobrist::piece(piece, move.from());
-    this->hash_ ^= Zobrist::piece(piece, move.to());
+        Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
+        bitboard.clear(move.from());
+        bitboard.set(move.to());
 
+        this->hash_ ^= Zobrist::piece(piece, move.from());
+        this->hash_ ^= Zobrist::piece(piece, move.to());
+    }
+
+    // Switch the turn
     this->hash_ ^= Zobrist::blackToMove();
 
     return { captured };
 }
 
 void Board::unmakeMoveNoTurnUpdate(Move move, MakeMoveInfo info) {
-    // Unmove piece
+    // Remove the piece from its new square
     Piece piece = this->pieceAt(move.to());
-    this->pieces_[move.to()] = Piece::empty();
-    this->pieces_[move.from()] = piece;
+    if (move.isPromotion()) {
+        // Remove the promoted piece
+        this->removePiece(piece, move.to());
 
-    Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
-    bitboard.clear(move.to());
-    bitboard.set(move.from());
+        // Add the pawn
+        this->addPiece(Piece::pawn(piece.color()), move.from());
+    } else {
+        // Unmove the piece
+        this->pieces_[move.to()] = Piece::empty();
+        this->pieces_[move.from()] = piece;
 
-    this->hash_ ^= Zobrist::piece(piece, move.to());
-    this->hash_ ^= Zobrist::piece(piece, move.from());
+        Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
+        bitboard.clear(move.to());
+        bitboard.set(move.from());
+
+        this->hash_ ^= Zobrist::piece(piece, move.to());
+        this->hash_ ^= Zobrist::piece(piece, move.from());
+    }
 
     // Add captured piece
     if (!info.captured.isEmpty()) {
         this->addPiece(info.captured, move.to());
     }
 
+    // Switch the turn
     this->hash_ ^= Zobrist::blackToMove();
 }
 

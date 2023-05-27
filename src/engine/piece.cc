@@ -15,39 +15,30 @@ std::string Square::debugName() const {
     return this->uci();
 }
 
+std::string PieceTypeNamespace::debugName(PieceType pieceType) {
+    // @formatter:off
+    switch (pieceType) {
+        case PieceType::Pawn: return "Pawn";
+        case PieceType::Knight: return "Knight";
+        case PieceType::Bishop: return "Bishop";
+        case PieceType::Rook: return "Rook";
+        case PieceType::Queen: return "Queen";
+        case PieceType::King: return "King";
+        default: return "Unknown";
+    }
+    // @formatter:on
+}
 
+std::string ColorNamespace::debugName(Color color) {
+    // @formatter:off
+    switch (color) {
+        case Color::White: return "White";
+        case Color::Black: return "Black";
+        default: return "Unknown";
+    }
+    // @formatter:on
+}
 
 std::string Piece::debugName() const {
-    std::string name;
-    if (this->color() == Color::White) {
-        name += "White ";
-    } else {
-        name += "Black ";
-    }
-
-    switch (this->type()) {
-        case PieceType::Pawn:
-            name += "Pawn";
-            break;
-        case PieceType::Knight:
-            name += "Knight";
-            break;
-        case PieceType::Bishop:
-            name += "Bishop";
-            break;
-        case PieceType::Rook:
-            name += "Rook";
-            break;
-        case PieceType::Queen:
-            name += "Queen";
-            break;
-        case PieceType::King:
-            name += "King";
-            break;
-        default:
-            name = "Unknown";
-            break;
-    }
-
-    return name;
+    return ColorNamespace::debugName(this->color()) + " " + PieceTypeNamespace::debugName(this->type());
 }

@@ -5,6 +5,7 @@
 
 #include "piece.h"
 #include "move.h"
+#include "move_queue.h"
 #include "movegen.h"
 #include "evaluation.h"
 
@@ -88,7 +89,7 @@ SearchRootNode FixedDepthSearcher::searchRoot() {
     MovePriorityQueueStackGuard movesStackGuard(moves);
 
     moves.maybeLoadHashMoveFromPreviousIteration(board, this->previousTable_);
-    MoveGenerator<Turn> generator(board, moves);
+    MoveGenerator<Turn, false> generator(board, moves);
     generator.generate();
 
     if (moves.empty()) {
@@ -147,7 +148,7 @@ INLINE SearchNode FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint
     MovePriorityQueueStackGuard movesStackGuard(moves);
 
     moves.maybeLoadHashMoveFromPreviousIteration(board, this->previousTable_);
-    MoveGenerator<Turn> generator(board, moves);
+    MoveGenerator<Turn, false> generator(board, moves);
     generator.generate();
 
     if (moves.empty()) {

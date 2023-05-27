@@ -16,5 +16,9 @@ private:
     const Board &board_;
 
     Bitboard friendlyPawnAttacks_;
+    Bitboard friendlyKnightAttacks_;
+
+    Bitboard enemyKnights_;
+    Bitboard enemyRooks_;
     Bitboard enemyPawnAttacks_;
 };

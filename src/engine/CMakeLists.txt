@@ -16,6 +16,8 @@ target_sources(chess PRIVATE
         lock.h
         move.cc
         move.h
+        move_queue.cc
+        move_queue.h
         move_score.cc
         move_score.h
         movegen.cc
