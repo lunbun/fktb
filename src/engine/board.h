@@ -48,18 +48,27 @@ public:
         return this->bitboards_[color][pieceType];
     }
     template<Color Side>
-    [[nodiscard]] Bitboard bitboard(PieceType pieceType) const { return this->bitboards_[Side][pieceType]; }
+    [[nodiscard]] INLINE Bitboard bitboard(PieceType pieceType) const { return this->bitboards_[Side][pieceType]; }
 
     // Returns the composite bitboard with all pieces of the given color.
     template<Color Side>
-    [[nodiscard]] Bitboard composite() const;
+    [[nodiscard]] INLINE Bitboard composite() const {
+        const auto &bitboards = this->bitboards_[Side];
+        return bitboards[0] | bitboards[1] | bitboards[2] | bitboards[3] | bitboards[4] | bitboards[5];
+    }
     // Returns the bitboard of all occupied squares.
-    [[nodiscard]] Bitboard occupied() const;
+    [[nodiscard]] INLINE Bitboard occupied() const {
+        return this->composite<Color::White>() | this->composite<Color::Black>();
+    }
     // Returns the bitboard of all empty squares.
-    [[nodiscard]] Bitboard empty() const;
+    [[nodiscard]] INLINE Bitboard empty() const { return ~this->occupied(); }
 
     void addPiece(Piece piece, Square square);
     void removePiece(Piece piece, Square square);
+
+    // Makes/unmakes a move without updating the turn (updates the hash's turn, but not the turn_ field itself).
+    MakeMoveInfo makeMoveNoTurnUpdate(Move move);
+    void unmakeMoveNoTurnUpdate(Move move, MakeMoveInfo info);
 
     MakeMoveInfo makeMove(Move move);
     void unmakeMove(Move move, MakeMoveInfo info);

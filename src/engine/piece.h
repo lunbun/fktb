@@ -53,6 +53,7 @@ namespace PieceMaterial {
     constexpr int32_t Rook          = 500;
     constexpr int32_t Queen         = 950;
     constexpr int32_t King          = 1000000;
+    constexpr std::array<int32_t, 6> Values = { Pawn, Knight, Bishop, Rook, Queen, King };
 
     constexpr int32_t BishopPair    = 50;
 
@@ -115,7 +116,7 @@ struct Piece {
     [[nodiscard]] INLINE constexpr PieceType type() const { return static_cast<PieceType>(this->bits_ & 7); }
     [[nodiscard]] INLINE constexpr bool isEmpty() const { return this->type() == PieceType::Empty; }
 
-    [[nodiscard]] int32_t material() const;
+    [[nodiscard]] INLINE constexpr int32_t material() const { return PieceMaterial::Values[this->type()]; }
 
     [[nodiscard]] std::string debugName() const;
 

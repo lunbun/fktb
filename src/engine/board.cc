@@ -62,20 +62,6 @@ Board Board::copy() const {
     return Board::fromFen(this->toFen());
 }
 
-template<Color Side>
-Bitboard Board::composite() const {
-    const auto &bitboards = this->bitboards_[Side];
-    return bitboards[0] | bitboards[1] | bitboards[2] | bitboards[3] | bitboards[4] | bitboards[5];
-}
-
-Bitboard Board::occupied() const {
-    return this->composite<Color::White>() | this->composite<Color::Black>();
-}
-
-Bitboard Board::empty() const {
-    return ~this->occupied();
-}
-
 
 
 void Board::addPiece(Piece piece, Square square) {
@@ -92,7 +78,7 @@ void Board::removePiece(Piece piece, Square square) {
     this->hash_ ^= Zobrist::piece(piece, square);
 }
 
-MakeMoveInfo Board::makeMove(Move move) {
+MakeMoveInfo Board::makeMoveNoTurnUpdate(Move move) {
     // Remove captured piece
     Piece captured = this->pieceAt(move.to());
     if (!captured.isEmpty()) {
@@ -111,13 +97,12 @@ MakeMoveInfo Board::makeMove(Move move) {
     this->hash_ ^= Zobrist::piece(piece, move.from());
     this->hash_ ^= Zobrist::piece(piece, move.to());
 
-    this->turn_ = ~this->turn_;
     this->hash_ ^= Zobrist::blackToMove();
 
     return { captured };
 }
 
-void Board::unmakeMove(Move move, MakeMoveInfo info) {
+void Board::unmakeMoveNoTurnUpdate(Move move, MakeMoveInfo info) {
     // Unmove piece
     Piece piece = this->pieceAt(move.to());
     this->pieces_[move.to()] = Piece::empty();
@@ -135,6 +120,15 @@ void Board::unmakeMove(Move move, MakeMoveInfo info) {
         this->addPiece(info.captured, move.to());
     }
 
-    this->turn_ = ~this->turn_;
     this->hash_ ^= Zobrist::blackToMove();
+}
+
+MakeMoveInfo Board::makeMove(Move move) {
+    this->turn_ = ~this->turn_;
+    return this->makeMoveNoTurnUpdate(move);
+}
+
+void Board::unmakeMove(Move move, MakeMoveInfo info) {
+    this->turn_ = ~this->turn_;
+    this->unmakeMoveNoTurnUpdate(move, info);
 }

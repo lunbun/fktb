@@ -110,10 +110,10 @@ int main() {
     init();
 
 //    moveGenTest();
-//    fixedDepthTest();
+    fixedDepthTest();
 //    fixedDepthBenchmark(10);
 
-    uci();
+//    uci();
 
 //    return 0;
 }

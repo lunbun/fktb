@@ -56,7 +56,8 @@ SearchResult FixedDepthSearcher::search() {
     while (move.isValid()) {
         bestLine.push_back(move);
 
-        board.makeMove(move);
+        // No need to update the turn since this is a copy of the board that is only used for finding the best line
+        board.makeMoveNoTurnUpdate(move);
 
         // Find the next best move in the line
         depth--;
@@ -104,7 +105,8 @@ SearchRootNode FixedDepthSearcher::searchRoot() {
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
-        MakeMoveInfo moveInfo = board.makeMove(move);
+        // No need to update the turn since we do that manually with templates
+        MakeMoveInfo moveInfo = board.makeMoveNoTurnUpdate(move);
 
         SearchNode node = search<~Turn>(depth - 1, -INT32_MAX, -alpha);
         nodeCount += node.nodeCount;
@@ -116,7 +118,7 @@ SearchRootNode FixedDepthSearcher::searchRoot() {
             alpha = score;
         }
 
-        board.unmakeMove(move, moveInfo);
+        board.unmakeMoveNoTurnUpdate(move, moveInfo);
     }
 
     // Transposition table store
@@ -161,7 +163,8 @@ INLINE SearchNode FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
-        MakeMoveInfo moveInfo = board.makeMove(move);
+        // No need to update the turn since we do that manually with templates
+        MakeMoveInfo moveInfo = board.makeMoveNoTurnUpdate(move);
 
         SearchNode node = search<~Turn>(depth - 1, -beta, -alpha);
         nodeCount += node.nodeCount;
@@ -173,7 +176,7 @@ INLINE SearchNode FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint
             bestScore = score;
         }
 
-        board.unmakeMove(move, moveInfo);
+        board.unmakeMoveNoTurnUpdate(move, moveInfo);
 
         if (score >= beta) {
             break;

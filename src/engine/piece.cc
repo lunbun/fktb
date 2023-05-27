@@ -17,20 +17,6 @@ std::string Square::debugName() const {
 
 
 
-// @formatter:off
-int32_t Piece::material() const {
-    switch (this->type()) {
-        case PieceType::Pawn: return PieceMaterial::Pawn;
-        case PieceType::Knight: return PieceMaterial::Knight;
-        case PieceType::Bishop: return PieceMaterial::Bishop;
-        case PieceType::Rook: return PieceMaterial::Rook;
-        case PieceType::Queen: return PieceMaterial::Queen;
-        case PieceType::King: return PieceMaterial::King;
-        default: return 0;
-    }
-}
-// @formatter:on
-
 std::string Piece::debugName() const {
     std::string name;
     if (this->color() == Color::White) {

@@ -1,6 +1,7 @@
 #include "movegen.h"
 
 #include "bitboard.h"
+#include "inline.h"
 
 template<Color Side>
 MoveGenerator<Side>::MoveGenerator(const Board &board, MovePriorityQueueStack &moves) : board_(board), moves_(moves) {
@@ -19,7 +20,7 @@ void MoveGenerator<Side>::serializeBitboard(Square from, Bitboard bitboard) {
 }
 
 template<Color Side>
-void MoveGenerator<Side>::generatePawnMoves(Square square) {
+INLINE void MoveGenerator<Side>::generatePawnMoves(Square square) {
     Bitboard empty = this->empty_;
 
     if constexpr (Side == Color::White) {
@@ -41,7 +42,7 @@ void MoveGenerator<Side>::generatePawnMoves(Square square) {
 }
 
 template<Color Side>
-void MoveGenerator<Side>::generateAllPawnMoves() {
+INLINE void MoveGenerator<Side>::generateAllPawnMoves() {
     Bitboard pawns = this->board_.template bitboard<Side>(PieceType::Pawn);
     while (pawns) {
         Square square = pawns.bsfReset();
