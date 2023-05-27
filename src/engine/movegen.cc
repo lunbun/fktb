@@ -63,11 +63,12 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generatePawnMoves(Square square) 
         Bitboard singlePush = ((1ULL << square) << 8) & empty;
         Bitboard promotions = singlePush & Bitboards::Rank8;
 
-        this->serializeQuiet(square, singlePush ^ promotions);
         this->serializePromotions(square, promotions);
 
-        // Double push (always quiet)
         if constexpr (!ExcludeQuiet) {
+            this->serializeQuiet(square, singlePush ^ promotions);
+
+            // Double push (always quiet)
             Bitboard doublePush = (singlePush << 8) & empty & Bitboards::Rank4;
             this->serializeQuiet(square, doublePush);
         }
@@ -76,11 +77,12 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generatePawnMoves(Square square) 
         Bitboard singlePush = ((1ULL << square) >> 8) & empty;
         Bitboard promotions = singlePush & Bitboards::Rank1;
 
-        this->serializeQuiet(square, singlePush ^ promotions);
         this->serializePromotions(square, promotions);
 
-        // Double push (always quiet)
         if constexpr (!ExcludeQuiet) {
+            this->serializeQuiet(square, singlePush ^ promotions);
+
+            // Double push (always quiet)
             Bitboard doublePush = (singlePush >> 8) & empty & Bitboards::Rank5;
             this->serializeQuiet(square, doublePush);
         }

@@ -74,6 +74,8 @@ private:
     [[nodiscard]] SearchRootNode searchRoot();
 
     template<Color Turn>
+    [[nodiscard]] SearchNode searchQuiesce(int32_t alpha, int32_t beta);
+    template<Color Turn>
     [[nodiscard]] SearchNode searchNoTransposition(Move &bestMove, uint16_t depth, int32_t &alpha, int32_t beta);
     template<Color Turn>
     [[nodiscard]] SearchNode search(uint16_t depth, int32_t alpha, int32_t beta);

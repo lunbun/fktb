@@ -9,12 +9,22 @@ template<Color Side>
 MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
     constexpr Color Enemy = ~Side;
 
+    Bitboard occupied = board.occupied();
+
     this->friendlyPawnAttacks_ = Bitboards::allPawn<Side>(board.bitboard<Side>(PieceType::Pawn));
     this->friendlyKnightAttacks_ = Bitboards::allKnight(board.bitboard<Side>(PieceType::Knight));
 
     this->enemyKnights_ = board.bitboard<Enemy>(PieceType::Knight);
+    Bitboard enemyBishops = board.bitboard<Enemy>(PieceType::Bishop);
     this->enemyRooks_ = board.bitboard<Enemy>(PieceType::Rook);
+
     this->enemyPawnAttacks_ = Bitboards::allPawn<Enemy>(board.bitboard<Enemy>(PieceType::Pawn));
+    Bitboard enemyKnightAttacks = Bitboards::allKnight(this->enemyKnights_);
+    Bitboard enemyBishopAttacks = Bitboards::allBishop(enemyBishops, occupied);
+    Bitboard enemyRookAttacks = Bitboards::allRook(this->enemyRooks_, occupied);
+
+    this->enemyBishopOrLowerAttacks_ = enemyBishopAttacks | enemyKnightAttacks | this->enemyPawnAttacks_;
+    this->enemyRookOrLowerAttacks_ = enemyRookAttacks | this->enemyBishopOrLowerAttacks_;
 }
 
 template<Color Side>
@@ -70,15 +80,50 @@ int32_t MoveScorer<Side>::score(Move move) {
                 score += 100;
             }
 
+            // Moving a knight to a square defended by an enemy pawn is bad
+            if (this->enemyPawnAttacks_.get(move.to())) {
+                score -= PieceMaterial::Knight;
+            }
+
+            break;
+        }
+
+        // Bishop heuristics
+        case PieceType::Bishop: {
+            // Moving a bishop to a square defended by a friendly pawn is good because it's a fortress
+            if (this->friendlyPawnAttacks_.get(move.to())) {
+                score += 100;
+            }
+
+            // Moving a bishop to a square defended by an enemy pawn is bad
+            if (this->enemyPawnAttacks_.get(move.to())) {
+                score -= PieceMaterial::Bishop;
+            }
+
+            break;
+        }
+
+        // Rook heuristics
+        case PieceType::Rook: {
+            // Moving a rook to a square defended by an enemy bishop or lower is bad
+            if (this->enemyBishopOrLowerAttacks_.get(move.to())) {
+                score -= PieceMaterial::Rook;
+            }
+
+            break;
+        }
+
+        // Queen heuristics
+        case PieceType::Queen: {
+            // Moving a queen to a square defended by an enemy rook or lower is bad
+            if (this->enemyRookOrLowerAttacks_.get(move.to())) {
+                score -= PieceMaterial::Queen;
+            }
+
             break;
         }
 
         default: break;
-    }
-
-    // Moving a piece to a square attacked by an enemy pawn is bad
-    if (piece.material() > PieceMaterial::Pawn && this->enemyPawnAttacks_.get(move.to())) {
-        score -= (piece.material() - PieceMaterial::Pawn) * 2;
     }
 
     return score;

@@ -59,8 +59,6 @@ namespace PieceMaterial {
 
     constexpr int32_t BishopPair    = 50;
 
-    constexpr int32_t RookOn7th     = 100;
-
     INLINE constexpr int32_t material(PieceType pieceType) { return PieceMaterial::Values[pieceType]; }
 }
 

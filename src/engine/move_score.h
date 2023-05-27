@@ -21,4 +21,6 @@ private:
     Bitboard enemyKnights_;
     Bitboard enemyRooks_;
     Bitboard enemyPawnAttacks_;
+    Bitboard enemyBishopOrLowerAttacks_; // Bishop, knight, or pawn attacks
+    Bitboard enemyRookOrLowerAttacks_; // Rook, bishop, knight, or pawn attacks
 };

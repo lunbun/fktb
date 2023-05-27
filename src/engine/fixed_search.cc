@@ -27,7 +27,10 @@ FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, Trans
     : FixedDepthSearcher(board, depth, table, nullptr) { }
 
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table,
-    ReadonlyTranspositionTable *previousTable) : board_(board.copy()), depth_(depth), moves_(depth, 64 * depth),
+    ReadonlyTranspositionTable *previousTable) : board_(board.copy()), depth_(depth),
+    // TODO: MovePriorityQueueStack does not work well with quiescence search. We should probably replace it with a
+    //  different data structure, but for now, just make it large enough to not cause any issues.
+                                                 moves_(depth * 20, 64 * (depth * 10)),
                                                  table_(table), previousTable_(previousTable) { }
 
 void FixedDepthSearcher::halt() {
@@ -134,11 +137,63 @@ SearchRootNode FixedDepthSearcher::searchRoot() {
 
 
 template<Color Turn>
-INLINE SearchNode FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_t depth, int32_t &alpha, int32_t beta) {
+SearchNode FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
+    Board &board = this->board_;
+
+    int32_t standPat = Evaluation::evaluate<Turn>(board);
+    if (standPat >= beta) {
+        return { beta, 1, 0 };
+    }
+
+    // Delta pruning
+    int32_t delta = (PieceMaterial::Queen + 200);
+    if (standPat + delta <= alpha) {
+        return { alpha, 1, 0 };
+    }
+
+    alpha = std::max(alpha, standPat);
+
+    // Capture search
+    MovePriorityQueueStack &moves = this->moves_;
+
+    // Creating a MovePriorityQueueStackGuard pushes a stack frame onto the MovePriorityQueueStack
+    MovePriorityQueueStackGuard movesStackGuard(moves);
+
+    MoveGenerator<Turn, true> generator(board, moves);
+    generator.generate();
+    moves.score<Turn>(board);
+
+    uint32_t nodeCount = 0;
+
+    while (!moves.empty()) {
+        Move move = moves.dequeue();
+        // No need to update the turn since we do that manually with templates
+        MakeMoveInfo moveInfo = board.makeMoveNoTurnUpdate(move);
+
+        SearchNode node = this->searchQuiesce<~Turn>(-beta, -alpha);
+        nodeCount += node.nodeCount;
+
+        int32_t score = -node.score;
+
+        board.unmakeMoveNoTurnUpdate(move, moveInfo);
+
+        if (score >= beta) {
+            return { beta, nodeCount, 0 };
+        }
+
+        alpha = std::max(alpha, score);
+    }
+
+    return { alpha, nodeCount, 0 };
+}
+
+template<Color Turn>
+INLINE SearchNode
+FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_t depth, int32_t &alpha, int32_t beta) {
     Board &board = this->board_;
 
     if (depth == 0) {
-        return { Evaluation::evaluate<Turn>(board), 1, 0 };
+        return this->searchQuiesce<Turn>(alpha, beta);
     }
 
     // Move search
@@ -167,7 +222,7 @@ INLINE SearchNode FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint
         // No need to update the turn since we do that manually with templates
         MakeMoveInfo moveInfo = board.makeMoveNoTurnUpdate(move);
 
-        SearchNode node = search<~Turn>(depth - 1, -beta, -alpha);
+        SearchNode node = this->search<~Turn>(depth - 1, -beta, -alpha);
         nodeCount += node.nodeCount;
         transpositionHits += node.transpositionHits;
 
