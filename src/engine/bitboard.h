@@ -25,6 +25,11 @@ INLINE uint8_t popCount(uint64_t x) {
     return (int) x;
 }
 
+INLINE uint64_t byteSwap(uint64_t x) {
+    asm ("bswapq %0" : "=r" (x) : "0" (x));
+    return x;
+}
+
 class Bitboard {
 public:
     INLINE constexpr Bitboard() : set_(0) { }
@@ -50,6 +55,9 @@ public:
     [[nodiscard]] INLINE bool get(uint8_t index) const { return (this->set_ & (1ULL << index)) != 0; }
     INLINE void set(uint8_t index) { this->set_ |= (1ULL << index); }
     INLINE void clear(uint8_t index) { this->set_ &= ~(1ULL << index); }
+
+    // Flips the board vertically.
+    [[nodiscard]] INLINE Bitboard flipVertical() const { return byteSwap(this->set_); }
 
     [[nodiscard]] std::string debug() const;
 

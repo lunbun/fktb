@@ -48,10 +48,10 @@ using PieceType = PieceTypeNamespace::PieceType;
 
 namespace PieceMaterial {
     constexpr int32_t Pawn          = 100;
-    constexpr int32_t Knight        = 300;
-    constexpr int32_t Bishop        = 325;
+    constexpr int32_t Knight        = 320;
+    constexpr int32_t Bishop        = 330;
     constexpr int32_t Rook          = 500;
-    constexpr int32_t Queen         = 950;
+    constexpr int32_t Queen         = 900;
     constexpr int32_t King          = 1000000;
     constexpr std::array<int32_t, 6> Values = { Pawn, Knight, Bishop, Rook, Queen, King };
 

@@ -6,89 +6,81 @@
 #include "bitboard.h"
 #include "inline.h"
 
-using BonusTable = std::array<int32_t, 64>;
+using PieceSquareTable = std::array<int32_t, 64>;
 
-BonusTable knightBonuses;
-BonusTable bishopBonuses;
-BonusTable queenBonuses;
+// Tables taken from https://www.chessprogramming.org/Simplified_Evaluation_Function
+//
+// Important Note: The tables are actually flipped vertically from what is visually shown here since index 0 (rank 1)
+// is at the top, and index 63 (rank 8) is at the bottom.
+PieceSquareTable pawnTable = {
+    0,  0,  0,  0,  0,  0,  0,  0,
+    50, 50, 50, 50, 50, 50, 50, 50,
+    10, 10, 20, 30, 30, 20, 10, 10,
+    5,  5, 10, 25, 25, 10,  5,  5,
+    0,  0,  0, 20, 20,  0,  0,  0,
+    5, -5,-10,  0,  0,-10, -5,  5,
+    5, 10, 10,-20,-20, 10, 10,  5,
+    0,  0,  0,  0,  0,  0,  0,  0
+};
+PieceSquareTable knightTable = {
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50,
+};
+PieceSquareTable bishopTable = {
+    -20,-10,-10,-10,-10,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5, 10, 10,  5,  0,-10,
+    -10,  5,  5, 10, 10,  5,  5,-10,
+    -10,  0, 10, 10, 10, 10,  0,-10,
+    -10, 10, 10, 10, 10, 10, 10,-10,
+    -10,  5,  0,  0,  0,  0,  5,-10,
+    -20,-10,-10,-10,-10,-10,-10,-20,
+};
+PieceSquareTable rookTable = {
+    0,  0,  0,  0,  0,  0,  0,  0,
+    5, 10, 10, 10, 10, 10, 10,  5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    0,  0,  0,  5,  5,  0,  0,  0
+};
+PieceSquareTable queenTable = {
+    -20,-10,-10, -5, -5,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5,  5,  5,  5,  0,-10,
+    -5,  0,  5,  5,  5,  5,  0, -5,
+    0,  0,  5,  5,  5,  5,  0, -5,
+    -10,  5,  5,  5,  5,  5,  0,-10,
+    -10,  0,  5,  0,  0,  0,  0,-10,
+    -20,-10,-10, -5, -5,-10,-10,-20
+};
 
-// Generates attacks for a sliding piece on an empty board.
-// Used for initBonuses templates.
-template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
-Bitboard bindEmpty(Square square) {
-    return GenerateAttacks(square, 0);
-}
-
-// Initializes the bonus table based on the number of attacks for each square.
-template<Bitboard (*GenerateAttacks)(Square)>
-void initAttackBonuses(BonusTable &table) {
-    table.fill(0);
-
-    // Add the number of attacks for each square.
-    int32_t minAttacks = INT32_MAX;
-    int32_t maxAttacks = INT32_MIN;
-    for (uint8_t square = 0; square < 64; square++) {
-        int32_t attacks = GenerateAttacks(square).count();
-
-        minAttacks = std::min(minAttacks, attacks);
-        maxAttacks = std::max(maxAttacks, attacks);
-        table[square] = attacks;
-    }
-
-    // Subtract the average number of attacks for each square to make the bonuses centered around 0.
-    int32_t averageAttacks = (minAttacks + maxAttacks) / 2;
-    for (uint8_t square = 0; square < 64; square++) {
-        table[square] -= averageAttacks;
-    }
-
-    // Scale the bonuses (to make them more significant, since evaluation is in centipawns).
-    for (uint8_t square = 0; square < 64; square++) {
-        table[square] *= 3;
-    }
-}
-
-void Evaluation::maybeInit() {
-    static bool isInitialized = false;
-
-    if (isInitialized) {
-        return;
-    }
-
-    isInitialized = true;
-
-    Bitboards::maybeInit();
-
-    initAttackBonuses<Bitboards::knight>(knightBonuses);
-    initAttackBonuses<bindEmpty<Bitboards::bishop>>(bishopBonuses);
-    initAttackBonuses<bindEmpty<Bitboards::queen>>(queenBonuses);
-}
 
 
-
-template<Color Side, PieceType Type, const BonusTable &Table>
+template<Color Side, PieceType Type, const PieceSquareTable &Table>
 INLINE int32_t evaluatePieceBonuses(const Board &board) {
     int32_t score = 0;
 
     Bitboard pieces = board.bitboard<Side>(Type);
+    if constexpr (Side == Color::White) {
+        // TODO: Flip the table instead of the bitboard.
+        pieces = pieces.flipVertical();
+    }
+
     while (pieces) {
         Square square = pieces.bsfReset();
         score += Table[square];
     }
 
     return score;
-}
-
-template<Color Side>
-INLINE int32_t evaluateRookBonuses(const Board &board) {
-    // Bonus for having a rook on the 7th rank, since there are usually lots of free pawns to attack.
-    Bitboard rooks = board.bitboard<Side>(PieceType::Rook);
-    if constexpr (Side == Color::White) {
-        rooks = rooks & Bitboards::Rank7;
-    } else {
-        rooks = rooks & Bitboards::Rank2;
-    }
-
-    return rooks.count() * PieceMaterial::RookOn7th;
 }
 
 // Evaluates the board for the given side.
@@ -102,10 +94,11 @@ INLINE int32_t evaluateForSide(const Board &board) {
     // Bonus for having a bishop pair
     score += PieceMaterial::BishopPair * (board.bitboard<Side>(PieceType::Bishop).count() >= 2);
 
-    score += evaluatePieceBonuses<Side, PieceType::Knight, knightBonuses>(board);
-    score += evaluatePieceBonuses<Side, PieceType::Bishop, bishopBonuses>(board);
-    score += evaluateRookBonuses<Side>(board);
-    score += evaluatePieceBonuses<Side, PieceType::Queen, queenBonuses>(board);
+    score += evaluatePieceBonuses<Side, PieceType::Pawn, pawnTable>(board);
+    score += evaluatePieceBonuses<Side, PieceType::Knight, knightTable>(board);
+    score += evaluatePieceBonuses<Side, PieceType::Bishop, bishopTable>(board);
+    score += evaluatePieceBonuses<Side, PieceType::Rook, rookTable>(board);
+    score += evaluatePieceBonuses<Side, PieceType::Queen, queenTable>(board);
 
     return score;
 }

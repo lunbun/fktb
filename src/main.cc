@@ -31,7 +31,6 @@ std::string formatNumber(int64_t number) {
 void init() {
     Bitboards::maybeInit();
     Zobrist::maybeInit();
-    Evaluation::maybeInit();
 }
 
 void moveGenTest() {
@@ -110,10 +109,10 @@ int main() {
     init();
 
 //    moveGenTest();
-    fixedDepthTest();
+//    fixedDepthTest();
 //    fixedDepthBenchmark(10);
 
-//    uci();
+    uci();
 
 //    return 0;
 }
