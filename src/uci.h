@@ -40,11 +40,9 @@ private:
 
     bool isSearching_ = false;
     std::optional<SearchOptions> searchOptions_;
-    uint64_t nodeCount_ = 0;
-    std::chrono::time_point<std::chrono::steady_clock> startTime_;
 
     std::unique_ptr<Board> board_;
-    std::unique_ptr<IterativeSearchThread> searchThread_;
+    std::unique_ptr<IterativeSearcher> searcher_;
 
     void error(const std::string &message);
 

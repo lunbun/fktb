@@ -44,7 +44,7 @@ public:
     template<Color Side>
     [[nodiscard]] INLINE int32_t material() const { return this->material_[Side]; }
     [[nodiscard]] INLINE Color turn() const { return this->turn_; }
-    [[nodiscard]] INLINE uint64_t &hash() { return this->hash_; }
+    [[nodiscard]] INLINE uint64_t hash() const { return this->hash_; }
 
     [[nodiscard]] INLINE Piece pieceAt(Square square) const { return this->pieces_[square]; }
 

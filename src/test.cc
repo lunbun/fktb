@@ -6,10 +6,11 @@
 #include <string>
 #include <stdexcept>
 #include <sstream>
+#include <thread>
 #include <chrono>
 
 #include "engine/piece.h"
-#include "engine/move_queue.h"
+#include "engine/move_list.h"
 #include "engine/movegen.h"
 #include "engine/transposition.h"
 #include "engine/fixed_search.h"
@@ -42,77 +43,68 @@ std::string formatWithExact(int64_t number) {
     }
 }
 
+
+
+// Move generation test
 void Tests::moveGenTest(const std::string &fen) {
     Board board = Board::fromFen(fen);
 
-    MovePriorityQueueStack moves(1, 64);
-    moves.push();
-    if (board.turn() == Color::White) {
-        MoveGenerator<Color::White, false> generator(board, moves);
-        generator.generate();
-        moves.score<Color::White>(board);
-    } else {
-        MoveGenerator<Color::Black, false> generator(board, moves);
-        generator.generate();
-        moves.score<Color::Black>(board);
-    }
+    RootMoveList moves = MoveGeneration::generateRoot(board);
+
+    moves.score(board);
+    moves.sort();
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
         std::cout << move.debugName(board) << std::endl;
     }
-
-    moves.pop();
 }
 
+
+
+// Fixed depth search test
 void Tests::fixedDepthTest(const std::string &fen, uint16_t depth) {
     // Use mainly for benchmarking
     Board board = Board::fromFen(fen);
 
-    auto start = std::chrono::steady_clock::now();
-
     TranspositionTable table(2097152);
-    FixedDepthSearcher searcher(board, depth, table);
-    SearchResult result = searcher.search();
+    SearchDebugInfo debugInfo;
+    FixedDepthSearcher searcher(board, depth, table, debugInfo);
+    SearchLine bestLine = searcher.search();
 
-    auto end = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-    std::cout << "Best move: " << result.bestLine[0].debugName(board) << std::endl;
-    std::cout << "Score: " << result.score << std::endl;
-    std::cout << "Nodes: " << formatWithExact(result.nodeCount) << std::endl;
-    std::cout << "Transposition hits: " << formatWithExact(result.transpositionHits) << std::endl;
-    std::cout << "Time: " << duration << "ms" << std::endl;
+    std::cout << "Best move: " << bestLine.moves[0].debugName(board) << std::endl;
+    std::cout << "Score: " << bestLine.score << std::endl;
+    std::cout << "Nodes: " << formatWithExact(debugInfo.nodeCount()) << std::endl;
+    std::cout << "Transposition hits: " << formatWithExact(debugInfo.transpositionHits()) << std::endl;
+    std::cout << "Time: " << debugInfo.elapsed().count() << "ms" << std::endl;
 }
 
+
+
+// Iterative deepening search test
 void Tests::iterativeTest(const std::string &fen, uint16_t depth) {
     Board board = Board::fromFen(fen);
 
-    IterativeSearchThread thread;
+    IterativeSearcher searcher(std::thread::hardware_concurrency());
 
     volatile bool isComplete = false;
 
-    auto start = std::chrono::steady_clock::now();
-
-    thread.addIterationCallback([&board, &thread, &isComplete, depth, start](const SearchResult &result) {
-        auto now = std::chrono::steady_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
-
+    searcher.addIterationCallback([&board, &searcher, &isComplete, depth](const SearchResult &result) {
         std::cout << result.bestLine[0].debugName(board);
         std::cout << " depth " << result.depth;
         std::cout << " score " << result.score;
         std::cout << " nodes " << formatNumber(result.nodeCount);
-        std::cout << " time " << duration << "ms";
+        std::cout << " time " << result.elapsed.count() << "ms";
         std::cout << std::endl;
 
         if (result.depth == depth) {
             isComplete = true;
 
-            thread.stop();
+            searcher.stop();
         }
     });
 
-    thread.start(board);
+    searcher.start(board);
 
     // Sleep until the search is complete
     while (!isComplete) {
@@ -120,6 +112,9 @@ void Tests::iterativeTest(const std::string &fen, uint16_t depth) {
     }
 }
 
+
+
+// Zobrist hash test
 void verifyHash(Board &board) {
     uint64_t hash = board.hash();
 
@@ -132,15 +127,17 @@ void verifyHash(Board &board) {
 }
 
 template<Color Side>
-uint32_t hashTestSearch(Board &board, MovePriorityQueueStack &moves, uint16_t depth) {
+uint32_t hashTestSearch(Board &board, uint16_t depth) {
     if (depth == 0) {
         return 1;
     }
 
-    MovePriorityQueueStackGuard movesStackGuard(moves);
+    AlignedMoveEntry moveBuffer[MaxMoveCount];
+    MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveGenerator<Side, false> generator(board, moves);
-    generator.generate();
+    MoveEntry *movesEnd = MoveGeneration::generate<Side, false>(board, movesStart);
+
+    MovePriorityQueue moves(movesStart, movesEnd);
 
     uint32_t nodeCount = 0;
 
@@ -151,7 +148,7 @@ uint32_t hashTestSearch(Board &board, MovePriorityQueueStack &moves, uint16_t de
 
         verifyHash(board);
 
-        nodeCount += hashTestSearch<~Side>(board, moves, depth - 1);
+        nodeCount += hashTestSearch<~Side>(board, depth - 1);
 
         board.unmakeMove(move, info);
 
@@ -162,17 +159,15 @@ uint32_t hashTestSearch(Board &board, MovePriorityQueueStack &moves, uint16_t de
 }
 
 void Tests::hashTest(const std::string &fen, uint16_t depth) {
-    MovePriorityQueueStack moves(depth, 64 * depth);
-
     Board board = Board::fromFen(fen);
 
     auto start = std::chrono::steady_clock::now();
 
     uint32_t nodeCount;
     if (board.turn() == Color::White) {
-        nodeCount = hashTestSearch<Color::White>(board, moves, depth);
+        nodeCount = hashTestSearch<Color::White>(board, depth);
     } else {
-        nodeCount = hashTestSearch<Color::Black>(board, moves, depth);
+        nodeCount = hashTestSearch<Color::Black>(board, depth);
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -183,16 +178,107 @@ void Tests::hashTest(const std::string &fen, uint16_t depth) {
     std::cout << "Time: " << duration << "ms" << std::endl;
 }
 
+
+
+// Transposition table lock test
+void transpositionWriteNoLock(TranspositionTable &table, uint64_t key, int32_t value,
+    std::chrono::steady_clock::time_point end) {
+    while (std::chrono::steady_clock::now() < end) {
+        table.debugStoreWithoutLock(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+        table.debugStoreWithoutLock(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+        table.debugStoreWithoutLock(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+        table.debugStoreWithoutLock(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+        table.debugStoreWithoutLock(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+    }
+}
+
+void transpositionWriteLocked(TranspositionTable &table, uint64_t key, int32_t value,
+    std::chrono::steady_clock::time_point end) {
+    while (std::chrono::steady_clock::now() < end) {
+        table.store(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+        table.store(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+        table.store(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+        table.store(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+        table.store(key, value, TranspositionTable::Flag::Exact, Move::invalid(), value);
+    }
+}
+
+void transpositionCorruptionDetection(TranspositionTable &table, uint64_t key, uint32_t &corruptionCount,
+    std::chrono::steady_clock::time_point end) {
+    while (std::chrono::steady_clock::now() < end) {
+        TranspositionTable::LockedEntry entry = table.load(key);
+
+        if (entry->depth() != entry->bestScore()) {
+            corruptionCount++;
+        }
+    }
+}
+
+void Tests::transpositionLockTest() {
+    // The way this test works:
+    //  1. First, we test a control case where we don't use any locks, to make sure that we can accurately detect if
+    //      the transposition table is being corrupted.
+    //  2. Then, test using locks, and check for corruption.
+    //
+    // (we are just using depth and bestScore as a way to detect corruption, they don't actually mean anything here)
+    // Thread 1 will try to write:
+    //      depth = 1, bestScore = 1
+    // Thread 2 will try to write:
+    //      depth = 2, bestScore = 2
+    // Thread 3 will read, and if these two values are not equal, it means the table is corrupted.
+
+    TranspositionTable table(1);
+
+    // Control case, no locking
+    {
+        auto start = std::chrono::steady_clock::now();
+        auto end = start + std::chrono::milliseconds(500);
+        uint32_t corruptionCount = 0;
+
+        std::thread thread1(transpositionWriteNoLock, std::ref(table), 0, 1, end);
+        std::thread thread2(transpositionWriteNoLock, std::ref(table), 0, 2, end);
+        std::thread thread3(transpositionCorruptionDetection, std::ref(table), 0, std::ref(corruptionCount), end);
+
+        thread1.join();
+        thread2.join();
+        thread3.join();
+
+        std::cout << "Control case (no locking): " << corruptionCount << " corruptions detected." << std::endl;
+    }
+
+    // Test case, with locking
+    {
+        auto start = std::chrono::steady_clock::now();
+        auto end = start + std::chrono::milliseconds(500);
+        uint32_t corruptionCount = 0;
+
+        std::thread thread1(transpositionWriteLocked, std::ref(table), 0, 1, end);
+        std::thread thread2(transpositionWriteLocked, std::ref(table), 0, 2, end);
+        std::thread thread3(transpositionCorruptionDetection, std::ref(table), 0, std::ref(corruptionCount), end);
+
+        thread1.join();
+        thread2.join();
+        thread3.join();
+
+        std::cout << "Test case (with locking): " << corruptionCount << " corruptions detected." << std::endl;
+    }
+}
+
+
+
+// Perft test
 template<Color Side>
-uint32_t perftSearch(Board &board, MovePriorityQueueStack &moves, uint16_t depth) {
+uint32_t perftSearch(Board &board, uint16_t depth) {
     if (depth == 0) {
         return 1;
     }
 
-    MovePriorityQueueStackGuard movesStackGuard(moves);
+    AlignedMoveEntry moveBuffer[256];
+    MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveGenerator<Side, false> generator(board, moves);
-    generator.generate();
+    MoveEntry *movesEnd = MoveGeneration::generate<Side, false>(board, movesStart);
+
+    MovePriorityQueue moves(movesStart, movesEnd);
 
     uint32_t nodeCount = 0;
 
@@ -201,7 +287,7 @@ uint32_t perftSearch(Board &board, MovePriorityQueueStack &moves, uint16_t depth
 
         MakeMoveInfo info = board.makeMove(move);
 
-        nodeCount += perftSearch<~Side>(board, moves, depth - 1);
+        nodeCount += perftSearch<~Side>(board, depth - 1);
 
         board.unmakeMove(move, info);
     }
@@ -210,17 +296,15 @@ uint32_t perftSearch(Board &board, MovePriorityQueueStack &moves, uint16_t depth
 }
 
 void Tests::perft(const std::string &fen, uint16_t depth) {
-    MovePriorityQueueStack moves(depth, 64 * depth);
-
     Board board = Board::fromFen(fen);
 
     auto start = std::chrono::steady_clock::now();
 
     uint32_t nodeCount;
     if (board.turn() == Color::White) {
-        nodeCount = perftSearch<Color::White>(board, moves, depth);
+        nodeCount = perftSearch<Color::White>(board, depth);
     } else {
-        nodeCount = perftSearch<Color::Black>(board, moves, depth);
+        nodeCount = perftSearch<Color::Black>(board, depth);
     }
 
     auto end = std::chrono::steady_clock::now();

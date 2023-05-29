@@ -46,7 +46,30 @@ uint64_t Zobrist::piece(Piece piece, Square square) {
 
 
 
-TranspositionTable::TranspositionTable(uint32_t size) : lock_() {
+TranspositionTable::LockedEntry::LockedEntry() {
+    this->entry_ = nullptr;
+}
+
+TranspositionTable::LockedEntry::LockedEntry(Entry *entry) {
+    entry->lock().lock();
+    this->entry_ = entry;
+}
+
+TranspositionTable::LockedEntry::~LockedEntry() {
+    if (this->entry_ != nullptr) {
+        this->entry_->lock().unlock();
+    }
+}
+
+void TranspositionTable::Entry::store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
+    this->key_ = key;
+    this->depth_ = depth;
+    this->flag_ = flag;
+    this->bestMove_ = bestMove;
+    this->bestScore_ = bestScore;
+}
+
+TranspositionTable::TranspositionTable(uint32_t size) {
     bool powerOfTwo = (size != 0) && !(size & (size - 1));
     assert(powerOfTwo && "Transposition table size must be a power of two.");
 
@@ -59,22 +82,32 @@ TranspositionTable::~TranspositionTable() {
     std::free(this->entries_);
 }
 
-TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {
-    Entry *entry = this->entries_ + (key & this->sizeMask_);
+TranspositionTable::LockedEntry TranspositionTable::load(uint64_t key) const {
+    LockedEntry lockedEntry(this->entries_ + (key & this->sizeMask_));
 
-    if (entry->isValid() && entry->key() == key) {
-        return entry;
+    if (lockedEntry->isValid() && lockedEntry->key() == key) {
+        return lockedEntry;
     } else {
-        return nullptr;
+        return { };
     }
 }
 
 void TranspositionTable::store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
-    Entry *pointer = this->entries_ + (key & this->sizeMask_);
+    LockedEntry lockedEntry(this->entries_ + (key & this->sizeMask_));
 
     // Only overwrite an existing entry if the new entry has a higher depth
-    if (!pointer->isValid() || depth > pointer->depth()) {
-        // Emplace the new entry
-        new(pointer) Entry(key, depth, flag, bestMove, bestScore);
+    if (!lockedEntry->isValid() || depth > lockedEntry->depth()) {
+        // Write the new entry
+        lockedEntry->store(key, depth, flag, bestMove, bestScore);
     }
+}
+
+TranspositionTable::Entry *TranspositionTable::debugLoadWithoutLock(uint64_t key) {
+    return this->entries_ + (key & this->sizeMask_);
+}
+
+void TranspositionTable::debugStoreWithoutLock(uint64_t key, uint16_t depth, Flag flag, Move bestMove,
+    int32_t bestScore) {
+    Entry *entry = this->entries_ + (key & this->sizeMask_);
+    entry->store(key, depth, flag, bestMove, bestScore);
 }

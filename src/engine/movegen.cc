@@ -3,12 +3,47 @@
 #include <stdexcept>
 
 #include "bitboard.h"
-#include "move_queue.h"
+#include "move_list.h"
 #include "inline.h"
 
+// Class is used for convenience so that we don't have to pass around the board, move list, and bitboards separately as
+// parameters.
 template<Color Side, bool ExcludeQuiet>
-MoveGenerator<Side, ExcludeQuiet>::MoveGenerator(const Board &board, MovePriorityQueueStack &moves) : board_(board),
-                                                                                                      moves_(moves) {
+class MoveGenerator {
+public:
+    MoveGenerator() = delete;
+    MoveGenerator(const Board &board, MoveEntry *moves);
+
+    // Returns the pointer to the end of the move list.
+    [[nodiscard]] MoveEntry *generate();
+
+private:
+    const Board &board_;
+    MoveList list_;
+
+    Bitboard friendly_;
+    Bitboard enemy_;
+    Bitboard occupied_;
+    Bitboard empty_;
+
+    void serializeQuiet(Square from, Bitboard quiet);
+    void serializeCaptures(Square from, Bitboard captures);
+    void serializePromotions(Square from, Bitboard promotions);
+    // Serializes all moves in a bitboard, both quiet and captures (will not serialize quiet if in ExcludeQuiet mode)
+    void serializeBitboard(Square from, Bitboard bitboard);
+
+    void generatePawnMoves(Square square);
+    void generateAllPawnMoves();
+
+    template<Bitboard (*GenerateAttacks)(Square)>
+    void generateOffsetMoves(Piece piece);
+
+    template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
+    void generateSlidingMoves(Piece piece);
+};
+
+template<Color Side, bool ExcludeQuiet>
+MoveGenerator<Side, ExcludeQuiet>::MoveGenerator(const Board &board, MoveEntry *moves) : board_(board), list_(moves) {
     this->friendly_ = board.composite<Side>();
     this->enemy_ = board.composite<~Side>();
     this->occupied_ = this->friendly_ | this->enemy_;
@@ -23,7 +58,7 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeQuiet(Square from, Bitbo
 
     while (quiet) {
         Square to = quiet.bsfReset();
-        this->moves_.enqueue({ from, to, MoveFlag::Quiet });
+        this->list_.push({ from, to, MoveFlag::Quiet });
     }
 }
 
@@ -31,7 +66,7 @@ template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeCaptures(Square from, Bitboard captures) {
     while (captures) {
         Square to = captures.bsfReset();
-        this->moves_.enqueue({ from, to, MoveFlag::Capture });
+        this->list_.push({ from, to, MoveFlag::Capture });
     }
 }
 
@@ -39,10 +74,10 @@ template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotions(Square from, Bitboard promotions) {
     while (promotions) {
         Square to = promotions.bsfReset();
-        this->moves_.enqueue({ from, to, MoveFlag::KnightPromotion });
-        this->moves_.enqueue({ from, to, MoveFlag::BishopPromotion });
-        this->moves_.enqueue({ from, to, MoveFlag::RookPromotion });
-        this->moves_.enqueue({ from, to, MoveFlag::QueenPromotion });
+        this->list_.push({ from, to, MoveFlag::KnightPromotion });
+        this->list_.push({ from, to, MoveFlag::BishopPromotion });
+        this->list_.push({ from, to, MoveFlag::RookPromotion });
+        this->list_.push({ from, to, MoveFlag::QueenPromotion });
     }
 }
 
@@ -125,21 +160,42 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generateSlidingMoves(Piece piece)
     }
 }
 
-
-
 template<Color Side, bool ExcludeQuiet>
-void MoveGenerator<Side, ExcludeQuiet>::generate() {
+INLINE MoveEntry *MoveGenerator<Side, ExcludeQuiet>::generate() {
     this->generateAllPawnMoves();
     this->generateOffsetMoves<Bitboards::knight>(Piece::knight(Side));
     this->generateSlidingMoves<Bitboards::bishop>(Piece::bishop(Side));
     this->generateSlidingMoves<Bitboards::rook>(Piece::rook(Side));
     this->generateSlidingMoves<Bitboards::queen>(Piece::queen(Side));
     this->generateOffsetMoves<Bitboards::king>(Piece::king(Side));
+
+    return this->list_.end();
 }
 
 
 
-template class MoveGenerator<Color::White, false>;
-template class MoveGenerator<Color::Black, false>;
-template class MoveGenerator<Color::White, true>;
-template class MoveGenerator<Color::Black, true>;
+template<Color Side, bool ExcludeQuiet>
+MoveEntry *MoveGeneration::generate(const Board &board, MoveEntry *moves) {
+    MoveGenerator<Side, ExcludeQuiet> generator(board, moves);
+    return generator.generate();
+}
+
+RootMoveList MoveGeneration::generateRoot(const Board &board) {
+    AlignedMoveEntry movesBuffer[MaxMoveCount];
+    MoveEntry *movesStart = MoveEntry::fromAligned(movesBuffer);
+
+    MoveEntry *movesEnd;
+    if (board.turn() == Color::White) {
+        movesEnd = MoveGeneration::generate<Color::White, false>(board, movesStart);
+    } else {
+        movesEnd = MoveGeneration::generate<Color::Black, false>(board, movesStart);
+    }
+
+    // RootMoveList will copy the moves into its own buffer
+    return { movesStart, movesEnd };
+}
+
+template MoveEntry *MoveGeneration::generate<Color::White, false>(const Board &board, MoveEntry *moves);
+template MoveEntry *MoveGeneration::generate<Color::Black, false>(const Board &board, MoveEntry *moves);
+template MoveEntry *MoveGeneration::generate<Color::White, true>(const Board &board, MoveEntry *moves);
+template MoveEntry *MoveGeneration::generate<Color::Black, true>(const Board &board, MoveEntry *moves);

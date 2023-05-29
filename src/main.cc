@@ -12,7 +12,7 @@
 int main() {
     EngineInit::init();
 
-    Tests::iterativeTest(Board::KiwiPeteFen, 7);
+    uci();
 
 //    return 0;
 }

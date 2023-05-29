@@ -56,6 +56,10 @@ int32_t MoveScorer<Side>::score(Move move) {
     switch (piece.type()) {
         // Pawn heuristics
         case PieceType::Pawn: {
+            // Use piece-square tables
+            constexpr const PieceSquareTable &Table = Evaluation::pawnTable[Side];
+            score += (Table[move.to()] * 5);
+
             // The pawn attacks after this move
             Bitboard pawnAttacks = Bitboards::pawn<Side>(move.to());
 

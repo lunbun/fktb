@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <random>
+
 #include "piece.h"
 #include "bitboard.h"
 #include "board.h"
@@ -10,7 +13,7 @@ class MoveScorer {
 public:
     explicit MoveScorer(const Board &board);
 
-    int32_t score(Move move);
+    [[nodiscard]] int32_t score(Move move);
 
 private:
     const Board &board_;

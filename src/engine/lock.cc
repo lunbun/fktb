@@ -17,13 +17,3 @@ void SpinLock::lock() {
 void SpinLock::unlock() {
     this->lock_.store(false, std::memory_order_release);
 }
-
-
-
-SpinLockGuard::SpinLockGuard(SpinLock &lock) : lock_(lock) {
-    this->lock_.lock();
-}
-
-SpinLockGuard::~SpinLockGuard() {
-    this->lock_.unlock();
-}

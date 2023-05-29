@@ -24,8 +24,8 @@ const std::string &TokenStream::next() {
 
 UciHandler::UciHandler(std::string name, std::string author) : name_(std::move(name)), author_(std::move(author)),
                                                                board_(nullptr) {
-    this->searchThread_ = std::make_unique<IterativeSearchThread>();
-    this->searchThread_->addIterationCallback([this](const SearchResult &result) {
+    this->searcher_ = std::make_unique<IterativeSearcher>(std::thread::hardware_concurrency());
+    this->searcher_->addIterationCallback([this](const SearchResult &result) {
         this->iterationCallback(result);
     });
 }
@@ -221,10 +221,8 @@ void UciHandler::startSearch(const SearchOptions &options) {
 
     this->isSearching_ = true;
     this->searchOptions_ = options;
-    this->nodeCount_ = 0;
-    this->startTime_ = std::chrono::steady_clock::now();
 
-    this->searchThread_->start(*this->board_);
+    this->searcher_->start(*this->board_);
 
     if (options.moveTime.has_value()) {
         int32_t moveTime = options.moveTime.value();
@@ -246,13 +244,13 @@ void UciHandler::stopSearch() {
     this->isSearching_ = false;
     this->searchOptions_ = std::nullopt;
 
-    SearchResult result = this->searchThread_->stop();
+    std::optional<SearchResult> result = this->searcher_->stop();
 
-    if (!result.isValid || result.bestLine.empty()) {
+    if (!result.has_value() || result->bestLine.empty()) {
         return this->error("Search stopped before it could find a move");
     }
 
-    std::cout << "bestmove " << result.bestLine[0].uci() << std::endl;
+    std::cout << "bestmove " << result->bestLine[0].uci() << std::endl;
 }
 
 void UciHandler::iterationCallback(const SearchResult &result) {
@@ -260,24 +258,21 @@ void UciHandler::iterationCallback(const SearchResult &result) {
         return this->error("Iteration callback somehow called when not searching");
     }
 
-    this->nodeCount_ += result.nodeCount;
+    uint64_t millis = result.elapsed.count();
 
     // Calculate nodes per second
-    auto duration = std::chrono::steady_clock::now() - this->startTime_;
-    uint32_t millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-
     uint64_t nps;
     if (millis == 0) {
-        nps = this->nodeCount_ * 1000;
+        nps = result.nodeCount * 1000ULL;
     } else {
-        nps = this->nodeCount_ * 1000 / millis;
+        nps = result.nodeCount * 1000ULL / millis;
     }
 
     // Print the search result
     std::cout << "info depth " << result.depth;
     std::cout << " score cp " << result.score;
     std::cout << " time " << millis;
-    std::cout << " nodes " << this->nodeCount_;
+    std::cout << " nodes " << result.nodeCount;
     std::cout << " nps " << nps;
     std::cout << " pv ";
     for (Move move : result.bestLine) {

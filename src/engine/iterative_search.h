@@ -1,52 +1,59 @@
 #pragma once
 
-#include <optional>
-#include <thread>
+#include <cstdint>
 #include <mutex>
-#include <condition_variable>
+#include <memory>
+#include <vector>
+#include <chrono>
 #include <functional>
 
+#include "piece.h"
 #include "fixed_search.h"
+#include "transposition.h"
+#include "debug_info.h"
 #include "inline.h"
+
+// Note: In IterativeSearcher, nodeCount, transpositionHits, and elapsed are the amount of nodes/hits/elapsed time since
+// the start of the entire iterative search, not just the current iteration.
+struct SearchResult {
+    INLINE static SearchResult invalid() { return { }; }
+
+    uint16_t depth;
+    std::vector<Move> bestLine;
+    int32_t score;
+    uint64_t nodeCount;
+    uint64_t transpositionHits;
+    std::chrono::milliseconds elapsed;
+
+    SearchResult(); // Creates an invalid search result.
+    SearchResult(uint16_t depth, SearchLine line, const SearchDebugInfo &debugInfo);
+
+    [[nodiscard]] INLINE bool isValid() const { return !this->bestLine.empty(); }
+};
 
 using IterationCallback = std::function<void(const SearchResult &result)>;
 
-// Search starts immediately after construction, and continues until the object is destroyed.
-class IterativeSearchThread {
-private:
-    struct SearchData {
-        uint16_t depth;
-        SearchResult result;
-        Board board;
-        TranspositionTable table;
-        std::unique_ptr<FixedDepthSearcher> currentIteration;
-
-        explicit SearchData(Board board);
-    };
-
+class IterativeSearcher {
 public:
-    IterativeSearchThread();
+    explicit IterativeSearcher(uint32_t threadCount);
+    ~IterativeSearcher();
 
     void addIterationCallback(IterationCallback callback);
 
     void start(const Board &board);
     SearchResult stop();
 
-    [[nodiscard]] INLINE bool isSearching() const { return this->data_ != nullptr; }
-    [[nodiscard]] INLINE SearchData &data() const { return *this->data_; }
-
 private:
-    std::thread thread_;
-    std::mutex dataMutex_;
-    std::mutex searchMutex_;
-    std::condition_variable isSearchingCondition_;
-    std::vector<IterationCallback> iterationCallbacks_;
+    class SearchThread;
 
-    std::unique_ptr<SearchData> data_;
+    std::vector<std::unique_ptr<SearchThread>> threads_;
+    std::mutex mutex_;
 
-    [[noreturn]] void loop();
+    std::vector<IterationCallback> callbacks_;
+    SearchResult result_;
+    std::unique_ptr<TranspositionTable> table_;
+    std::unique_ptr<SearchDebugInfo> debugInfo_;
 
     void notifyCallbacks(const SearchResult &result);
-
-    void awaitSearchStart();
+    void receiveResultFromThread(const SearchResult &result);
 };

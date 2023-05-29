@@ -3,6 +3,7 @@ target_sources(chess PRIVATE
         bitboard.h
         board.cc
         board.h
+        debug_info.h
         evaluation.cc
         evaluation.h
         fen.cc
@@ -17,8 +18,8 @@ target_sources(chess PRIVATE
         lock.h
         move.cc
         move.h
-        move_queue.cc
-        move_queue.h
+        move_list.cc
+        move_list.h
         move_score.cc
         move_score.h
         movegen.cc
