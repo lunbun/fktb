@@ -4,8 +4,8 @@
 
 #include "move.h"
 #include "move_list.h"
-#include "bitboard.h"
-#include "board.h"
+#include "engine/board/board.h"
+#include "engine/board/bitboard.h"
 
 namespace MoveGeneration {
     // Generates all moves for the given side, excluding quiet moves if ExcludeQuiet is true.

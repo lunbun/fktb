@@ -7,11 +7,11 @@
 #include <chrono>
 #include <functional>
 
-#include "piece.h"
-#include "fixed_search.h"
-#include "transposition.h"
 #include "debug_info.h"
-#include "inline.h"
+#include "fixed_search.h"
+#include "engine/inline.h"
+#include "engine/board/piece.h"
+#include "engine/hash/transposition.h"
 
 // Note: In IterativeSearcher, nodeCount, transpositionHits, and elapsed are the amount of nodes/hits/elapsed time since
 // the start of the entire iterative search, not just the current iteration.

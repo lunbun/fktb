@@ -3,16 +3,19 @@
 #include <cstdint>
 #include <atomic>
 
-#include "move.h"
-#include "piece.h"
 #include "lock.h"
-#include "inline.h"
+#include "engine/inline.h"
+#include "engine/move/move.h"
+#include "engine/board/square.h"
+#include "engine/board/castling.h"
+#include "engine/board/piece.h"
 
 namespace Zobrist {
     // Initializes the Zobrist hash numbers, if not already initialized.
     void maybeInit();
 
     uint64_t blackToMove();
+    uint64_t castlingRights(CastlingRights castlingRights);
     uint64_t piece(Piece piece, Square square);
 }
 

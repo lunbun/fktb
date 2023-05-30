@@ -5,7 +5,9 @@
 #include <vector>
 #include <optional>
 
+#include "square.h"
 #include "piece.h"
+#include "castling.h"
 
 class FenReader {
 public:
@@ -24,6 +26,7 @@ public:
     Entry next();
 
     [[nodiscard]] Color turn() const;
+    [[nodiscard]] CastlingRights castlingRights() const;
 
 private:
     std::vector<std::string> fields_;
@@ -48,7 +51,8 @@ public:
     // Moves to the next rank.
     void nextRank();
 
-    void setTurn(Color color);
+    void turn(Color color);
+    void castlingRights(CastlingRights castlingRights);
 
     // Returns the FEN string.
     [[nodiscard]] const std::string &fen() const { return this->fen_; }

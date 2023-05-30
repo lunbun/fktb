@@ -5,8 +5,11 @@
 #include <string>
 #include <vector>
 
-#include "piece.h"
-#include "inline.h"
+#include "engine/inline.h"
+#include "engine/board/square.h"
+#include "engine/board/color.h"
+#include "engine/board/piece.h"
+#include "engine/board/castling.h"
 
 class Board;
 
@@ -14,6 +17,12 @@ class Board;
 namespace MoveFlagNamespace {
     enum MoveFlag : uint8_t {
         Quiet               = 0b0000,
+
+        // IMPORTANT NOTE: Some promotion flags have the castle bits, so if you want to use CastleMask to check if a
+        // move is a castle, you also have to make sure it's not a promotion.
+        CastleMask          = 0b0010,
+        KingCastle          = 0b0010,
+        QueenCastle         = 0b0011,
 
         Capture             = 0b0100,
 
@@ -50,8 +59,18 @@ public:
     [[nodiscard]] INLINE constexpr MoveFlag flags() const { return static_cast<MoveFlag>((this->bits_ >> 12) & 0x0F); }
 
     [[nodiscard]] INLINE constexpr bool isValid() const { return this->from() != this->to(); }
+    [[nodiscard]] INLINE constexpr bool isCastle() const {
+        // Some promotion flags also have the castle bits, so we have to explicitly check that it's not a promotion.
+        return this->flags() & MoveFlag::CastleMask && !this->isPromotion();
+    }
     [[nodiscard]] INLINE constexpr bool isCapture() const { return this->flags() & MoveFlag::Capture; }
     [[nodiscard]] INLINE constexpr bool isPromotion() const { return this->flags() & MoveFlag::PromotionMask; }
+
+    // Returns the side that the castle is on.
+    // Assumes that the move is a castle, will return a garbage value otherwise.
+    [[nodiscard]] INLINE constexpr CastlingSide castlingSide() const {
+        return static_cast<CastlingSide>((this->flags() & 1) + CastlingSide::King);
+    }
 
     // Returns the piece type that the pawn is promoted to.
     // Assumes that the move is a promotion, will return a garbage value otherwise.
@@ -59,7 +78,7 @@ public:
         return static_cast<PieceType>((this->flags() & 3) + PieceType::Knight);
     }
 
-    [[nodiscard]] bool operator==(const Move &other) const;
+    [[nodiscard]] INLINE constexpr bool operator==(Move other) const { return this->bits_ == other.bits_; }
 
     [[nodiscard]] std::string uci() const;
     [[nodiscard]] std::string debugName(const Board &board) const;

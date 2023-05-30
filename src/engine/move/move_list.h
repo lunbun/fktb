@@ -4,10 +4,10 @@
 #include <vector>
 
 #include "move.h"
-#include "piece.h"
-#include "board.h"
-#include "inline.h"
 #include "move_score.h"
+#include "engine/inline.h"
+#include "engine/board/piece.h"
+#include "engine/board/board.h"
 
 class TranspositionTable;
 

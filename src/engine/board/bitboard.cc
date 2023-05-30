@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "inline.h"
+#include "engine/inline.h"
 
 std::string Bitboard::debug() const {
     std::string result;

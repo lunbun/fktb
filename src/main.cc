@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "engine/init.h"
 
 #include "test.h"
@@ -11,6 +13,10 @@
 
 int main() {
     EngineInit::init();
+
+//    Tests::unmakeMoveTest(Board::KiwiPeteFen);
+//    Tests::moveGenTest(Board::KiwiPeteFen);
+//    Tests::fixedDepthTest(Board::KiwiPeteFen, 7);
 
     uci();
 

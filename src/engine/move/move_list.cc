@@ -4,10 +4,10 @@
 #include <algorithm>
 
 #include "move.h"
-#include "piece.h"
-#include "board.h"
 #include "move_score.h"
-#include "transposition.h"
+#include "engine/board/piece.h"
+#include "engine/board/board.h"
+#include "engine/hash/transposition.h"
 
 MovePriorityQueue::MovePriorityQueue(MoveEntry *start, MoveEntry *end) : hashMove_(Move::invalid()), start_(start),
                                                                          end_(end) { }

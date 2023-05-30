@@ -4,32 +4,8 @@
 #include <string>
 #include <array>
 
-#include "inline.h"
-
-// Square can technically fit into 6 bits.
-class Square {
-public:
-    INLINE constexpr Square() : index_(0) { }
-    INLINE constexpr Square(uint8_t index) : index_(index) { } // NOLINT(google-explicit-constructor)
-    INLINE constexpr Square(uint8_t file, uint8_t rank) : index_(file | (rank << 3)) { }
-    INLINE constexpr operator uint8_t() const { return this->index_; } // NOLINT(google-explicit-constructor)
-
-    [[nodiscard]] INLINE constexpr static uint8_t file(uint8_t index) { return index & 7; }
-    [[nodiscard]] INLINE constexpr static uint8_t rank(uint8_t index) { return index >> 3; };
-
-    [[nodiscard]] INLINE constexpr uint8_t file() const { return Square::file(this->index_); }
-    [[nodiscard]] INLINE constexpr uint8_t rank() const { return Square::rank(this->index_); }
-
-    [[nodiscard]] std::string uci() const;
-    [[nodiscard]] std::string debugName() const;
-
-private:
-    uint8_t index_;
-};
-
-static_assert(sizeof(Square) == 1, "Square must be 1 byte");
-
-
+#include "color.h"
+#include "engine/inline.h"
 
 // @formatter:off
 namespace PieceTypeNamespace {
@@ -61,44 +37,7 @@ namespace PieceMaterial {
 
     INLINE constexpr int32_t material(PieceType pieceType) { return PieceMaterial::Values[pieceType]; }
 }
-
-namespace ColorNamespace {
-    enum Color : uint8_t {
-        White       = 0,
-        Black       = 1
-    };
-
-    [[nodiscard]] std::string debugName(Color color);
-}
-using Color = ColorNamespace::Color;
 // @formatter:on
-
-INLINE constexpr Color operator~(Color color) {
-    return static_cast<Color>(color ^ 1);
-}
-
-template<typename T>
-class ColorMap {
-public:
-    constexpr ColorMap() = default;
-    constexpr ColorMap(const T &white, const T &black) : values_{ white, black } { }
-
-    ColorMap(const ColorMap &other) = default;
-    ColorMap &operator=(const ColorMap &other) = default;
-    ColorMap(ColorMap &&other) noexcept = default;
-    ColorMap &operator=(ColorMap &&other) noexcept = default;
-
-    [[nodiscard]] INLINE constexpr T &operator[](Color color) { return this->values_[color]; }
-    [[nodiscard]] INLINE constexpr const T &operator[](Color color) const { return this->values_[color]; }
-
-    [[nodiscard]] INLINE constexpr T &white() { return this->values_[0]; }
-    [[nodiscard]] INLINE constexpr T &black() { return this->values_[1]; }
-    [[nodiscard]] INLINE constexpr const T &white() const { return this->values_[0]; }
-    [[nodiscard]] INLINE constexpr const T &black() const { return this->values_[1]; }
-
-private:
-    std::array<T, 2> values_;
-};
 
 
 
@@ -122,6 +61,8 @@ struct Piece {
     [[nodiscard]] INLINE constexpr bool isEmpty() const { return this->type() == PieceType::Empty; }
 
     [[nodiscard]] INLINE constexpr int32_t material() const { return PieceMaterial::material(this->type()); }
+
+    [[nodiscard]] INLINE constexpr bool operator==(Piece other) const { return this->bits_ == other.bits_; }
 
     [[nodiscard]] std::string debugName() const;
 

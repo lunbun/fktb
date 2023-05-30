@@ -6,8 +6,8 @@
 #include <optional>
 #include <memory>
 
-#include "engine/board.h"
-#include "engine/iterative_search.h"
+#include "engine/board/board.h"
+#include "engine/search/iterative_search.h"
 
 class TokenStream {
 public:

@@ -5,8 +5,10 @@
 #include <string>
 #include <array>
 
+#include "color.h"
+#include "square.h"
 #include "piece.h"
-#include "inline.h"
+#include "engine/inline.h"
 
 INLINE uint8_t bitScanForward(uint64_t x) {
     assert(x != 0);
@@ -70,14 +72,27 @@ private:
 using AttackTable = std::array<Bitboard, 64>;
 
 namespace Bitboards {
-    constexpr Bitboard Rank1 = 0x00000000000000FFULL;
-    constexpr Bitboard Rank2 = 0x000000000000FF00ULL;
-    constexpr Bitboard Rank3 = 0x0000000000FF0000ULL;
-    constexpr Bitboard Rank4 = 0x00000000FF000000ULL;
-    constexpr Bitboard Rank5 = 0x000000FF00000000ULL;
-    constexpr Bitboard Rank6 = 0x0000FF0000000000ULL;
-    constexpr Bitboard Rank7 = 0x00FF000000000000ULL;
-    constexpr Bitboard Rank8 = 0xFF00000000000000ULL;
+    // Bitboards for all the squares, files, and ranks.
+    // @formatter:off
+#define BB_SQ(square) constexpr Bitboard square = 1ULL << (Square::square);
+    BB_SQ(A1) BB_SQ(B1) BB_SQ(C1) BB_SQ(D1) BB_SQ(E1) BB_SQ(F1) BB_SQ(G1) BB_SQ(H1)
+    BB_SQ(A2) BB_SQ(B2) BB_SQ(C2) BB_SQ(D2) BB_SQ(E2) BB_SQ(F2) BB_SQ(G2) BB_SQ(H2)
+    BB_SQ(A3) BB_SQ(B3) BB_SQ(C3) BB_SQ(D3) BB_SQ(E3) BB_SQ(F3) BB_SQ(G3) BB_SQ(H3)
+    BB_SQ(A4) BB_SQ(B4) BB_SQ(C4) BB_SQ(D4) BB_SQ(E4) BB_SQ(F4) BB_SQ(G4) BB_SQ(H4)
+    BB_SQ(A5) BB_SQ(B5) BB_SQ(C5) BB_SQ(D5) BB_SQ(E5) BB_SQ(F5) BB_SQ(G5) BB_SQ(H5)
+    BB_SQ(A6) BB_SQ(B6) BB_SQ(C6) BB_SQ(D6) BB_SQ(E6) BB_SQ(F6) BB_SQ(G6) BB_SQ(H6)
+    BB_SQ(A7) BB_SQ(B7) BB_SQ(C7) BB_SQ(D7) BB_SQ(E7) BB_SQ(F7) BB_SQ(G7) BB_SQ(H7)
+    BB_SQ(A8) BB_SQ(B8) BB_SQ(C8) BB_SQ(D8) BB_SQ(E8) BB_SQ(F8) BB_SQ(G8) BB_SQ(H8)
+#undef BB_SQ
+
+#define BB_FILE(file) constexpr Bitboard File ## file = 0x0101010101010101ULL << (file - 1);
+    BB_FILE(1) BB_FILE(2) BB_FILE(3) BB_FILE(4) BB_FILE(5) BB_FILE(6) BB_FILE(7) BB_FILE(8)
+#undef BB_FILE
+
+#define BB_RANK(rank) constexpr Bitboard Rank ## rank = 0xFFULL << (8 * (rank - 1));
+    BB_RANK(1) BB_RANK(2) BB_RANK(3) BB_RANK(4) BB_RANK(5) BB_RANK(6) BB_RANK(7) BB_RANK(8)
+#undef BB_RANK
+    // @formatter:on
 
     // Ray attack tables.
     extern AttackTable northAttacks;

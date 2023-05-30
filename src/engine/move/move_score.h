@@ -3,9 +3,9 @@
 #include <memory>
 #include <random>
 
-#include "piece.h"
-#include "bitboard.h"
-#include "board.h"
+#include "engine/board/piece.h"
+#include "engine/board/bitboard.h"
+#include "engine/board/board.h"
 #include "move.h"
 
 template<Color Side>

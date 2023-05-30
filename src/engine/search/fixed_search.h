@@ -5,14 +5,15 @@
 #include <memory>
 #include <vector>
 
-#include "board.h"
-#include "piece.h"
-#include "move.h"
-#include "move_score.h"
-#include "move_list.h"
-#include "transposition.h"
 #include "debug_info.h"
-#include "inline.h"
+#include "engine/inline.h"
+#include "engine/board/board.h"
+#include "engine/board/color.h"
+#include "engine/board/piece.h"
+#include "engine/move/move.h"
+#include "engine/move/move_score.h"
+#include "engine/move/move_list.h"
+#include "engine/hash/transposition.h"
 
 struct SearchRootNode {
     INLINE constexpr static SearchRootNode invalid() { return { Move::invalid(), 0 }; };

@@ -1,19 +1,9 @@
 #include "piece.h"
 
 #include <string>
+#include <vector>
 
-std::string Square::uci() const {
-    std::string name;
-
-    name += static_cast<char>(this->file() + 'a');
-    name += static_cast<char>(this->rank() + '1');
-
-    return name;
-}
-
-std::string Square::debugName() const {
-    return this->uci();
-}
+#include "color.h"
 
 std::string PieceTypeNamespace::debugName(PieceType pieceType) {
     // @formatter:off
@@ -24,16 +14,7 @@ std::string PieceTypeNamespace::debugName(PieceType pieceType) {
         case PieceType::Rook: return "Rook";
         case PieceType::Queen: return "Queen";
         case PieceType::King: return "King";
-        default: return "Unknown";
-    }
-    // @formatter:on
-}
-
-std::string ColorNamespace::debugName(Color color) {
-    // @formatter:off
-    switch (color) {
-        case Color::White: return "White";
-        case Color::Black: return "Black";
+        case PieceType::Empty: return "Empty";
         default: return "Unknown";
     }
     // @formatter:on

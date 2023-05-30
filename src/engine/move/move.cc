@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <cstring>
 
-#include "board.h"
+#include "engine/board/board.h"
 
 MoveFlag promotionFlagFromUciChar(char c) {
     // @formatter:off
@@ -42,13 +42,27 @@ Move Move::fromUci(const std::string &uci, const Board &board) {
     Square from(fromFile, fromRank);
     Square to(toFile, toRank);
 
+    Piece piece = board.pieceAt(from);
+
     uint8_t flags = MoveFlag::Quiet;
 
+    // Check for castling
+    if (piece.type() == PieceType::King) {
+        int32_t fileDiff = to.file() - from.file();
+        if (fileDiff == 2) {
+            flags |= MoveFlag::KingCastle;
+        } else if (fileDiff == -2) {
+            flags |= MoveFlag::QueenCastle;
+        }
+    }
+
+    // Check for captures
     Piece captured = board.pieceAt(to);
     if (!captured.isEmpty()) {
         flags |= MoveFlag::Capture;
     }
 
+    // Check for promotions
     if (uci.length() == 5) {
         flags |= promotionFlagFromUciChar(uci[4]);
     }
@@ -57,10 +71,6 @@ Move Move::fromUci(const std::string &uci, const Board &board) {
 }
 
 
-
-bool Move::operator==(const Move &other) const {
-    return !std::memcmp(this, &other, sizeof(Move));
-}
 
 std::string Move::uci() const {
     std::string uci;
@@ -84,6 +94,10 @@ std::string Move::debugName(const Board &board) const {
     name += this->from().debugName();
     name += " to ";
     name += this->to().debugName();
+
+    if (this->isCastle()) {
+        name += " castling";
+    }
 
     if (this->isCapture()) {
         Piece captured = board.pieceAt(this->to());

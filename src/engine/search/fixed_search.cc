@@ -3,11 +3,11 @@
 #include <vector>
 #include <optional>
 
-#include "piece.h"
-#include "move.h"
-#include "move_list.h"
-#include "movegen.h"
 #include "evaluation.h"
+#include "engine/board/piece.h"
+#include "engine/move/move.h"
+#include "engine/move/move_list.h"
+#include "engine/move/movegen.h"
 
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table,
     SearchDebugInfo &debugInfo) : board_(board.copy()), depth_(depth), table_(table), debugInfo_(debugInfo) { }
@@ -50,7 +50,7 @@ SearchLine FixedDepthSearcher::search(RootMoveList moves) {
         bestLine.push_back(move);
 
         // No need to update the turn since this is a copy of the board that is only used for finding the best line
-        board.makeMoveNoTurnUpdate(move);
+        board.makeMove<false>(move);
 
         // Find the next best move in the line
         depth--;
@@ -95,7 +95,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
     while (!moves.empty()) {
         Move move = moves.dequeue();
         // No need to update the turn since we do that manually with templates
-        MakeMoveInfo moveInfo = board.makeMoveNoTurnUpdate(move);
+        MakeMoveInfo moveInfo = board.makeMove<false>(move);
 
         int32_t score = -search<~Turn>(depth - 1, -INT32_MAX, -alpha);
 
@@ -104,7 +104,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
             alpha = score;
         }
 
-        board.unmakeMoveNoTurnUpdate(move, moveInfo);
+        board.unmakeMove<false>(move, moveInfo);
     }
 
     // Transposition table store
@@ -147,11 +147,11 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
     while (!moves.empty()) {
         Move move = moves.dequeue();
         // No need to update the turn since we do that manually with templates
-        MakeMoveInfo moveInfo = board.makeMoveNoTurnUpdate(move);
+        MakeMoveInfo moveInfo = board.makeMove<false>(move);
 
         int32_t score = -this->searchQuiesce<~Turn>(-beta, -alpha);
 
-        board.unmakeMoveNoTurnUpdate(move, moveInfo);
+        board.unmakeMove<false>(move, moveInfo);
 
         if (score >= beta) {
             return beta;
@@ -195,7 +195,7 @@ INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_
     while (!moves.empty()) {
         Move move = moves.dequeue();
         // No need to update the turn since we do that manually with templates
-        MakeMoveInfo moveInfo = board.makeMoveNoTurnUpdate(move);
+        MakeMoveInfo moveInfo = board.makeMove<false>(move);
 
         int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
 
@@ -204,7 +204,7 @@ INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_
             bestScore = score;
         }
 
-        board.unmakeMoveNoTurnUpdate(move, moveInfo);
+        board.unmakeMove<false>(move, moveInfo);
 
         if (score >= beta) {
             break;

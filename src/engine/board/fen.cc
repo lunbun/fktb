@@ -102,6 +102,32 @@ Color FenReader::turn() const {
     }
 }
 
+CastlingRights FenReader::castlingRights() const {
+    if (this->fields_.size() < 3) {
+        return CastlingRights::All;
+    }
+
+    const std::string &castlingRights = this->fields_[2];
+    if (castlingRights == "-") {
+        return CastlingRights::None;
+    }
+
+    CastlingRights result = CastlingRights::None;
+    for (char c : castlingRights) {
+        // @formatter:off
+        switch (c) {
+            case 'K': result = result | CastlingRights::WhiteKingSide; break;
+            case 'Q': result = result | CastlingRights::WhiteQueenSide; break;
+            case 'k': result = result | CastlingRights::BlackKingSide; break;
+            case 'q': result = result | CastlingRights::BlackQueenSide; break;
+            default: throw std::runtime_error("Invalid castling rights in FEN string");
+        }
+        // @formatter:on
+    }
+
+    return result;
+}
+
 
 
 FenWriter::FenWriter() : rank_(7), file_(0), emptyFilesInARow_(0), fen_() { }
@@ -152,13 +178,29 @@ void FenWriter::nextRank() {
     this->rank_--;
 }
 
-void FenWriter::setTurn(Color color) {
+void FenWriter::turn(Color color) {
     this->fen_ += ' ';
     if (color == Color::White) {
         this->fen_ += 'w';
     } else {
         this->fen_ += 'b';
     }
+}
+
+void FenWriter::castlingRights(CastlingRights castlingRights) {
+    this->fen_ += ' ';
+
+    if (castlingRights == CastlingRights::None) {
+        this->fen_ += '-';
+        return;
+    }
+
+    // @formatter:off
+    if (castlingRights.has(CastlingRights::WhiteKingSide))  this->fen_ += 'K';
+    if (castlingRights.has(CastlingRights::WhiteQueenSide)) this->fen_ += 'Q';
+    if (castlingRights.has(CastlingRights::BlackKingSide))  this->fen_ += 'k';
+    if (castlingRights.has(CastlingRights::BlackQueenSide)) this->fen_ += 'q';
+    // @formatter:on
 }
 
 void FenWriter::maybeAddEmptyFilesToFen() {

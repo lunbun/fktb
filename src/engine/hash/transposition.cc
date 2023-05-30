@@ -6,13 +6,14 @@
 #include <array>
 #include <cassert>
 
-#include "piece.h"
-#include "move.h"
+#include "engine/move/move.h"
+#include "engine/board/piece.h"
 
 namespace {
     bool isInitialized = false;
 
     uint64_t blackToMoveNumber = 0;
+    std::array<uint64_t, 16> castlingRightsNumbers;
     ColorMap<std::array<std::array<uint64_t, 64>, 6>> pieceNumbers;
 }
 
@@ -28,6 +29,11 @@ void Zobrist::maybeInit() {
     std::mt19937_64 generator(seed);
 
     blackToMoveNumber = generator();
+
+    for (uint8_t castlingRights = 0; castlingRights < 16; castlingRights++) {
+        castlingRightsNumbers[castlingRights] = generator();
+    }
+
     for (uint8_t piece = 0; piece < 6; piece++) {
         for (uint8_t square = 0; square < 64; square++) {
             pieceNumbers.white()[piece][square] = generator();
@@ -38,6 +44,10 @@ void Zobrist::maybeInit() {
 
 uint64_t Zobrist::blackToMove() {
     return blackToMoveNumber;
+}
+
+uint64_t Zobrist::castlingRights(CastlingRights castlingRights) {
+    return castlingRightsNumbers[castlingRights];
 }
 
 uint64_t Zobrist::piece(Piece piece, Square square) {

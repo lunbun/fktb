@@ -1,11 +1,10 @@
 #include "evaluation.h"
 
-#include <iostream>
 #include <cstdint>
 #include <array>
 
-#include "bitboard.h"
-#include "inline.h"
+#include "engine/inline.h"
+#include "engine/board/bitboard.h"
 
 constexpr PieceSquareTable flipVertical(const PieceSquareTable &table) {
     std::array<int32_t, 64> flippedTable = { 0 };
@@ -81,6 +80,16 @@ constexpr ColorMap<PieceSquareTable> Evaluation::queenTable = createColoredPiece
     -10,  0,  5,  0,  0,  0,  0,-10,
     -20,-10,-10, -5, -5,-10,-10,-20
 });
+constexpr ColorMap<PieceSquareTable> Evaluation::kingTable = createColoredPieceSquareTable({
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -20,-30,-30,-40,-40,-30,-30,-20,
+    -10,-20,-20,-20,-20,-20,-20,-10,
+    20, 20,  0,  0,  0,  0, 20, 20,
+    20, 30, 10,  0,  0, 10, 30, 20
+});
 // @formatter:on
 
 
@@ -116,6 +125,7 @@ INLINE int32_t evaluateForSide(const Board &board) {
     score += evaluatePieceTable<Side, PieceType::Bishop, Evaluation::bishopTable>(board);
     score += evaluatePieceTable<Side, PieceType::Rook, Evaluation::rookTable>(board);
     score += evaluatePieceTable<Side, PieceType::Queen, Evaluation::queenTable>(board);
+    score += evaluatePieceTable<Side, PieceType::King, Evaluation::kingTable>(board);
 
     return score;
 }

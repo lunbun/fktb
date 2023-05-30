@@ -9,7 +9,7 @@
 
 #include "fixed_search.h"
 #include "debug_info.h"
-#include "movegen.h"
+#include "engine/move/movegen.h"
 
 SearchResult::SearchResult() : depth(0), bestLine(), score(0), nodeCount(0), transpositionHits(0), elapsed() { }
 

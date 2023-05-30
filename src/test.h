@@ -11,7 +11,10 @@ namespace Tests {
     void fixedDepthTest(const std::string &fen, uint16_t depth);
 
     // Runs an iterative deepening search on a given position.
-    void iterativeTest(const std::string &fen, uint16_t depth);
+    void iterativeTest(const std::string &fen, uint16_t depth, uint32_t threads);
+
+    // Verifies that unmakeMove is working correctly.
+    void unmakeMoveTest(const std::string &fen);
 
     // Verifies that the Zobrist hash is working correctly.
     void hashTest(const std::string &fen, uint16_t depth);

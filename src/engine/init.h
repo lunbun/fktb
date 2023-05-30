@@ -1,7 +1,7 @@
 #pragma once
 
-#include "bitboard.h"
-#include "transposition.h"
+#include "engine/board/bitboard.h"
+#include "engine/hash/transposition.h"
 
 namespace EngineInit {
     void init() {

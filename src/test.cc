@@ -9,21 +9,21 @@
 #include <thread>
 #include <chrono>
 
-#include "engine/piece.h"
-#include "engine/move_list.h"
-#include "engine/movegen.h"
-#include "engine/transposition.h"
-#include "engine/fixed_search.h"
-#include "engine/iterative_search.h"
-#include "engine/evaluation.h"
+#include "engine/board/piece.h"
+#include "engine/move/move_list.h"
+#include "engine/move/movegen.h"
+#include "engine/hash/transposition.h"
+#include "engine/search/fixed_search.h"
+#include "engine/search/iterative_search.h"
+#include "engine/search/evaluation.h"
 
-std::string formatNumber(int64_t number, int64_t divisor, char suffix) {
+std::string formatNumber(uint64_t number, uint64_t divisor, char suffix) {
     std::stringstream ss;
     ss << std::fixed << std::setprecision(2) << (number / (double) divisor) << suffix;
     return ss.str();
 }
 
-std::string formatNumber(int64_t number) {
+std::string formatNumber(uint64_t number) {
     if (number < 1000) {
         return std::to_string(number);
     } else if (number < 1000000) {
@@ -35,7 +35,7 @@ std::string formatNumber(int64_t number) {
     }
 }
 
-std::string formatWithExact(int64_t number) {
+std::string formatWithExact(uint64_t number) {
     if (number < 1000) {
         return std::to_string(number);
     } else {
@@ -82,10 +82,10 @@ void Tests::fixedDepthTest(const std::string &fen, uint16_t depth) {
 
 
 // Iterative deepening search test
-void Tests::iterativeTest(const std::string &fen, uint16_t depth) {
+void Tests::iterativeTest(const std::string &fen, uint16_t depth, uint32_t threads) {
     Board board = Board::fromFen(fen);
 
-    IterativeSearcher searcher(std::thread::hardware_concurrency());
+    IterativeSearcher searcher(threads);
 
     volatile bool isComplete = false;
 
@@ -110,6 +110,44 @@ void Tests::iterativeTest(const std::string &fen, uint16_t depth) {
     while (!isComplete) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+}
+
+
+
+// Unmake move test
+void Tests::unmakeMoveTest(const std::string &fen) {
+    Board board = Board::fromFen(fen);
+
+    RootMoveList moves = MoveGeneration::generateRoot(board);
+
+    while (!moves.empty()) {
+        Move move = moves.dequeue();
+
+        std::string beforeFen = board.toFen();
+        Board beforeBoard = board.copy();
+
+        MakeMoveInfo info = board.makeMove<true>(move);
+
+        board.unmakeMove<true>(move, info);
+
+        if (beforeFen != board.toFen()) {
+            throw std::runtime_error("Fen does not match after unmake move. Fen: " + beforeFen);
+        }
+
+        // Check all the bitboards
+        for (uint8_t i = 0; i < 2; i++) {
+            for (uint8_t j = 0; j < 6; j++) {
+                auto color = static_cast<Color>(i);
+                auto type = static_cast<PieceType>(j);
+
+                if (board.bitboard(type, color) != beforeBoard.bitboard(type, color)) {
+                    throw std::runtime_error("Bitboard does not match after unmake move. Fen: " + beforeFen);
+                }
+            }
+        }
+    }
+
+    std::cout << "Unmake move test passed" << std::endl;
 }
 
 
@@ -144,13 +182,13 @@ uint32_t hashTestSearch(Board &board, uint16_t depth) {
     while (!moves.empty()) {
         Move move = moves.dequeue();
 
-        MakeMoveInfo info = board.makeMove(move);
+        MakeMoveInfo info = board.makeMove<true>(move);
 
         verifyHash(board);
 
         nodeCount += hashTestSearch<~Side>(board, depth - 1);
 
-        board.unmakeMove(move, info);
+        board.unmakeMove<true>(move, info);
 
         verifyHash(board);
     }
@@ -285,11 +323,11 @@ uint32_t perftSearch(Board &board, uint16_t depth) {
     while (!moves.empty()) {
         Move move = moves.dequeue();
 
-        MakeMoveInfo info = board.makeMove(move);
+        MakeMoveInfo info = board.makeMove<true>(move);
 
         nodeCount += perftSearch<~Side>(board, depth - 1);
 
-        board.unmakeMove(move, info);
+        board.unmakeMove<true>(move, info);
     }
 
     return nodeCount;

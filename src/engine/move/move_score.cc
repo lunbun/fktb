@@ -1,10 +1,10 @@
 #include "move_score.h"
 
-#include "piece.h"
-#include "bitboard.h"
-#include "board.h"
 #include "move.h"
-#include "evaluation.h"
+#include "engine/board/piece.h"
+#include "engine/board/board.h"
+#include "engine/board/bitboard.h"
+#include "engine/search/evaluation.h"
 
 template<Color Side>
 MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
@@ -41,6 +41,10 @@ int32_t MoveScorer<Side>::score(Move move) {
 
     Piece piece = board.pieceAt(move.from());
 
+    // Castling
+    if (move.isCastle()) {
+        score += 1000;
+    }
 
     // Captures
     if (move.isCapture()) {

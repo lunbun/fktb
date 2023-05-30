@@ -161,7 +161,7 @@ void UciHandler::handlePosition(TokenStream &tokens) {
             const std::string &moveString = tokens.next();
 
             Move move = Move::fromUci(moveString, *this->board_);
-            this->board_->makeMove(move);
+            this->board_->makeMove<true>(move);
         }
     }
 }

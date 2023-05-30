@@ -1,30 +1,8 @@
+add_subdirectory(board)
+add_subdirectory(hash)
+add_subdirectory(move)
+add_subdirectory(search)
+
 target_sources(chess PRIVATE
-        bitboard.cc
-        bitboard.h
-        board.cc
-        board.h
-        debug_info.h
-        evaluation.cc
-        evaluation.h
-        fen.cc
-        fen.h
-        fixed_search.cc
-        fixed_search.h
         init.h
-        inline.h
-        iterative_search.cc
-        iterative_search.h
-        lock.cc
-        lock.h
-        move.cc
-        move.h
-        move_list.cc
-        move_list.h
-        move_score.cc
-        move_score.h
-        movegen.cc
-        movegen.h
-        piece.cc
-        piece.h
-        transposition.cc
-        transposition.h)
+        inline.h)
