@@ -85,7 +85,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
 
     if (moves.empty()) {
         // TODO: Checkmate detection
-        return { Move::invalid(), 0 };
+        return { Move::invalid(), this->searchQuiesce<Turn>(-INT32_MAX, INT32_MAX) };
     }
 
     // Search
@@ -184,7 +184,7 @@ INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_
 
     if (moves.empty()) {
         // TODO: Checkmate detection
-        return 0;
+        return this->searchQuiesce<Turn>(alpha, beta);
     }
 
     moves.score<Turn>(board);

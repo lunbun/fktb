@@ -14,9 +14,8 @@
 int main() {
     EngineInit::init();
 
-//    Tests::unmakeMoveTest(Board::KiwiPeteFen);
-//    Tests::moveGenTest(Board::KiwiPeteFen);
-//    Tests::fixedDepthTest(Board::KiwiPeteFen, 7);
+    // TODO:
+    //  Make sure that castling rights are actually working with Zobrist hashing
 
     uci();
 

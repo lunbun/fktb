@@ -62,7 +62,7 @@ int32_t MoveScorer<Side>::score(Move move) {
         case PieceType::Pawn: {
             // Use piece-square tables
             constexpr const PieceSquareTable &Table = Evaluation::pawnTable[Side];
-            score += (Table[move.to()] * 5);
+            score += (Table[move.to()] * 10);
 
             // The pawn attacks after this move
             Bitboard pawnAttacks = Bitboards::pawn<Side>(move.to());
@@ -88,6 +88,11 @@ int32_t MoveScorer<Side>::score(Move move) {
                 }
             }
 
+            // If we are being attacked by an enemy pawn, moving the pawn to get out of danger is probably good
+            if (this->enemyPawnAttacks_.get(move.from())) {
+                score += (PieceMaterial::Pawn * 2);
+            }
+
             break;
         }
 
@@ -110,6 +115,12 @@ int32_t MoveScorer<Side>::score(Move move) {
             // Moving a knight to a square defended by an enemy bishop or lower is bad
             if (this->enemyBishopOrLowerAttacks_.get(move.to())) {
                 score -= (PieceMaterial::Knight * 2);
+            }
+
+            // If we are being attacked by an enemy bishop or lower, moving the knight to get out of danger is probably
+            // good
+            if (this->enemyBishopOrLowerAttacks_.get(move.from())) {
+                score += (PieceMaterial::Knight * 2);
             }
 
             // The knight attacks after this move
@@ -140,6 +151,12 @@ int32_t MoveScorer<Side>::score(Move move) {
                 score -= (PieceMaterial::Bishop * 2);
             }
 
+            // If we are being attacked by an enemy bishop or lower, moving the bishop to get out of danger is probably
+            // good
+            if (this->enemyBishopOrLowerAttacks_.get(move.from())) {
+                score += (PieceMaterial::Bishop * 2);
+            }
+
             break;
         }
 
@@ -154,6 +171,11 @@ int32_t MoveScorer<Side>::score(Move move) {
                 score -= (PieceMaterial::Rook * 2);
             }
 
+            // If we are being attacked by an enemy rook or lower, moving the rook to get out of danger is probably good
+            if (this->enemyRookOrLowerAttacks_.get(move.from())) {
+                score += (PieceMaterial::Rook * 2);
+            }
+
             break;
         }
 
@@ -166,6 +188,12 @@ int32_t MoveScorer<Side>::score(Move move) {
             // Moving a queen to a square defended by an enemy queen or lower is bad
             if (this->enemyQueenOrLowerAttacks_.get(move.to())) {
                 score -= (PieceMaterial::Queen * 2);
+            }
+
+            // If we are being attacked by an enemy queen or lower, moving the queen to get out of danger is probably
+            // good
+            if (this->enemyQueenOrLowerAttacks_.get(move.from())) {
+                score += (PieceMaterial::Queen * 2);
             }
 
             break;

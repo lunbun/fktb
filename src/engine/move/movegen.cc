@@ -34,6 +34,7 @@ private:
     void serializeQuiet(Square from, Bitboard quiet);
     void serializeCaptures(Square from, Bitboard captures);
     void serializePromotions(Square from, Bitboard promotions);
+    void serializePromotionCaptures(Square from, Bitboard promoCaptures);
     // Serializes all moves in a bitboard, both quiet and captures (will not serialize quiet if in ExcludeQuiet mode)
     void serializeBitboard(Square from, Bitboard bitboard);
 
@@ -86,6 +87,17 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotions(Square from, 
 }
 
 template<Color Side, bool ExcludeQuiet>
+INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotionCaptures(Square from, Bitboard promoCaptures) {
+    while (promoCaptures) {
+        Square to = promoCaptures.bsfReset();
+        this->list_.push({ from, to, MoveFlag::KnightPromoCapture });
+        this->list_.push({ from, to, MoveFlag::BishopPromoCapture });
+        this->list_.push({ from, to, MoveFlag::RookPromoCapture });
+        this->list_.push({ from, to, MoveFlag::QueenPromoCapture });
+    }
+}
+
+template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeBitboard(Square from, Bitboard bitboard) {
     if constexpr (!ExcludeQuiet) {
         this->serializeQuiet(from, bitboard & this->empty_);
@@ -93,42 +105,44 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeBitboard(Square from, Bi
     this->serializeCaptures(from, bitboard & this->enemy_);
 }
 
+// Returns the bitboard shifted one rank forward for the given side.
+template<Color Side>
+INLINE Bitboard forwardOneRank(Bitboard pawn) {
+    if constexpr (Side == Color::White) {
+        return pawn << 8;
+    } else {
+        return pawn >> 8;
+    }
+}
+
 template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::generatePawnMoves(Square square) {
+    constexpr Bitboard PromotionRank = (Side == Color::White) ? Bitboards::Rank8 : Bitboards::Rank1;
+    constexpr Bitboard DoublePushToRank = (Side == Color::White) ? Bitboards::Rank4 : Bitboards::Rank5;
+
     Bitboard empty = this->empty_;
 
-    if constexpr (Side == Color::White) {
-        // Single push (quiet, but needed to check for promotions, which are not quiet)
-        Bitboard singlePush = ((1ULL << square) << 8) & empty;
-        Bitboard promotions = singlePush & Bitboards::Rank8;
+    // Pawn pushes
+    // Single push (quiet, but needed to check for promotions, which are not quiet)
+    Bitboard singlePush = forwardOneRank<Side>(1ULL << square) & empty;
+    Bitboard promotions = singlePush & PromotionRank;
 
-        this->serializePromotions(square, promotions);
+    this->serializePromotions(square, promotions);
 
-        if constexpr (!ExcludeQuiet) {
-            this->serializeQuiet(square, singlePush ^ promotions);
+    if constexpr (!ExcludeQuiet) {
+        this->serializeQuiet(square, singlePush ^ promotions);
 
-            // Double push (always quiet)
-            Bitboard doublePush = (singlePush << 8) & empty & Bitboards::Rank4;
-            this->serializeQuiet(square, doublePush);
-        }
-    } else {
-        // Single push (quiet, but needed to check for promotions, which are not quiet)
-        Bitboard singlePush = ((1ULL << square) >> 8) & empty;
-        Bitboard promotions = singlePush & Bitboards::Rank1;
-
-        this->serializePromotions(square, promotions);
-
-        if constexpr (!ExcludeQuiet) {
-            this->serializeQuiet(square, singlePush ^ promotions);
-
-            // Double push (always quiet)
-            Bitboard doublePush = (singlePush >> 8) & empty & Bitboards::Rank5;
-            this->serializeQuiet(square, doublePush);
-        }
+        // Double push (always quiet)
+        Bitboard doublePush = forwardOneRank<Side>(singlePush) & empty & DoublePushToRank;
+        this->serializeQuiet(square, doublePush);
     }
 
+    // Pawn captures
     Bitboard attacks = Bitboards::pawn<Side>(square) & this->enemy_;
-    this->serializeCaptures(square, attacks);
+    Bitboard promotionsCaptures = attacks & PromotionRank;
+    Bitboard captures = attacks ^ promotionsCaptures;
+    this->serializePromotionCaptures(square, promotionsCaptures);
+    this->serializeCaptures(square, captures);
 }
 
 template<Color Side, bool ExcludeQuiet>

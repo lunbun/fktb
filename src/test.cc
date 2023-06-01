@@ -135,8 +135,8 @@ void Tests::unmakeMoveTest(const std::string &fen) {
         }
 
         // Check all the bitboards
-        for (uint8_t i = 0; i < 2; i++) {
-            for (uint8_t j = 0; j < 6; j++) {
+        for (uint8_t i = 0; i < 2; ++i) {
+            for (uint8_t j = 0; j < 6; ++j) {
                 auto color = static_cast<Color>(i);
                 auto type = static_cast<PieceType>(j);
 
