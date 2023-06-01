@@ -7,6 +7,10 @@
 #include <optional>
 #include <thread>
 
+#include "engine/board/board.h"
+#include "engine/search/score.h"
+#include "engine/search/iterative_search.h"
+
 TokenStream::TokenStream(const std::string &input) : index_(0), tokens_() {
     std::stringstream ss(input);
     std::string item;
@@ -270,7 +274,12 @@ void UciHandler::iterationCallback(const SearchResult &result) {
 
     // Print the search result
     std::cout << "info depth " << result.depth;
-    std::cout << " score cp " << result.score;
+    std::cout << " score ";
+    if (Score::isMate(result.score)) {
+        std::cout << "mate " << Score::matePlies(result.score);
+    } else {
+        std::cout << "cp " << result.score;
+    }
     std::cout << " time " << millis;
     std::cout << " nodes " << result.nodeCount;
     std::cout << " nps " << nps;

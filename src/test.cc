@@ -46,10 +46,33 @@ std::string formatWithExact(uint64_t number) {
 
 
 // Move generation test
-void Tests::moveGenTest(const std::string &fen) {
+void Tests::pseudoLegalMoveGenTest(const std::string &fen) {
     Board board = Board::fromFen(fen);
 
-    RootMoveList moves = MoveGeneration::generateRoot(board);
+    AlignedMoveEntry moveBuffer[MaxMoveCount];
+    MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
+
+    MoveEntry *movesEnd = (board.turn() == Color::White) ?
+        MoveGeneration::generatePseudoLegal<Color::White, false>(board, movesStart) :
+        MoveGeneration::generatePseudoLegal<Color::Black, false>(board, movesStart);
+
+    MovePriorityQueue moves(movesStart, movesEnd);
+    if (board.turn() == Color::White) {
+        moves.score<Color::White>(board);
+    } else {
+        moves.score<Color::Black>(board);
+    }
+
+    while (!moves.empty()) {
+        Move move = moves.dequeue();
+        std::cout << move.debugName(board) << std::endl;
+    }
+}
+
+void Tests::legalMoveGenTest(const std::string &fen) {
+    Board board = Board::fromFen(fen);
+
+    RootMoveList moves = MoveGeneration::generateLegalRoot(board);
 
     moves.score(board);
     moves.sort();
@@ -118,7 +141,7 @@ void Tests::iterativeTest(const std::string &fen, uint16_t depth, uint32_t threa
 void Tests::unmakeMoveTest(const std::string &fen) {
     Board board = Board::fromFen(fen);
 
-    RootMoveList moves = MoveGeneration::generateRoot(board);
+    RootMoveList moves = MoveGeneration::generateLegalRoot(board);
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
@@ -173,7 +196,7 @@ uint32_t hashTestSearch(Board &board, uint16_t depth) {
     AlignedMoveEntry moveBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generate<Side, false>(board, movesStart);
+    MoveEntry *movesEnd = MoveGeneration::generateLegal<Side, false>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
 
@@ -314,7 +337,7 @@ uint32_t perftSearch(Board &board, uint16_t depth) {
     AlignedMoveEntry moveBuffer[256];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generate<Side, false>(board, movesStart);
+    MoveEntry *movesEnd = MoveGeneration::generateLegal<Side, false>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
 

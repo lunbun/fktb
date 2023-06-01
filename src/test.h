@@ -5,7 +5,8 @@
 
 namespace Tests {
     // Prints out all the moves for a given position.
-    void moveGenTest(const std::string &fen);
+    void pseudoLegalMoveGenTest(const std::string &fen);
+    void legalMoveGenTest(const std::string &fen);
 
     // Runs a fixed depth search on a given position.
     void fixedDepthTest(const std::string &fen, uint16_t depth);

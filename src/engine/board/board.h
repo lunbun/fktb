@@ -70,6 +70,10 @@ public:
     // Returns the bitboard of all empty squares.
     [[nodiscard]] INLINE Bitboard empty() const { return ~this->occupied(); }
 
+    // TODO: This function is expensive.
+    template<Color Side>
+    [[nodiscard]] bool isInCheck() const;
+
     template<bool UpdateHash>
     void addPiece(Piece piece, Square square);
     template<bool UpdateHash>

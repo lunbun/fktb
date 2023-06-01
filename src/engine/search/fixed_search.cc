@@ -3,6 +3,7 @@
 #include <vector>
 #include <optional>
 
+#include "score.h"
 #include "evaluation.h"
 #include "engine/board/piece.h"
 #include "engine/move/move.h"
@@ -19,7 +20,7 @@ void FixedDepthSearcher::halt() {
 
 
 SearchLine FixedDepthSearcher::search() {
-    RootMoveList moves = MoveGeneration::generateRoot(this->board_);
+    RootMoveList moves = MoveGeneration::generateLegalRoot(this->board_);
 
     moves.score(this->board_);
     moves.sort();
@@ -84,8 +85,11 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
     TranspositionTable &table = this->table_;
 
     if (moves.empty()) {
-        // TODO: Checkmate detection
-        return { Move::invalid(), this->searchQuiesce<Turn>(-INT32_MAX, INT32_MAX) };
+        if (board.isInCheck<Turn>()) { // Checkmate
+            return { Move::invalid(), Score::mateIn(0) };
+        } else { // Stalemate
+            return { Move::invalid(), 0 };
+        }
     }
 
     // Search
@@ -138,7 +142,7 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
     AlignedMoveEntry moveBuffer[MaxCaptureCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generate<Turn, true>(board, movesStart);
+    MoveEntry *movesEnd = MoveGeneration::generateLegal<Turn, true>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
     moves.score<Turn>(board);
@@ -177,14 +181,17 @@ INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_
     AlignedMoveEntry moveBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generate<Turn, false>(board, movesStart);
+    MoveEntry *movesEnd = MoveGeneration::generateLegal<Turn, false>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
     moves.loadHashMove(board, this->table_);
 
     if (moves.empty()) {
-        // TODO: Checkmate detection
-        return this->searchQuiesce<Turn>(alpha, beta);
+        if (board.isInCheck<Turn>()) { // Checkmate
+            return Score::mateIn(this->depth_ - depth);
+        } else { // Stalemate
+            return 0;
+        }
     }
 
     moves.score<Turn>(board);

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "engine/inline.h"
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
 

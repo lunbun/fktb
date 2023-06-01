@@ -230,30 +230,55 @@ INLINE MoveEntry *MoveGenerator<Side, ExcludeQuiet>::generate() {
     return this->list_.end();
 }
 
+template<Color Side>
+INLINE MoveEntry *filterLegal(Board &board, MoveEntry *start, MoveEntry *end) {
+    MoveEntry *result = start;
+    // TODO: This is a very inefficient method. Implement a more efficient method.
+    for (MoveEntry *entry = start; entry != end; entry++) {
+        Move move = entry->move;
+        MakeMoveInfo info = board.makeMove<false>(move);
+
+        // TODO: Do not allow castling through check (or in check)
+        if (!board.isInCheck<Side>()) {
+            *(result++) = *entry;
+        }
+
+        board.unmakeMove<false>(move, info);
+    }
+
+    return result;
+}
+
 
 
 template<Color Side, bool ExcludeQuiet>
-MoveEntry *MoveGeneration::generate(const Board &board, MoveEntry *moves) {
+MoveEntry *MoveGeneration::generatePseudoLegal(const Board &board, MoveEntry *moves) {
     MoveGenerator<Side, ExcludeQuiet> generator(board, moves);
     return generator.generate();
 }
 
-RootMoveList MoveGeneration::generateRoot(const Board &board) {
+template<Color Side, bool ExcludeQuiet>
+MoveEntry *MoveGeneration::generateLegal(Board &board, MoveEntry *moves) {
+    MoveEntry *end = MoveGeneration::generatePseudoLegal<Side, ExcludeQuiet>(board, moves);
+    return filterLegal<Side>(board, moves, end);
+}
+
+RootMoveList MoveGeneration::generateLegalRoot(Board &board) {
     AlignedMoveEntry movesBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(movesBuffer);
 
     MoveEntry *movesEnd;
     if (board.turn() == Color::White) {
-        movesEnd = MoveGeneration::generate<Color::White, false>(board, movesStart);
+        movesEnd = MoveGeneration::generateLegal<Color::White, false>(board, movesStart);
     } else {
-        movesEnd = MoveGeneration::generate<Color::Black, false>(board, movesStart);
+        movesEnd = MoveGeneration::generateLegal<Color::Black, false>(board, movesStart);
     }
 
     // RootMoveList will copy the moves into its own buffer
     return { movesStart, movesEnd };
 }
 
-template MoveEntry *MoveGeneration::generate<Color::White, false>(const Board &board, MoveEntry *moves);
-template MoveEntry *MoveGeneration::generate<Color::Black, false>(const Board &board, MoveEntry *moves);
-template MoveEntry *MoveGeneration::generate<Color::White, true>(const Board &board, MoveEntry *moves);
-template MoveEntry *MoveGeneration::generate<Color::Black, true>(const Board &board, MoveEntry *moves);
+template MoveEntry *MoveGeneration::generateLegal<Color::White, false>(Board &board, MoveEntry *moves);
+template MoveEntry *MoveGeneration::generateLegal<Color::Black, false>(Board &board, MoveEntry *moves);
+template MoveEntry *MoveGeneration::generateLegal<Color::White, true>(Board &board, MoveEntry *moves);
+template MoveEntry *MoveGeneration::generateLegal<Color::Black, true>(Board &board, MoveEntry *moves);

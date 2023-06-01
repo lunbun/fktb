@@ -8,11 +8,16 @@
 #include "engine/board/bitboard.h"
 
 namespace MoveGeneration {
-    // Generates all moves for the given side, excluding quiet moves if ExcludeQuiet is true.
+    // Generates all pseudo-legal moves for the given side, excluding quiet moves if ExcludeQuiet is true.
     // Returns the pointer to the end of the move list.
     template<Color Side, bool ExcludeQuiet>
-    [[nodiscard]] MoveEntry *generate(const Board &board, MoveEntry *moves);
+    [[nodiscard]] MoveEntry *generatePseudoLegal(const Board &board, MoveEntry *moves);
+
+    // Generates all legal moves for the given side, excluding quiet moves if ExcludeQuiet is true.
+    // Returns the pointer to the end of the move list.
+    template<Color Side, bool ExcludeQuiet>
+    [[nodiscard]] MoveEntry *generateLegal(Board &board, MoveEntry *moves);
 
     // Generates all moves for the turn.
-    [[nodiscard]] RootMoveList generateRoot(const Board &board);
+    [[nodiscard]] RootMoveList generateLegalRoot(Board &board);
 }

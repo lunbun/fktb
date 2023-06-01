@@ -227,7 +227,8 @@ void IterativeSearcher::start(const Board &board) {
     this->table_ = std::make_unique<TranspositionTable>(4194304);
     this->debugInfo_ = std::make_unique<SearchDebugInfo>();
 
-    RootMoveList rootMoves = MoveGeneration::generateRoot(board);
+    Board boardCopy = board.copy();
+    RootMoveList rootMoves = MoveGeneration::generateLegalRoot(boardCopy);
 
     std::random_device device;
     std::mt19937 generator(device());

@@ -69,6 +69,28 @@ Board Board::copy() const {
 
 
 
+// TODO: This function is expensive.
+template<Color Side>
+bool Board::isInCheck() const {
+    constexpr Color Enemy = ~Side;
+
+    Bitboard occupied = this->occupied();
+    Bitboard attacks = Bitboards::allPawn<Enemy>(this->bitboard<Enemy>(PieceType::Pawn))
+        | Bitboards::allKnight(this->bitboard<Enemy>(PieceType::Knight))
+        | Bitboards::allBishop(this->bitboard<Enemy>(PieceType::Bishop), occupied)
+        | Bitboards::allRook(this->bitboard<Enemy>(PieceType::Rook), occupied)
+        | Bitboards::allQueen(this->bitboard<Enemy>(PieceType::Queen), occupied)
+        | Bitboards::allKing(this->bitboard<Enemy>(PieceType::King));
+    Bitboard king = this->bitboard<Side>(PieceType::King);
+
+    return (attacks & king);
+}
+
+template bool Board::isInCheck<Color::White>() const;
+template bool Board::isInCheck<Color::Black>() const;
+
+
+
 template<bool UpdateHash>
 INLINE void Board::addPiece(Piece piece, Square square) {
     assert(this->pieceAt(square).isEmpty());
@@ -230,17 +252,12 @@ MakeMoveInfo Board::makeMove(Move move) {
         // Check if the move is a capture before getting the captured piece to avoid unnecessary calls to pieceAt
         // (avoids unnecessary memory reads)
         captured = this->pieceAt(move.to());
+        assert(captured.type() != PieceType::King);
         this->removePiece<true>(captured, move.to());
 
         // If a rook is captured, update castling rights if necessary
         if (captured.type() == PieceType::Rook) {
             this->maybeRevokeCastlingRightsForRookSquare(move.to());
-        }
-
-        // TODO: Once we properly implement checks/checkmate, we can remove the following code. But for now, we have to
-        //  revoke castling rights if a king is captured
-        else if (captured.type() == PieceType::King) {
-            this->castlingRights(this->castlingRights_.without(captured.color()));
         }
     }
 
