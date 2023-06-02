@@ -28,7 +28,8 @@ const std::string &TokenStream::next() {
 
 UciHandler::UciHandler(std::string name, std::string author) : name_(std::move(name)), author_(std::move(author)),
                                                                board_(nullptr) {
-    this->searcher_ = std::make_unique<IterativeSearcher>(std::thread::hardware_concurrency());
+//    this->searcher_ = std::make_unique<IterativeSearcher>(std::thread::hardware_concurrency());
+    this->searcher_ = std::make_unique<IterativeSearcher>(1);
     this->searcher_->addIterationCallback([this](const SearchResult &result) {
         this->iterationCallback(result);
     });
@@ -185,6 +186,9 @@ void UciHandler::handleGo(TokenStream &tokens) {
         } else if (command == "depth") {
             if (tokens.isEnd()) return this->error("depth command requires an argument");
             options.depth = std::stoi(tokens.next());
+        } else if (command == "nodes") {
+            if (tokens.isEnd()) return this->error("nodes command requires an argument");
+            options.nodes = std::stoull(tokens.next());
         } else if (command == "movetime") {
             if (tokens.isEnd()) return this->error("movetime command requires an argument");
             options.moveTime = std::stoi(tokens.next());
@@ -228,6 +232,18 @@ void UciHandler::startSearch(const SearchOptions &options) {
 
     this->searcher_->start(*this->board_);
 
+    if (options.nodes.has_value()) {
+        uint64_t nodes = options.nodes.value();
+
+        // Start a new thread to stop the search after the given number of nodes
+        // It's possible that we may run into thread safety issues here
+        std::thread([this, nodes]() {
+            while (this->isSearching_ && this->searcher_->debugInfo().nodeCount() < nodes) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            this->stopSearch();
+        }).detach();
+    }
     if (options.moveTime.has_value()) {
         int32_t moveTime = options.moveTime.value();
 

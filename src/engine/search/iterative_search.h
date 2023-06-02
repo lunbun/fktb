@@ -43,6 +43,8 @@ public:
     void start(const Board &board);
     SearchResult stop();
 
+    [[nodiscard]] INLINE const SearchDebugInfo &debugInfo() const { return *this->debugInfo_; }
+
 private:
     class SearchThread;
 

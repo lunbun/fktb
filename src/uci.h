@@ -24,7 +24,8 @@ private:
 
 struct SearchOptions {
     bool infinite = false;
-    std::optional<int32_t> depth;
+    std::optional<uint16_t> depth;
+    std::optional<uint64_t> nodes;
     std::optional<int32_t> moveTime;
 };
 

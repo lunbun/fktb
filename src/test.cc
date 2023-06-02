@@ -8,6 +8,7 @@
 #include <sstream>
 #include <thread>
 #include <chrono>
+#include <cassert>
 
 #include "engine/board/piece.h"
 #include "engine/move/move_list.h"
@@ -106,6 +107,8 @@ void Tests::fixedDepthTest(const std::string &fen, uint16_t depth) {
 
 // Iterative deepening search test
 void Tests::iterativeTest(const std::string &fen, uint16_t depth, uint32_t threads) {
+    assert(threads == 1);
+
     Board board = Board::fromFen(fen);
 
     IterativeSearcher searcher(threads);

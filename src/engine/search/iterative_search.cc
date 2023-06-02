@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <random>
 #include <condition_variable>
+#include <cassert>
 
 #include "fixed_search.h"
 #include "debug_info.h"
@@ -188,6 +189,9 @@ void IterativeSearcher::SearchThread::loop() {
 
 IterativeSearcher::IterativeSearcher(uint32_t threadCount) : threads_(), mutex_(), callbacks_(),
                                                              result_(SearchResult::invalid()), table_(nullptr) {
+    // Lazy SMP seems to be broken atm so only allow one thread
+    assert(threadCount == 1);
+
     this->threads_.reserve(threadCount);
     for (uint32_t i = 0; i < threadCount; i++) {
         this->threads_.push_back(std::make_unique<SearchThread>(*this));
