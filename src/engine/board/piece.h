@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <cassert>
 
 #include "color.h"
 #include "engine/inline.h"
@@ -30,7 +31,7 @@ namespace PieceMaterial {
     constexpr int32_t Bishop        = 330;
     constexpr int32_t Rook          = 500;
     constexpr int32_t Queen         = 900;
-    constexpr int32_t King          = 1000000;
+    constexpr int32_t King          = 0;
     constexpr std::array<int32_t, 6> Values = { Pawn, Knight, Bishop, Rook, Queen, King };
 
     constexpr int32_t BishopPair    = 50;

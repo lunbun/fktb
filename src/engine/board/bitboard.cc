@@ -227,11 +227,3 @@ Bitboard Bitboards::allQueen(Bitboard queens, Bitboard occupied) {
     }
     return attacks;
 }
-
-Bitboard Bitboards::allKing(Bitboard kings) {
-    Bitboard attacks;
-    while (kings) {
-        attacks = attacks | Bitboards::king(kings.bsfReset());
-    }
-    return attacks;
-}

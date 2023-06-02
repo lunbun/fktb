@@ -48,20 +48,28 @@ public:
     [[nodiscard]] INLINE uint64_t hash() const { return this->hash_; }
     [[nodiscard]] INLINE CastlingRights castlingRights() const { return this->castlingRights_; }
 
+    template<Color Side>
+    [[nodiscard]] INLINE Square king() const { return this->kings_[Side]; }
     [[nodiscard]] INLINE Piece pieceAt(Square square) const { return this->pieces_[square]; }
 
     // Returns the bitboard with all given pieces.
     [[nodiscard]] INLINE Bitboard &bitboard(PieceType pieceType, Color color) {
+        assert(pieceType != PieceType::King);
+        assert(pieceType != PieceType::Empty);
         return this->bitboards_[color][pieceType];
     }
     template<Color Side>
-    [[nodiscard]] INLINE Bitboard bitboard(PieceType pieceType) const { return this->bitboards_[Side][pieceType]; }
+    [[nodiscard]] INLINE Bitboard bitboard(PieceType pieceType) const {
+        assert(pieceType != PieceType::King);
+        assert(pieceType != PieceType::Empty);
+        return this->bitboards_[Side][pieceType];
+    }
 
     // Returns the composite bitboard with all pieces of the given color.
     template<Color Side>
     [[nodiscard]] INLINE Bitboard composite() const {
         const auto &bitboards = this->bitboards_[Side];
-        return bitboards[0] | bitboards[1] | bitboards[2] | bitboards[3] | bitboards[4] | bitboards[5];
+        return bitboards[0] | bitboards[1] | bitboards[2] | bitboards[3] | bitboards[4] | (1ULL << this->king<Side>());
     }
     // Returns the bitboard of all occupied squares.
     [[nodiscard]] INLINE Bitboard occupied() const {
@@ -74,6 +82,8 @@ public:
     template<Color Side>
     [[nodiscard]] bool isInCheck() const;
 
+    template<bool UpdateHash>
+    void addKing(Color color, Square square);
     template<bool UpdateHash>
     void addPiece(Piece piece, Square square);
     template<bool UpdateHash>
@@ -90,9 +100,10 @@ private:
     Color turn_;
     uint64_t hash_;
 
+    ColorMap<Square> kings_;
     CastlingRights castlingRights_;
     std::array<Piece, 64> pieces_;
-    ColorMap<std::array<Bitboard, 6>> bitboards_;
+    ColorMap<std::array<Bitboard, 5>> bitboards_;
 
     // Updates the hash and castling rights.
     void castlingRights(CastlingRights newCastlingRights);

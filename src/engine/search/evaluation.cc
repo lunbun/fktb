@@ -109,6 +109,12 @@ INLINE int32_t evaluatePieceTable(const Board &board) {
     return score;
 }
 
+template<Color Side>
+INLINE int32_t evaluateKingTable(const Board &board) {
+    constexpr const PieceSquareTable &Table = Evaluation::kingTable[Side];
+    return Table[board.king<Side>()];
+}
+
 // Evaluates the board for the given side.
 template<Color Side>
 INLINE int32_t evaluateForSide(const Board &board) {
@@ -125,7 +131,7 @@ INLINE int32_t evaluateForSide(const Board &board) {
     score += evaluatePieceTable<Side, PieceType::Bishop, Evaluation::bishopTable>(board);
     score += evaluatePieceTable<Side, PieceType::Rook, Evaluation::rookTable>(board);
     score += evaluatePieceTable<Side, PieceType::Queen, Evaluation::queenTable>(board);
-    score += evaluatePieceTable<Side, PieceType::King, Evaluation::kingTable>(board);
+    score += evaluateKingTable<Side>(board);
 
     return score;
 }

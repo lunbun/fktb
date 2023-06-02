@@ -10,7 +10,8 @@
 #include "engine/inline.h"
 
 Board::Board(Color turn, CastlingRights castlingRights) : material_(), turn_(turn), hash_(0),
-                                                          castlingRights_(castlingRights), pieces_(), bitboards_() {
+                                                          castlingRights_(castlingRights), pieces_(), bitboards_(),
+                                                          kings_(Square::Invalid, Square::Invalid) {
     this->pieces_.fill(Piece::empty());
     this->bitboards_.white().fill(0);
     this->bitboards_.black().fill(0);
@@ -34,7 +35,12 @@ Board Board::fromFen(const std::string &fen) {
     while (reader.hasNext()) {
         auto entry = reader.next();
 
-        board.addPiece<true>(entry.piece, entry.square);
+        Piece piece = entry.piece;
+        if (piece.type() == PieceType::King) {
+            board.addKing<true>(piece.color(), entry.square);
+        } else {
+            board.addPiece<true>(piece, entry.square);
+        }
     }
 
     return board;
@@ -80,16 +86,29 @@ bool Board::isInCheck() const {
         | Bitboards::allBishop(this->bitboard<Enemy>(PieceType::Bishop), occupied)
         | Bitboards::allRook(this->bitboard<Enemy>(PieceType::Rook), occupied)
         | Bitboards::allQueen(this->bitboard<Enemy>(PieceType::Queen), occupied)
-        | Bitboards::allKing(this->bitboard<Enemy>(PieceType::King));
-    Bitboard king = this->bitboard<Side>(PieceType::King);
+        | Bitboards::king(this->king<Enemy>());
+    Square king = this->king<Side>();
 
-    return (attacks & king);
+    return attacks.get(king);
 }
 
 template bool Board::isInCheck<Color::White>() const;
 template bool Board::isInCheck<Color::Black>() const;
 
 
+
+template<bool UpdateHash>
+INLINE void Board::addKing(Color color, Square square) {
+    assert(this->pieceAt(square).isEmpty());
+    this->pieces_[square] = Piece(PieceType::King, color);
+
+    assert(this->kings_[color] == Square::Invalid);
+    this->kings_[color] = square;
+
+    if constexpr (UpdateHash) {
+        this->hash_ ^= Zobrist::piece(Piece::king(color), square);
+    }
+}
 
 template<bool UpdateHash>
 INLINE void Board::addPiece(Piece piece, Square square) {
@@ -153,11 +172,16 @@ INLINE void Board::movePiece(Piece piece, Square from, Square to) {
     this->pieces_[from] = Piece::empty();
     this->pieces_[to] = piece;
 
-    Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
-    assert(bitboard.get(from));
-    assert(!bitboard.get(to));
-    bitboard.clear(from);
-    bitboard.set(to);
+    if (piece.type() == PieceType::King) { // King move
+        assert(this->kings_[piece.color()] == from);
+        this->kings_[piece.color()] = to;
+    } else { // Other piece move
+        Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
+        assert(bitboard.get(from));
+        assert(!bitboard.get(to));
+        bitboard.clear(from);
+        bitboard.set(to);
+    }
 
     if constexpr (UpdateHash) {
         this->hash_ ^= Zobrist::piece(piece, from);

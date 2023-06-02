@@ -19,7 +19,7 @@ MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
     this->enemyBishops_ = board.bitboard<Enemy>(PieceType::Bishop);
     this->enemyRooks_ = board.bitboard<Enemy>(PieceType::Rook);
     this->enemyQueens_ = board.bitboard<Enemy>(PieceType::Queen);
-    Bitboard enemyKings = board.bitboard<Enemy>(PieceType::King);
+    Bitboard enemyKing = (1ULL << board.king<Enemy>());
 
     this->enemyPawnAttacks_ = Bitboards::allPawn<Enemy>(board.bitboard<Enemy>(PieceType::Pawn));
     this->enemyKnightAttacks_ = Bitboards::allKnight(this->enemyKnights_);
@@ -27,7 +27,7 @@ MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
     Bitboard enemyRookAttacks = Bitboards::allRook(this->enemyRooks_, occupied);
     Bitboard enemyQueenAttacks = Bitboards::allQueen(this->enemyQueens_, occupied);
 
-    this->enemyRookOrHigher_ = this->enemyRooks_ | this->enemyQueens_ | enemyKings;
+    this->enemyRookOrHigher_ = this->enemyRooks_ | this->enemyQueens_ | enemyKing;
     this->enemyBishopOrLowerAttacks_ = this->enemyBishopAttacks_ | this->enemyKnightAttacks_ | this->enemyPawnAttacks_;
     this->enemyRookOrLowerAttacks_ = enemyRookAttacks | this->enemyBishopOrLowerAttacks_;
     this->enemyQueenOrLowerAttacks_ = enemyQueenAttacks | this->enemyRookOrLowerAttacks_;

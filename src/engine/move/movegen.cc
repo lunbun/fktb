@@ -41,7 +41,7 @@ private:
     void generatePawnMoves(Square square);
     void generateAllPawnMoves();
 
-    void generateCastlingMoves();
+    void generateKingMoves();
 
     template<Bitboard (*GenerateAttacks)(Square)>
     void generateOffsetMoves(Piece piece);
@@ -155,36 +155,43 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generateAllPawnMoves() {
 }
 
 template<Color Side, bool ExcludeQuiet>
-void MoveGenerator<Side, ExcludeQuiet>::generateCastlingMoves() {
-    assert(!ExcludeQuiet);
-    if constexpr (Side == Color::White) {
-        constexpr Bitboard F1G1 = Bitboards::F1 | Bitboards::G1;
-        constexpr Bitboard B1C1D1 = Bitboards::B1 | Bitboards::C1 | Bitboards::D1;
+void MoveGenerator<Side, ExcludeQuiet>::generateKingMoves() {
+    // Normal king moves
+    Square king = this->board_.template king<Side>();
+    Bitboard attacks = Bitboards::king(king);
+    this->serializeBitboard(king, attacks);
 
-        if (this->board_.castlingRights() & CastlingRights::WhiteKingSide) {
-            if (!(this->occupied_ & F1G1)) {
-                this->list_.push({ Square::E1, Square::G1, MoveFlag::KingCastle });
+    // Castling moves
+    if constexpr (!ExcludeQuiet) {
+        if constexpr (Side == Color::White) {
+            constexpr Bitboard F1G1 = Bitboards::F1 | Bitboards::G1;
+            constexpr Bitboard B1C1D1 = Bitboards::B1 | Bitboards::C1 | Bitboards::D1;
+
+            if (this->board_.castlingRights() & CastlingRights::WhiteKingSide) {
+                if (!(this->occupied_ & F1G1)) {
+                    this->list_.push({ Square::E1, Square::G1, MoveFlag::KingCastle });
+                }
             }
-        }
 
-        if (this->board_.castlingRights() & CastlingRights::WhiteQueenSide) {
-            if (!(this->occupied_ & B1C1D1)) {
-                this->list_.push({ Square::E1, Square::C1, MoveFlag::QueenCastle });
+            if (this->board_.castlingRights() & CastlingRights::WhiteQueenSide) {
+                if (!(this->occupied_ & B1C1D1)) {
+                    this->list_.push({ Square::E1, Square::C1, MoveFlag::QueenCastle });
+                }
             }
-        }
-    } else {
-        constexpr Bitboard F8G8 = Bitboards::F8 | Bitboards::G8;
-        constexpr Bitboard B8C8D8 = Bitboards::B8 | Bitboards::C8 | Bitboards::D8;
+        } else {
+            constexpr Bitboard F8G8 = Bitboards::F8 | Bitboards::G8;
+            constexpr Bitboard B8C8D8 = Bitboards::B8 | Bitboards::C8 | Bitboards::D8;
 
-        if (this->board_.castlingRights() & CastlingRights::BlackKingSide) {
-            if (!(this->occupied_ & F8G8)) {
-                this->list_.push({ Square::E8, Square::G8, MoveFlag::KingCastle });
+            if (this->board_.castlingRights() & CastlingRights::BlackKingSide) {
+                if (!(this->occupied_ & F8G8)) {
+                    this->list_.push({ Square::E8, Square::G8, MoveFlag::KingCastle });
+                }
             }
-        }
 
-        if (this->board_.castlingRights() & CastlingRights::BlackQueenSide) {
-            if (!(this->occupied_ & B8C8D8)) {
-                this->list_.push({ Square::E8, Square::C8, MoveFlag::QueenCastle });
+            if (this->board_.castlingRights() & CastlingRights::BlackQueenSide) {
+                if (!(this->occupied_ & B8C8D8)) {
+                    this->list_.push({ Square::E8, Square::C8, MoveFlag::QueenCastle });
+                }
             }
         }
     }
@@ -221,11 +228,7 @@ INLINE MoveEntry *MoveGenerator<Side, ExcludeQuiet>::generate() {
     this->generateSlidingMoves<Bitboards::bishop>(Piece::bishop(Side));
     this->generateSlidingMoves<Bitboards::rook>(Piece::rook(Side));
     this->generateSlidingMoves<Bitboards::queen>(Piece::queen(Side));
-    this->generateOffsetMoves<Bitboards::king>(Piece::king(Side));
-
-    if constexpr (!ExcludeQuiet) {
-        this->generateCastlingMoves();
-    }
+    this->generateKingMoves();
 
     return this->list_.end();
 }
