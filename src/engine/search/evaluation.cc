@@ -101,9 +101,8 @@ INLINE int32_t evaluatePieceTable(const Board &board) {
     int32_t score = 0;
 
     Bitboard pieces = board.bitboard<Side>(Type);
-    while (pieces) {
-        Square square = pieces.bsfReset();
-        score += Table[square];
+    for (Square piece : pieces) {
+        score += Table[piece];
     }
 
     return score;

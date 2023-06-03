@@ -61,24 +61,21 @@ MoveGenerator<Side, ExcludeQuiet>::MoveGenerator(const Board &board, MoveEntry *
 template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeQuiet(Square from, Bitboard quiet) {
     assert(!ExcludeQuiet);
-    while (quiet) {
-        Square to = quiet.bsfReset();
+    for (Square to : quiet) {
         this->list_.push({ from, to, MoveFlag::Quiet });
     }
 }
 
 template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeCaptures(Square from, Bitboard captures) {
-    while (captures) {
-        Square to = captures.bsfReset();
+    for (Square to : captures) {
         this->list_.push({ from, to, MoveFlag::Capture });
     }
 }
 
 template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotions(Square from, Bitboard promotions) {
-    while (promotions) {
-        Square to = promotions.bsfReset();
+    for (Square to : promotions) {
         this->list_.push({ from, to, MoveFlag::KnightPromotion });
         this->list_.push({ from, to, MoveFlag::BishopPromotion });
         this->list_.push({ from, to, MoveFlag::RookPromotion });
@@ -88,8 +85,7 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotions(Square from, 
 
 template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotionCaptures(Square from, Bitboard promoCaptures) {
-    while (promoCaptures) {
-        Square to = promoCaptures.bsfReset();
+    for (Square to : promoCaptures) {
         this->list_.push({ from, to, MoveFlag::KnightPromoCapture });
         this->list_.push({ from, to, MoveFlag::BishopPromoCapture });
         this->list_.push({ from, to, MoveFlag::RookPromoCapture });
@@ -148,8 +144,7 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generatePawnMoves(Square square) 
 template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::generateAllPawnMoves() {
     Bitboard pawns = this->board_.template bitboard<Side>(PieceType::Pawn);
-    while (pawns) {
-        Square square = pawns.bsfReset();
+    for (Square square : pawns) {
         this->generatePawnMoves(square);
     }
 }
@@ -201,9 +196,7 @@ template<Color Side, bool ExcludeQuiet>
 template<Bitboard (*GenerateAttacks)(Square)>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::generateOffsetMoves(Piece piece) {
     Bitboard pieces = this->board_.template bitboard<Side>(piece.type());
-    while (pieces) {
-        Square square = pieces.bsfReset();
-
+    for (Square square : pieces) {
         Bitboard attacks = GenerateAttacks(square);
         this->serializeBitboard(square, attacks);
     }
@@ -213,9 +206,7 @@ template<Color Side, bool ExcludeQuiet>
 template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::generateSlidingMoves(Piece piece) {
     Bitboard pieces = this->board_.template bitboard<Side>(piece.type());
-    while (pieces) {
-        Square square = pieces.bsfReset();
-
+    for (Square square : pieces) {
         Bitboard attacks = GenerateAttacks(square, this->occupied_);
         this->serializeBitboard(square, attacks);
     }

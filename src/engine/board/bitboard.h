@@ -4,6 +4,7 @@
 #include <cassert>
 #include <string>
 #include <array>
+#include <iterator>
 
 #include "color.h"
 #include "square.h"
@@ -12,24 +13,20 @@
 
 INLINE uint8_t bitScanForward(uint64_t x) {
     assert(x != 0);
-    asm ("bsfq %0, %0" : "=r" (x) : "0" (x));
-    return (int) x;
+    return __builtin_ctzll(x);
 }
 
 INLINE uint8_t bitScanReverse(uint64_t x) {
     assert(x != 0);
-    asm ("bsrq %0, %0" : "=r" (x) : "0" (x));
-    return (int) x;
+    return 63 - __builtin_clzll(x);
 }
 
 INLINE uint8_t popCount(uint64_t x) {
-    asm ("popcntq %0, %0" : "=r" (x) : "0" (x));
-    return (int) x;
+    return __builtin_popcountll(x);
 }
 
 INLINE uint64_t byteSwap(uint64_t x) {
-    asm ("bswapq %0" : "=r" (x) : "0" (x));
-    return x;
+    return __builtin_bswap64(x);
 }
 
 class Bitboard {
@@ -41,25 +38,53 @@ public:
     // Returns the index of the least significant bit.
     [[nodiscard]] INLINE uint8_t bsf() const { return bitScanForward(this->set_); }
 
-    // Returns the index of the least significant bit and clears it.
-    [[nodiscard]] INLINE uint8_t bsfReset() {
-        uint8_t index = bitScanForward(this->set_);
-        this->set_ &= this->set_ - 1;
-        return index;
-    }
-
     // Returns the index of the most significant bit.
     [[nodiscard]] INLINE uint8_t bsr() const { return bitScanReverse(this->set_); }
 
     // Returns the number of bits in the bitboard.
     [[nodiscard]] INLINE uint8_t count() const { return popCount(this->set_); }
 
-    [[nodiscard]] INLINE bool get(uint8_t index) const { return (this->set_ & (1ULL << index)) != 0; }
+    [[nodiscard]] INLINE constexpr bool get(uint8_t index) const { return (this->set_ & (1ULL << index)) != 0; }
     INLINE void set(uint8_t index) { this->set_ |= (1ULL << index); }
     INLINE void clear(uint8_t index) { this->set_ &= ~(1ULL << index); }
 
     // Flips the board vertically.
     [[nodiscard]] INLINE Bitboard flipVertical() const { return byteSwap(this->set_); }
+
+    // Iterates over all the bits in the bitboard using a C++ iterator.
+    //
+    // Tested in godbolt, when compiled with -O3, the iterator produces the exact same assembly as a while loop like this:
+    // while (bitboard) {
+    //     uint8_t index = bitboard.bsf();
+    //     // Do something with index.
+    //     bitboard &= bitboard - 1;
+    // }
+    class Iterator {
+    public:
+        using iterator_category = std::input_iterator_tag;
+        using difference_type = uint8_t;
+        using value_type = uint8_t;
+        using pointer = uint8_t *;
+        using reference = uint8_t &;
+
+        INLINE constexpr Iterator() : set_(0) { }
+        INLINE constexpr Iterator(uint64_t set) : set_(set) { } // NOLINT(google-explicit-constructor)
+
+        INLINE constexpr bool operator==(const Iterator &other) const { return this->set_ == other.set_; }
+        INLINE constexpr bool operator!=(const Iterator &other) const { return this->set_ != other.set_; }
+
+        INLINE uint8_t operator*() const { return bitScanForward(this->set_); }
+
+        INLINE constexpr Iterator &operator++() {
+            this->set_ &= this->set_ - 1;
+            return *this;
+        }
+
+    private:
+        uint64_t set_;
+    };
+    [[nodiscard]] INLINE constexpr Iterator begin() const { return this->set_; }
+    INLINE constexpr static Iterator end() { return 0; }
 
     [[nodiscard]] std::string debug() const;
 

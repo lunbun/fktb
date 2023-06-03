@@ -187,8 +187,8 @@ Bitboard Bitboards::diagonal(Square square, Bitboard occupied) {
 template<Color Side>
 Bitboard Bitboards::allPawn(Bitboard pawns) {
     Bitboard attacks;
-    while (pawns) {
-        attacks = attacks | Bitboards::pawn<Side>(pawns.bsfReset());
+    for (Square pawn : pawns) {
+        attacks = attacks | Bitboards::pawn<Side>(pawn);
     }
     return attacks;
 }
@@ -198,32 +198,32 @@ template Bitboard Bitboards::allPawn<Color::Black>(Bitboard pawns);
 
 Bitboard Bitboards::allKnight(Bitboard knights) {
     Bitboard attacks;
-    while (knights) {
-        attacks = attacks | Bitboards::knight(knights.bsfReset());
+    for (Square knight : knights) {
+        attacks = attacks | Bitboards::knight(knight);
     }
     return attacks;
 }
 
 Bitboard Bitboards::allBishop(Bitboard bishops, Bitboard occupied) {
     Bitboard attacks;
-    while (bishops) {
-        attacks = attacks | Bitboards::bishop(bishops.bsfReset(), occupied);
+    for (Square bishop : bishops) {
+        attacks = attacks | Bitboards::bishop(bishop, occupied);
     }
     return attacks;
 }
 
 Bitboard Bitboards::allRook(Bitboard rooks, Bitboard occupied) {
     Bitboard attacks;
-    while (rooks) {
-        attacks = attacks | Bitboards::rook(rooks.bsfReset(), occupied);
+    for (Square rook : rooks) {
+        attacks = attacks | Bitboards::rook(rook, occupied);
     }
     return attacks;
 }
 
 Bitboard Bitboards::allQueen(Bitboard queens, Bitboard occupied) {
     Bitboard attacks;
-    while (queens) {
-        attacks = attacks | Bitboards::queen(queens.bsfReset(), occupied);
+    for (Square queen : queens) {
+        attacks = attacks | Bitboards::queen(queen, occupied);
     }
     return attacks;
 }
