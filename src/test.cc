@@ -92,15 +92,15 @@ void Tests::fixedDepthTest(const std::string &fen, uint16_t depth) {
     Board board = Board::fromFen(fen);
 
     TranspositionTable table(2097152);
-    SearchDebugInfo debugInfo;
-    FixedDepthSearcher searcher(board, depth, table, debugInfo);
+    SearchStatistics stats;
+    FixedDepthSearcher searcher(board, depth, table, stats);
     SearchLine bestLine = searcher.search();
 
     std::cout << "Best move: " << bestLine.moves[0].debugName(board) << std::endl;
     std::cout << "Score: " << bestLine.score << std::endl;
-    std::cout << "Nodes: " << formatWithExact(debugInfo.nodeCount()) << std::endl;
-    std::cout << "Transposition hits: " << formatWithExact(debugInfo.transpositionHits()) << std::endl;
-    std::cout << "Time: " << debugInfo.elapsed().count() << "ms" << std::endl;
+    std::cout << "Nodes: " << formatWithExact(stats.nodeCount()) << std::endl;
+    std::cout << "Transposition hits: " << formatWithExact(stats.transpositionHits()) << std::endl;
+    std::cout << "Time: " << stats.elapsed().count() << "ms" << std::endl;
 }
 
 

@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-#include "debug_info.h"
+#include "statistics.h"
 #include "engine/inline.h"
 #include "engine/board/board.h"
 #include "engine/board/color.h"
@@ -37,7 +37,7 @@ struct SearchLine {
 
 class FixedDepthSearcher {
 public:
-    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, SearchDebugInfo &debugInfo);
+    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, SearchStatistics &stats);
 
     [[nodiscard]] SearchLine search();
 
@@ -59,7 +59,7 @@ private:
     Board board_;
     uint16_t depth_;
     TranspositionTable &table_;
-    SearchDebugInfo &debugInfo_;
+    SearchStatistics &stats_;
 
     template<Color Turn>
     [[nodiscard]] SearchRootNode searchRoot(RootMoveList moves);

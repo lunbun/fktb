@@ -238,7 +238,7 @@ void UciHandler::startSearch(const SearchOptions &options) {
         // Start a new thread to stop the search after the given number of nodes
         // It's possible that we may run into thread safety issues here
         std::thread([this, nodes]() {
-            while (this->isSearching_ && this->searcher_->debugInfo().nodeCount() < nodes) {
+            while (this->isSearching_ && this->searcher_->stats().nodeCount() < nodes) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             this->stopSearch();

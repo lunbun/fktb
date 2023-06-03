@@ -7,7 +7,7 @@
 #include <chrono>
 #include <functional>
 
-#include "debug_info.h"
+#include "statistics.h"
 #include "fixed_search.h"
 #include "engine/inline.h"
 #include "engine/board/piece.h"
@@ -26,7 +26,7 @@ struct SearchResult {
     std::chrono::milliseconds elapsed;
 
     SearchResult(); // Creates an invalid search result.
-    SearchResult(uint16_t depth, SearchLine line, const SearchDebugInfo &debugInfo);
+    SearchResult(uint16_t depth, SearchLine line, const SearchStatistics &statistics);
 
     [[nodiscard]] INLINE bool isValid() const { return !this->bestLine.empty(); }
 };
@@ -43,7 +43,7 @@ public:
     void start(const Board &board);
     SearchResult stop();
 
-    [[nodiscard]] INLINE const SearchDebugInfo &debugInfo() const { return *this->debugInfo_; }
+    [[nodiscard]] INLINE const SearchStatistics &stats() const { return *this->stats_; }
 
 private:
     class SearchThread;
@@ -54,7 +54,7 @@ private:
     std::vector<IterationCallback> callbacks_;
     SearchResult result_;
     std::unique_ptr<TranspositionTable> table_;
-    std::unique_ptr<SearchDebugInfo> debugInfo_;
+    std::unique_ptr<SearchStatistics> stats_;
 
     void notifyCallbacks(const SearchResult &result);
     void receiveResultFromThread(const SearchResult &result);

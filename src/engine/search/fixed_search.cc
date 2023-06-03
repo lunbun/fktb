@@ -11,7 +11,7 @@
 #include "engine/move/movegen.h"
 
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table,
-    SearchDebugInfo &debugInfo) : board_(board.copy()), depth_(depth), table_(table), debugInfo_(debugInfo) { }
+    SearchStatistics &stats) : board_(board.copy()), depth_(depth), table_(table), stats_(stats) { }
 
 void FixedDepthSearcher::halt() {
     this->isHalted_ = true;
@@ -78,7 +78,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
         return SearchRootNode::invalid();
     }
 
-    this->debugInfo_.incrementNodeCount();
+    this->stats_.incrementNodeCount();
 
     uint16_t depth = this->depth_;
     Board &board = this->board_;
@@ -121,7 +121,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
 
 template<Color Turn>
 int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
-    this->debugInfo_.incrementNodeCount();
+    this->stats_.incrementNodeCount();
 
     Board &board = this->board_;
 
@@ -169,7 +169,7 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
 
 template<Color Turn>
 INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_t depth, int32_t &alpha, int32_t beta) {
-    this->debugInfo_.incrementNodeCount();
+    this->stats_.incrementNodeCount();
 
     Board &board = this->board_;
 
@@ -235,7 +235,7 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
     {
         TranspositionTable::LockedEntry entry = table.load(board.hash());
         if (entry != nullptr && entry->depth() >= depth) {
-            this->debugInfo_.incrementTranspositionHits();
+            this->stats_.incrementTranspositionHits();
 
             if (entry->flag() == TranspositionTable::Flag::Exact) {
                 return entry->bestScore();

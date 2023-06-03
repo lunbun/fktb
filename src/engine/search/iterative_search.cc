@@ -9,18 +9,18 @@
 #include <cassert>
 
 #include "fixed_search.h"
-#include "debug_info.h"
+#include "statistics.h"
 #include "engine/move/movegen.h"
 
 SearchResult::SearchResult() : depth(0), bestLine(), score(0), nodeCount(0), transpositionHits(0), elapsed() { }
 
-SearchResult::SearchResult(uint16_t depth, SearchLine line, const SearchDebugInfo &debugInfo) : elapsed() {
+SearchResult::SearchResult(uint16_t depth, SearchLine line, const SearchStatistics &stats) : elapsed() {
     this->depth = depth;
     this->bestLine = std::move(line.moves);
     this->score = line.score;
-    this->nodeCount = debugInfo.nodeCount();
-    this->transpositionHits = debugInfo.transpositionHits();
-    this->elapsed = debugInfo.elapsed();
+    this->nodeCount = stats.nodeCount();
+    this->transpositionHits = stats.transpositionHits();
+    this->elapsed = stats.elapsed();
 }
 
 
@@ -31,12 +31,12 @@ struct SearchTask {
     std::optional<RootMoveList> rootMoveOrder = std::nullopt;
     bool canUseHashMove = false;
     TranspositionTable &table;
-    SearchDebugInfo &debugInfo;
+    SearchStatistics &stats;
     std::unique_ptr<FixedDepthSearcher> iteration = nullptr;
 
-    SearchTask(const Board &board, TranspositionTable &table, SearchDebugInfo &debugInfo) : board(board.copy()),
+    SearchTask(const Board &board, TranspositionTable &table, SearchStatistics &stats) : board(board.copy()),
                                                                                             table(table),
-                                                                                            debugInfo(debugInfo) { }
+                                                                                            stats(stats) { }
 };
 
 
@@ -137,7 +137,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
     // Create a copy of parts of the task that we need, so that we are not holding the task mutex while searching.
     // Also create the FixedDepthSearcher here.
     uint16_t depth;
-    SearchDebugInfo *debugInfo;
+    SearchStatistics *stats;
     std::optional<RootMoveList> rootMoveOrder;
     FixedDepthSearcher *iteration;
 
@@ -147,7 +147,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
         SearchTask &task = *this->task_;
 
         depth = task.depth;
-        debugInfo = &task.debugInfo;
+        stats = &task.stats;
 
         rootMoveOrder = task.rootMoveOrder;
         if (task.canUseHashMove) {
@@ -156,7 +156,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
         }
 
         // Create a new searcher
-        task.iteration = std::make_unique<FixedDepthSearcher>(task.board, task.depth, task.table, task.debugInfo);
+        task.iteration = std::make_unique<FixedDepthSearcher>(task.board, task.depth, task.table, task.stats);
 
         iteration = task.iteration.get();
     }
@@ -164,7 +164,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
     // Search
     std::lock_guard<std::mutex> lock(this->searchMutex_);
     SearchLine line = iteration->search(rootMoveOrder.value());
-    return { depth, std::move(line), *debugInfo };
+    return { depth, std::move(line), *stats };
 }
 
 void IterativeSearcher::SearchThread::loop() {
@@ -229,7 +229,7 @@ void IterativeSearcher::start(const Board &board) {
 
     this->result_ = SearchResult::invalid();
     this->table_ = std::make_unique<TranspositionTable>(4194304);
-    this->debugInfo_ = std::make_unique<SearchDebugInfo>();
+    this->stats_ = std::make_unique<SearchStatistics>();
 
     Board boardCopy = board.copy();
     RootMoveList rootMoves = MoveGeneration::generateLegalRoot(boardCopy);
@@ -238,7 +238,7 @@ void IterativeSearcher::start(const Board &board) {
     std::mt19937 generator(device());
 
     for (uint32_t i = 0; i < this->threads_.size(); i++) {
-        std::unique_ptr<SearchTask> task = std::make_unique<SearchTask>(board, *this->table_, *this->debugInfo_);
+        std::unique_ptr<SearchTask> task = std::make_unique<SearchTask>(board, *this->table_, *this->stats_);
 
         // Create a copy of the root moves so that we can modify it
         RootMoveList rootMoveOrder = rootMoves;
@@ -306,7 +306,7 @@ SearchResult IterativeSearcher::stop() {
 
     this->result_ = SearchResult::invalid();
     this->table_ = nullptr;
-    this->debugInfo_ = nullptr;
+    this->stats_ = nullptr;
 
     return result;
 }

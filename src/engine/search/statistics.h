@@ -6,9 +6,9 @@
 
 // Stores information like node count and transposition hits about the current search.
 // This class is thread safe.
-class SearchDebugInfo {
+class SearchStatistics {
 public:
-    SearchDebugInfo() : nodeCount_(0), transpositionHits_(0), start_() {
+    SearchStatistics() : nodeCount_(0), transpositionHits_(0), start_() {
         this->start_ = std::chrono::steady_clock::now();
     }
 
