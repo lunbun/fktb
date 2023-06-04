@@ -1,7 +1,5 @@
 #include "movegen.h"
 
-#include <cassert>
-
 #include "move_list.h"
 #include "engine/inline.h"
 #include "engine/board/castling.h"
@@ -60,7 +58,7 @@ MoveGenerator<Side, ExcludeQuiet>::MoveGenerator(const Board &board, MoveEntry *
 
 template<Color Side, bool ExcludeQuiet>
 INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeQuiet(Square from, Bitboard quiet) {
-    assert(!ExcludeQuiet);
+    static_assert(!ExcludeQuiet, "Cannot serialize quiet moves in ExcludeQuiet mode");
     for (Square to : quiet) {
         this->list_.push({ from, to, MoveFlag::Quiet });
     }

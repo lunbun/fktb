@@ -99,51 +99,16 @@ namespace Bitboards {
 #undef BB_RANK
     // @formatter:on
 
-    // Using PEXT bitboards for generating sliding piece attacks: https://www.chessprogramming.org/BMI2#PEXTBitboards
-    // (similar to magic bitboards, but without the magic :) )
-    extern SquareMap<Bitboard> diagonalMasks;
-    extern SquareMap<Bitboard> orthogonalMasks;
-    // TODO: Sliding piece attack tables can be smaller.
-    extern SquareMap<std::array<Bitboard, 512>> diagonalAttackTable;    // 256 KiB
-    extern SquareMap<std::array<Bitboard, 4096>> orthogonalAttackTable; // 2 MiB
-
-    extern ColorMap<SquareMap<Bitboard>> pawnAttackTable;
-    extern SquareMap<Bitboard> knightAttackTable;
-    extern SquareMap<Bitboard> kingAttackTable;
-
     // Initialize the bitboard attack tables, if they haven't been initialized already.
     void maybeInit();
 
     template<Color Side>
-    INLINE Bitboard pawnAttacks(Square square) {
-        return pawnAttackTable[Side][square];
-    }
-
-    INLINE Bitboard knightAttacks(Square square) {
-        return knightAttackTable[square];
-    }
-
-    INLINE Bitboard bishopAttacks(Square square, Bitboard occupied) {
-        uint64_t index = Intrinsics::pext(occupied, diagonalMasks[square]);
-
-        assert(index < 512);
-        return diagonalAttackTable[square][index];
-    }
-
-    INLINE Bitboard rookAttacks(Square square, Bitboard occupied) {
-        uint64_t index = Intrinsics::pext(occupied, orthogonalMasks[square]);
-
-        assert(index < 4096);
-        return orthogonalAttackTable[square][index];
-    }
-
-    INLINE Bitboard queenAttacks(Square square, Bitboard occupied) {
-        return bishopAttacks(square, occupied) | rookAttacks(square, occupied);
-    }
-
-    INLINE Bitboard kingAttacks(Square square) {
-        return kingAttackTable[square];
-    }
+    Bitboard pawnAttacks(Square square);
+    Bitboard knightAttacks(Square square);
+    Bitboard bishopAttacks(Square square, Bitboard occupied);
+    Bitboard rookAttacks(Square square, Bitboard occupied);
+    Bitboard queenAttacks(Square square, Bitboard occupied);
+    Bitboard kingAttacks(Square square);
 
     // Returns a bitboard with all attacks of the given piece type.
     template<Color Side>
