@@ -1,8 +1,10 @@
 #include "bitboard.h"
 
 #include <string>
+#include <array>
 
 #include "engine/inline.h"
+#include "engine/intrinsics.h"
 
 std::string Bitboard::debug() const {
     std::string result;
@@ -24,36 +26,127 @@ std::string Bitboard::debug() const {
 
 
 
-AttackTable Bitboards::northAttacks;
-AttackTable Bitboards::northEastAttacks;
-AttackTable Bitboards::eastAttacks;
-AttackTable Bitboards::southEastAttacks;
-AttackTable Bitboards::southAttacks;
-AttackTable Bitboards::southWestAttacks;
-AttackTable Bitboards::westAttacks;
-AttackTable Bitboards::northWestAttacks;
+SquareMap<Bitboard> Bitboards::diagonalMasks;
+SquareMap<Bitboard> Bitboards::orthogonalMasks;
+SquareMap<std::array<Bitboard, 512>> Bitboards::diagonalAttacks;
+SquareMap<std::array<Bitboard, 4096>> Bitboards::orthogonalAttacks;
 
-ColorMap<AttackTable> Bitboards::pawnAttacks;
-AttackTable Bitboards::knightAttacks;
-AttackTable Bitboards::kingAttacks;
+ColorMap<SquareMap<Bitboard>> Bitboards::pawnAttacks;
+SquareMap<Bitboard> Bitboards::knightAttacks;
+SquareMap<Bitboard> Bitboards::kingAttacks;
 
-void initRayAttacks(AttackTable &table, int8_t fileOffset, int8_t rankOffset) {
-    table.fill(0);
+// This is an expensive method, only call during initialization.
+Bitboard generateRayAttacks(Square square, int8_t fileDelta, int8_t rankDelta, Bitboard blockers) {
+    Bitboard attacks;
 
-    for (uint8_t index = 0; index < 64; ++index) {
-        Bitboard attacks;
+    int32_t file = Square::file(square) + fileDelta;
+    int32_t rank = Square::rank(square) + rankDelta;
 
-        auto file = static_cast<int8_t>(Square::file(index) + fileOffset);
-        auto rank = static_cast<int8_t>(Square::rank(index) + rankOffset);
+    while (file >= 0 && file <= 7 && rank >= 0 && rank <= 7) {
+        Square attack(file, rank);
 
-        while (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
-            attacks.set(Square(file, rank));
+        attacks.set(attack);
 
-            file += fileOffset;
-            rank += rankOffset;
+        if (blockers.get(attack)) {
+            break;
         }
 
-        table[index] = attacks;
+        file += fileDelta;
+        rank += rankDelta;
+    }
+
+    return attacks;
+}
+
+void initDiagonalAttacks() {
+    for (uint8_t square = 0; square < 64; ++square) {
+        // Generate the mask for the square.
+        Bitboard mask;
+        {
+            // Don't need to go all the way to the edge of the board since those squares will not affect the attacks
+            // regardless of if they are occupied or not.
+            int32_t file = Square::file(square) - 1;
+            int32_t rank = Square::rank(square) - 1;
+            while (file >= 1 && rank >= 1) {
+                mask.set(Square(file--, rank--));
+            }
+
+            file = Square::file(square) + 1;
+            rank = Square::rank(square) - 1;
+            while (file < 7 && rank >= 1) {
+                mask.set(Square(file++, rank--));
+            }
+
+            file = Square::file(square) - 1;
+            rank = Square::rank(square) + 1;
+            while (file >= 1 && rank < 7) {
+                mask.set(Square(file--, rank++));
+            }
+
+            file = Square::file(square) + 1;
+            rank = Square::rank(square) + 1;
+            while (file < 7 && rank < 7) {
+                mask.set(Square(file++, rank++));
+            }
+
+            Bitboards::diagonalMasks[square] = mask;
+        }
+
+        // Generate all attacks for the square.
+        for (uint64_t index = 0; index < 512; ++index) {
+            Bitboard blockers = Intrinsics::pdep(index, mask);
+
+            Bitboard attacks;
+
+            attacks |= generateRayAttacks(square, 1, 1, blockers);
+            attacks |= generateRayAttacks(square, -1, 1, blockers);
+            attacks |= generateRayAttacks(square, 1, -1, blockers);
+            attacks |= generateRayAttacks(square, -1, -1, blockers);
+
+            Bitboards::diagonalAttacks[square][index] = attacks;
+        }
+    }
+}
+
+void initOrthogonalAttacks() {
+    for (uint8_t square = 0; square < 64; ++square) {
+        // Generate the mask for the square.
+        Bitboard mask;
+        {
+            uint8_t file = Square::file(square);
+            uint8_t rank = Square::rank(square);
+
+            // Don't need to go all the way to the edge of the board since those squares will not affect the attacks
+            // regardless of if they are occupied or not.
+            for (uint8_t i = 1; i < file; ++i) {
+                mask.set(Square(i, rank));
+            }
+            for (uint8_t i = file + 1; i < 7; ++i) {
+                mask.set(Square(i, rank));
+            }
+            for (uint8_t i = 1; i < rank; ++i) {
+                mask.set(Square(file, i));
+            }
+            for (uint8_t i = rank + 1; i < 7; ++i) {
+                mask.set(Square(file, i));
+            }
+
+            Bitboards::orthogonalMasks[square] = mask;
+        }
+
+        // Generate all attacks for the square.
+        for (uint64_t index = 0; index < 4096; ++index) {
+            Bitboard blockers = Intrinsics::pdep(index, mask);
+
+            Bitboard attacks;
+
+            attacks |= generateRayAttacks(square, 1, 0, blockers);
+            attacks |= generateRayAttacks(square, -1, 0, blockers);
+            attacks |= generateRayAttacks(square, 0, 1, blockers);
+            attacks |= generateRayAttacks(square, 0, -1, blockers);
+
+            Bitboards::orthogonalAttacks[square][index] = attacks;
+        }
     }
 }
 
@@ -136,14 +229,8 @@ void Bitboards::maybeInit() {
 
     isInitialized = true;
 
-    initRayAttacks(northAttacks, 0, 1);
-    initRayAttacks(northEastAttacks, 1, 1);
-    initRayAttacks(eastAttacks, 1, 0);
-    initRayAttacks(southEastAttacks, 1, -1);
-    initRayAttacks(southAttacks, 0, -1);
-    initRayAttacks(southWestAttacks, -1, -1);
-    initRayAttacks(westAttacks, -1, 0);
-    initRayAttacks(northWestAttacks, -1, 1);
+    initDiagonalAttacks();
+    initOrthogonalAttacks();
 
     initPawnAttacks();
     initKnightAttacks();
@@ -152,43 +239,11 @@ void Bitboards::maybeInit() {
 
 
 
-// The approach described in the following article is how we generate attacks for sliding pieces:
-// https://www.chessprogramming.org/Classical_Approach
-template<const AttackTable &Table>
-INLINE Bitboard generatePositiveAttacks(Square square, Bitboard occupied) {
-    Bitboard attacks = Table[square];
-    Bitboard blockers = (attacks & occupied) | 0x8000000000000000ULL;
-    return attacks & ~Table[blockers.bsf()];
-}
-
-template<const AttackTable &Table>
-INLINE Bitboard generateNegativeAttacks(Square square, Bitboard occupied) {
-    Bitboard attacks = Table[square];
-    Bitboard blockers = (attacks & occupied) | 1ULL;
-    return attacks & ~Table[blockers.bsr()];
-}
-
-Bitboard Bitboards::orthogonal(Square square, Bitboard occupied) {
-    return generatePositiveAttacks<Bitboards::northAttacks>(square, occupied)
-        | generateNegativeAttacks<Bitboards::southAttacks>(square, occupied)
-        | generatePositiveAttacks<Bitboards::eastAttacks>(square, occupied)
-        | generateNegativeAttacks<Bitboards::westAttacks>(square, occupied);
-}
-
-Bitboard Bitboards::diagonal(Square square, Bitboard occupied) {
-    return generatePositiveAttacks<Bitboards::northEastAttacks>(square, occupied)
-        | generateNegativeAttacks<Bitboards::southEastAttacks>(square, occupied)
-        | generatePositiveAttacks<Bitboards::northWestAttacks>(square, occupied)
-        | generateNegativeAttacks<Bitboards::southWestAttacks>(square, occupied);
-}
-
-
-
 template<Color Side>
 Bitboard Bitboards::allPawn(Bitboard pawns) {
     Bitboard attacks;
     for (Square pawn : pawns) {
-        attacks = attacks | Bitboards::pawn<Side>(pawn);
+        attacks |= Bitboards::pawn<Side>(pawn);
     }
     return attacks;
 }
@@ -199,7 +254,7 @@ template Bitboard Bitboards::allPawn<Color::Black>(Bitboard pawns);
 Bitboard Bitboards::allKnight(Bitboard knights) {
     Bitboard attacks;
     for (Square knight : knights) {
-        attacks = attacks | Bitboards::knight(knight);
+        attacks |= Bitboards::knight(knight);
     }
     return attacks;
 }
@@ -207,7 +262,7 @@ Bitboard Bitboards::allKnight(Bitboard knights) {
 Bitboard Bitboards::allBishop(Bitboard bishops, Bitboard occupied) {
     Bitboard attacks;
     for (Square bishop : bishops) {
-        attacks = attacks | Bitboards::bishop(bishop, occupied);
+        attacks |= Bitboards::bishop(bishop, occupied);
     }
     return attacks;
 }
@@ -215,7 +270,7 @@ Bitboard Bitboards::allBishop(Bitboard bishops, Bitboard occupied) {
 Bitboard Bitboards::allRook(Bitboard rooks, Bitboard occupied) {
     Bitboard attacks;
     for (Square rook : rooks) {
-        attacks = attacks | Bitboards::rook(rook, occupied);
+        attacks |= Bitboards::rook(rook, occupied);
     }
     return attacks;
 }
@@ -223,7 +278,7 @@ Bitboard Bitboards::allRook(Bitboard rooks, Bitboard occupied) {
 Bitboard Bitboards::allQueen(Bitboard queens, Bitboard occupied) {
     Bitboard attacks;
     for (Square queen : queens) {
-        attacks = attacks | Bitboards::queen(queen, occupied);
+        attacks |= Bitboards::queen(queen, occupied);
     }
     return attacks;
 }

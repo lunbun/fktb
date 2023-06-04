@@ -3,10 +3,11 @@
 #include <cstdint>
 
 #include "engine/inline.h"
+#include "engine/board/square.h"
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
 
-using PieceSquareTable = std::array<int32_t, 64>;
+using PieceSquareTable = SquareMap<int32_t>;
 
 namespace Evaluation {
     extern const ColorMap<PieceSquareTable> pawnTable;

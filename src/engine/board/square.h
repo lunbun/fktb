@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <array>
 
 #include "engine/inline.h"
 
@@ -25,8 +26,8 @@ public:
     INLINE constexpr Square(uint8_t file, uint8_t rank) : index_(file | (rank << 3)) { }
     INLINE constexpr operator uint8_t() const { return this->index_; } // NOLINT(google-explicit-constructor)
 
-    [[nodiscard]] INLINE constexpr static uint8_t file(uint8_t index) { return index & 7; }
-    [[nodiscard]] INLINE constexpr static uint8_t rank(uint8_t index) { return index >> 3; };
+    [[nodiscard]] INLINE constexpr static uint8_t file(Square square) { return square & 7; }
+    [[nodiscard]] INLINE constexpr static uint8_t rank(Square square) { return square >> 3; };
 
     [[nodiscard]] INLINE constexpr uint8_t file() const { return Square::file(this->index_); }
     [[nodiscard]] INLINE constexpr uint8_t rank() const { return Square::rank(this->index_); }
@@ -39,3 +40,6 @@ private:
 };
 
 static_assert(sizeof(Square) == 1, "Square must be 1 byte");
+
+template<typename T>
+using SquareMap = std::array<T, 64>;

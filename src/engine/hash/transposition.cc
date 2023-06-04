@@ -7,6 +7,7 @@
 #include <cassert>
 
 #include "engine/move/move.h"
+#include "engine/board/square.h"
 #include "engine/board/piece.h"
 
 namespace {
@@ -14,7 +15,7 @@ namespace {
 
     uint64_t blackToMoveNumber = 0;
     std::array<uint64_t, 16> castlingRightsNumbers;
-    ColorMap<std::array<std::array<uint64_t, 64>, 6>> pieceNumbers;
+    ColorMap<std::array<SquareMap<uint64_t>, 6>> pieceNumbers;
 }
 
 void Zobrist::maybeInit() {

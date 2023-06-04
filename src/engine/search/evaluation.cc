@@ -1,13 +1,13 @@
 #include "evaluation.h"
 
 #include <cstdint>
-#include <array>
 
 #include "engine/inline.h"
+#include "engine/board/square.h"
 #include "engine/board/bitboard.h"
 
 constexpr PieceSquareTable flipVertical(const PieceSquareTable &table) {
-    std::array<int32_t, 64> flippedTable = { 0 };
+    SquareMap<int32_t> flippedTable = { 0 };
     for (uint8_t rank = 0; rank < 8; rank++) {
         for (uint8_t file = 0; file < 8; file++) {
             uint8_t index = rank * 8 + file;

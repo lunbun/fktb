@@ -54,6 +54,12 @@ public:
         return this->bits_ & ~CastlingRights::color(color);
     }
 
+    // @formatter:off
+    INLINE CastlingRights &operator|=(CastlingRights other) { this->bits_ |= other.bits_; return *this; }
+    INLINE CastlingRights &operator&=(CastlingRights other) { this->bits_ &= other.bits_; return *this; }
+    INLINE CastlingRights &operator^=(CastlingRights other) { this->bits_ ^= other.bits_; return *this; }
+    // @formatter:on
+
     [[nodiscard]] std::string debugName() const;
 
 private:

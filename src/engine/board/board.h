@@ -8,6 +8,8 @@
 #include <string>
 #include <cassert>
 
+#include "color.h"
+#include "square.h"
 #include "piece.h"
 #include "bitboard.h"
 #include "engine/inline.h"
@@ -102,7 +104,7 @@ private:
 
     ColorMap<Square> kings_;
     CastlingRights castlingRights_;
-    std::array<Piece, 64> pieces_;
+    SquareMap<Piece> pieces_;
     ColorMap<std::array<Bitboard, 5>> bitboards_;
 
     // Updates the hash and castling rights.

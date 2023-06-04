@@ -333,27 +333,25 @@ void Tests::transpositionLockTest() {
 // Perft test
 template<Color Side>
 uint32_t perftSearch(Board &board, uint16_t depth) {
-    if (depth == 0) {
-        return 1;
-    }
-
     AlignedMoveEntry moveBuffer[256];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
     MoveEntry *movesEnd = MoveGeneration::generateLegal<Side, false>(board, movesStart);
-
-    MovePriorityQueue moves(movesStart, movesEnd);
+    if (depth == 1) {
+        // If we are at the bottom of the search, just return the number of moves
+        return movesEnd - movesStart;
+    }
 
     uint32_t nodeCount = 0;
 
-    while (!moves.empty()) {
-        Move move = moves.dequeue();
+    while (movesEnd != movesStart) {
+        Move move = (--movesEnd)->move;
 
-        MakeMoveInfo info = board.makeMove<true>(move);
+        MakeMoveInfo info = board.makeMove<false>(move);
 
         nodeCount += perftSearch<~Side>(board, depth - 1);
 
-        board.unmakeMove<true>(move, info);
+        board.unmakeMove<false>(move, info);
     }
 
     return nodeCount;

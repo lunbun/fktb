@@ -5,4 +5,5 @@ add_subdirectory(search)
 
 target_sources(chess PRIVATE
         init.h
-        inline.h)
+        inline.h
+        intrinsics.h)

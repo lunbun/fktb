@@ -116,10 +116,10 @@ CastlingRights FenReader::castlingRights() const {
     for (char c : castlingRights) {
         // @formatter:off
         switch (c) {
-            case 'K': result = result | CastlingRights::WhiteKingSide; break;
-            case 'Q': result = result | CastlingRights::WhiteQueenSide; break;
-            case 'k': result = result | CastlingRights::BlackKingSide; break;
-            case 'q': result = result | CastlingRights::BlackQueenSide; break;
+            case 'K': result |= CastlingRights::WhiteKingSide; break;
+            case 'Q': result |= CastlingRights::WhiteQueenSide; break;
+            case 'k': result |= CastlingRights::BlackKingSide; break;
+            case 'q': result |= CastlingRights::BlackQueenSide; break;
             default: throw std::runtime_error("Invalid castling rights in FEN string");
         }
         // @formatter:on
