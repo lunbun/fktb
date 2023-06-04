@@ -3,6 +3,10 @@
 #include <string>
 #include <array>
 
+#include "color.h"
+#include "square.h"
+#include "piece.h"
+#include "board.h"
 #include "engine/inline.h"
 #include "engine/intrinsics.h"
 
@@ -28,12 +32,12 @@ std::string Bitboard::debug() const {
 
 SquareMap<Bitboard> Bitboards::diagonalMasks;
 SquareMap<Bitboard> Bitboards::orthogonalMasks;
-SquareMap<std::array<Bitboard, 512>> Bitboards::diagonalAttacks;
-SquareMap<std::array<Bitboard, 4096>> Bitboards::orthogonalAttacks;
+SquareMap<std::array<Bitboard, 512>> Bitboards::diagonalAttackTable;
+SquareMap<std::array<Bitboard, 4096>> Bitboards::orthogonalAttackTable;
 
-ColorMap<SquareMap<Bitboard>> Bitboards::pawnAttacks;
-SquareMap<Bitboard> Bitboards::knightAttacks;
-SquareMap<Bitboard> Bitboards::kingAttacks;
+ColorMap<SquareMap<Bitboard>> Bitboards::pawnAttackTable;
+SquareMap<Bitboard> Bitboards::knightAttackTable;
+SquareMap<Bitboard> Bitboards::kingAttackTable;
 
 // This is an expensive method, only call during initialization.
 Bitboard generateRayAttacks(Square square, int8_t fileDelta, int8_t rankDelta, Bitboard blockers) {
@@ -103,7 +107,7 @@ void initDiagonalAttacks() {
             attacks |= generateRayAttacks(square, 1, -1, blockers);
             attacks |= generateRayAttacks(square, -1, -1, blockers);
 
-            Bitboards::diagonalAttacks[square][index] = attacks;
+            Bitboards::diagonalAttackTable[square][index] = attacks;
         }
     }
 }
@@ -145,13 +149,13 @@ void initOrthogonalAttacks() {
             attacks |= generateRayAttacks(square, 0, 1, blockers);
             attacks |= generateRayAttacks(square, 0, -1, blockers);
 
-            Bitboards::orthogonalAttacks[square][index] = attacks;
+            Bitboards::orthogonalAttackTable[square][index] = attacks;
         }
     }
 }
 
 void initPawnAttacks() {
-    Bitboards::pawnAttacks.white().fill(0);
+    Bitboards::pawnAttackTable.white().fill(0);
     for (uint8_t index = 0; index < 64; ++index) {
         Bitboard attacks;
 
@@ -161,10 +165,10 @@ void initPawnAttacks() {
         if (file > 0 && rank < 7) attacks.set(index + 7);
         if (file < 7 && rank < 7) attacks.set(index + 9);
 
-        Bitboards::pawnAttacks.white()[index] = attacks;
+        Bitboards::pawnAttackTable.white()[index] = attacks;
     }
 
-    Bitboards::pawnAttacks.black().fill(0);
+    Bitboards::pawnAttackTable.black().fill(0);
     for (uint8_t index = 0; index < 64; ++index) {
         Bitboard attacks;
 
@@ -174,12 +178,12 @@ void initPawnAttacks() {
         if (file > 0 && rank > 0) attacks.set(index - 9);
         if (file < 7 && rank > 0) attacks.set(index - 7);
 
-        Bitboards::pawnAttacks.black()[index] = attacks;
+        Bitboards::pawnAttackTable.black()[index] = attacks;
     }
 }
 
 void initKnightAttacks() {
-    Bitboards::knightAttacks.fill(0);
+    Bitboards::knightAttackTable.fill(0);
     for (uint8_t index = 0; index < 64; ++index) {
         Bitboard attacks;
 
@@ -195,12 +199,12 @@ void initKnightAttacks() {
         if (file >= 1 && rank <= 5) attacks.set(index + 15);
         if (file >= 2 && rank <= 6) attacks.set(index + 6);
 
-        Bitboards::knightAttacks[index] = attacks;
+        Bitboards::knightAttackTable[index] = attacks;
     }
 }
 
 void initKingAttacks() {
-    Bitboards::kingAttacks.fill(0);
+    Bitboards::kingAttackTable.fill(0);
     for (uint8_t index = 0; index < 64; ++index) {
         Bitboard attacks;
 
@@ -216,7 +220,7 @@ void initKingAttacks() {
         if (file <= 6) attacks.set(index + 1);
         if (file <= 6 && rank <= 6) attacks.set(index + 9);
 
-        Bitboards::kingAttacks[index] = attacks;
+        Bitboards::kingAttackTable[index] = attacks;
     }
 }
 
@@ -240,45 +244,66 @@ void Bitboards::maybeInit() {
 
 
 template<Color Side>
-Bitboard Bitboards::allPawn(Bitboard pawns) {
-    Bitboard attacks;
-    for (Square pawn : pawns) {
-        attacks |= Bitboards::pawn<Side>(pawn);
+Bitboard Bitboards::allPawnAttacks(Bitboard pawns) {
+    // Pawns are special since we can just shift them to get all the attacks in one go, instead of having to iterate
+    // over each pawn and generate the attacks individually.
+
+    // Pawns not on the A file can attack to the left, and pawns not on the H file can attack to the right (opposite
+    // for black).
+    constexpr Bitboard NonAFile = ~Bitboards::FileA;
+    constexpr Bitboard NonHFile = ~Bitboards::FileH;
+
+    if constexpr (Side == Color::White) {
+        return ((pawns & NonAFile) << 7) | ((pawns & NonHFile) << 9);
+    } else {
+        return ((pawns & NonAFile) >> 9) | ((pawns & NonHFile) >> 7);
     }
-    return attacks;
 }
 
-template Bitboard Bitboards::allPawn<Color::White>(Bitboard pawns);
-template Bitboard Bitboards::allPawn<Color::Black>(Bitboard pawns);
+template Bitboard Bitboards::allPawnAttacks<Color::White>(Bitboard pawns);
+template Bitboard Bitboards::allPawnAttacks<Color::Black>(Bitboard pawns);
 
-Bitboard Bitboards::allKnight(Bitboard knights) {
+Bitboard Bitboards::allKnightAttacks(Bitboard knights) {
     Bitboard attacks;
     for (Square knight : knights) {
-        attacks |= Bitboards::knight(knight);
+        attacks |= Bitboards::knightAttacks(knight);
     }
     return attacks;
 }
 
-Bitboard Bitboards::allBishop(Bitboard bishops, Bitboard occupied) {
+Bitboard Bitboards::allBishopAttacks(Bitboard bishops, Bitboard occupied) {
     Bitboard attacks;
     for (Square bishop : bishops) {
-        attacks |= Bitboards::bishop(bishop, occupied);
+        attacks |= Bitboards::bishopAttacks(bishop, occupied);
     }
     return attacks;
 }
 
-Bitboard Bitboards::allRook(Bitboard rooks, Bitboard occupied) {
+Bitboard Bitboards::allRookAttacks(Bitboard rooks, Bitboard occupied) {
     Bitboard attacks;
     for (Square rook : rooks) {
-        attacks |= Bitboards::rook(rook, occupied);
+        attacks |= Bitboards::rookAttacks(rook, occupied);
     }
     return attacks;
 }
 
-Bitboard Bitboards::allQueen(Bitboard queens, Bitboard occupied) {
+Bitboard Bitboards::allQueenAttacks(Bitboard queens, Bitboard occupied) {
     Bitboard attacks;
     for (Square queen : queens) {
-        attacks |= Bitboards::queen(queen, occupied);
+        attacks |= Bitboards::queenAttacks(queen, occupied);
     }
     return attacks;
 }
+
+template<Color Side>
+Bitboard Bitboards::allAttacks(const Board &board, Bitboard occupied) {
+    return allPawnAttacks<Side>(board.bitboard<Side>(PieceType::Pawn))
+        | allKnightAttacks(board.bitboard<Side>(PieceType::Knight))
+        | allBishopAttacks(board.bitboard<Side>(PieceType::Bishop), occupied)
+        | allRookAttacks(board.bitboard<Side>(PieceType::Rook), occupied)
+        | allQueenAttacks(board.bitboard<Side>(PieceType::Queen), occupied)
+        | kingAttacks(board.king<Side>());
+}
+
+template Bitboard Bitboards::allAttacks<Color::White>(const Board &board, Bitboard occupied);
+template Bitboard Bitboards::allAttacks<Color::Black>(const Board &board, Bitboard occupied);

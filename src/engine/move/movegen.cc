@@ -134,7 +134,7 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generatePawnMoves(Square square) 
     }
 
     // Pawn captures
-    Bitboard attacks = Bitboards::pawn<Side>(square) & this->enemy_;
+    Bitboard attacks = Bitboards::pawnAttacks<Side>(square) & this->enemy_;
     Bitboard promotionsCaptures = attacks & PromotionRank;
     Bitboard captures = attacks ^ promotionsCaptures;
     this->serializePromotionCaptures(square, promotionsCaptures);
@@ -153,7 +153,7 @@ template<Color Side, bool ExcludeQuiet>
 void MoveGenerator<Side, ExcludeQuiet>::generateKingMoves() {
     // Normal king moves
     Square king = this->board_.template king<Side>();
-    Bitboard attacks = Bitboards::king(king);
+    Bitboard attacks = Bitboards::kingAttacks(king);
     this->serializeBitboard(king, attacks);
 
     // Castling moves
@@ -215,10 +215,10 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generateSlidingMoves(Piece piece)
 template<Color Side, bool ExcludeQuiet>
 INLINE MoveEntry *MoveGenerator<Side, ExcludeQuiet>::generate() {
     this->generateAllPawnMoves();
-    this->generateOffsetMoves<Bitboards::knight>(Piece::knight(Side));
-    this->generateSlidingMoves<Bitboards::bishop>(Piece::bishop(Side));
-    this->generateSlidingMoves<Bitboards::rook>(Piece::rook(Side));
-    this->generateSlidingMoves<Bitboards::queen>(Piece::queen(Side));
+    this->generateOffsetMoves<Bitboards::knightAttacks>(Piece::knight(Side));
+    this->generateSlidingMoves<Bitboards::bishopAttacks>(Piece::bishop(Side));
+    this->generateSlidingMoves<Bitboards::rookAttacks>(Piece::rook(Side));
+    this->generateSlidingMoves<Bitboards::queenAttacks>(Piece::queen(Side));
     this->generateKingMoves();
 
     return this->list_.end();

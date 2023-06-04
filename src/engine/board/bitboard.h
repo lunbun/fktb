@@ -74,6 +74,8 @@ private:
 
 
 
+class Board;
+
 namespace Bitboards {
     // Bitboards for all the squares, files, and ranks.
     // @formatter:off
@@ -88,8 +90,8 @@ namespace Bitboards {
     BB_SQ(A8) BB_SQ(B8) BB_SQ(C8) BB_SQ(D8) BB_SQ(E8) BB_SQ(F8) BB_SQ(G8) BB_SQ(H8)
 #undef BB_SQ
 
-#define BB_FILE(file) constexpr Bitboard File ## file = 0x0101010101010101ULL << (file - 1);
-    BB_FILE(1) BB_FILE(2) BB_FILE(3) BB_FILE(4) BB_FILE(5) BB_FILE(6) BB_FILE(7) BB_FILE(8)
+#define BB_FILE(file) constexpr Bitboard File ## file = 0x0101010101010101ULL << Square:: file ## 1;
+    BB_FILE(A) BB_FILE(B) BB_FILE(C) BB_FILE(D) BB_FILE(E) BB_FILE(F) BB_FILE(G) BB_FILE(H)
 #undef BB_FILE
 
 #define BB_RANK(rank) constexpr Bitboard Rank ## rank = 0xFFULL << (8 * (rank - 1));
@@ -102,52 +104,56 @@ namespace Bitboards {
     extern SquareMap<Bitboard> diagonalMasks;
     extern SquareMap<Bitboard> orthogonalMasks;
     // TODO: Sliding piece attack tables can be smaller.
-    extern SquareMap<std::array<Bitboard, 512>> diagonalAttacks;    // 256 KiB
-    extern SquareMap<std::array<Bitboard, 4096>> orthogonalAttacks; // 2 MiB
+    extern SquareMap<std::array<Bitboard, 512>> diagonalAttackTable;    // 256 KiB
+    extern SquareMap<std::array<Bitboard, 4096>> orthogonalAttackTable; // 2 MiB
 
-    extern ColorMap<SquareMap<Bitboard>> pawnAttacks;
-    extern SquareMap<Bitboard> knightAttacks;
-    extern SquareMap<Bitboard> kingAttacks;
+    extern ColorMap<SquareMap<Bitboard>> pawnAttackTable;
+    extern SquareMap<Bitboard> knightAttackTable;
+    extern SquareMap<Bitboard> kingAttackTable;
 
     // Initialize the bitboard attack tables, if they haven't been initialized already.
     void maybeInit();
 
     template<Color Side>
-    INLINE Bitboard pawn(Square square) {
-        return pawnAttacks[Side][square];
+    INLINE Bitboard pawnAttacks(Square square) {
+        return pawnAttackTable[Side][square];
     }
 
-    INLINE Bitboard knight(Square square) {
-        return knightAttacks[square];
+    INLINE Bitboard knightAttacks(Square square) {
+        return knightAttackTable[square];
     }
 
-    INLINE Bitboard bishop(Square square, Bitboard occupied) {
+    INLINE Bitboard bishopAttacks(Square square, Bitboard occupied) {
         uint64_t index = Intrinsics::pext(occupied, diagonalMasks[square]);
 
         assert(index < 512);
-        return diagonalAttacks[square][index];
+        return diagonalAttackTable[square][index];
     }
 
-    INLINE Bitboard rook(Square square, Bitboard occupied) {
+    INLINE Bitboard rookAttacks(Square square, Bitboard occupied) {
         uint64_t index = Intrinsics::pext(occupied, orthogonalMasks[square]);
 
         assert(index < 4096);
-        return orthogonalAttacks[square][index];
+        return orthogonalAttackTable[square][index];
     }
 
-    INLINE Bitboard queen(Square square, Bitboard occupied) {
-        return bishop(square, occupied) | rook(square, occupied);
+    INLINE Bitboard queenAttacks(Square square, Bitboard occupied) {
+        return bishopAttacks(square, occupied) | rookAttacks(square, occupied);
     }
 
-    INLINE Bitboard king(Square square) {
-        return kingAttacks[square];
+    INLINE Bitboard kingAttacks(Square square) {
+        return kingAttackTable[square];
     }
 
     // Returns a bitboard with all attacks of the given piece type.
     template<Color Side>
-    Bitboard allPawn(Bitboard pawns);
-    Bitboard allKnight(Bitboard knights);
-    Bitboard allBishop(Bitboard bishops, Bitboard occupied);
-    Bitboard allRook(Bitboard rooks, Bitboard occupied);
-    Bitboard allQueen(Bitboard queens, Bitboard occupied);
+    Bitboard allPawnAttacks(Bitboard pawns);
+    Bitboard allKnightAttacks(Bitboard knights);
+    Bitboard allBishopAttacks(Bitboard bishops, Bitboard occupied);
+    Bitboard allRookAttacks(Bitboard rooks, Bitboard occupied);
+    Bitboard allQueenAttacks(Bitboard queens, Bitboard occupied);
+
+    // Returns a bitboard with all attacks of the given side.
+    template<Color Side>
+    Bitboard allAttacks(const Board &board, Bitboard occupied);
 }

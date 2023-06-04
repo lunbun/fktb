@@ -12,8 +12,8 @@ MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
 
     Bitboard occupied = board.occupied();
 
-    this->friendlyPawnAttacks_ = Bitboards::allPawn<Side>(board.bitboard<Side>(PieceType::Pawn));
-    this->friendlyKnightAttacks_ = Bitboards::allKnight(board.bitboard<Side>(PieceType::Knight));
+    this->friendlyPawnAttacks_ = Bitboards::allPawnAttacks<Side>(board.bitboard<Side>(PieceType::Pawn));
+    this->friendlyKnightAttacks_ = Bitboards::allKnightAttacks(board.bitboard<Side>(PieceType::Knight));
 
     this->enemyKnights_ = board.bitboard<Enemy>(PieceType::Knight);
     this->enemyBishops_ = board.bitboard<Enemy>(PieceType::Bishop);
@@ -21,11 +21,11 @@ MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
     this->enemyQueens_ = board.bitboard<Enemy>(PieceType::Queen);
     Bitboard enemyKing = (1ULL << board.king<Enemy>());
 
-    this->enemyPawnAttacks_ = Bitboards::allPawn<Enemy>(board.bitboard<Enemy>(PieceType::Pawn));
-    this->enemyKnightAttacks_ = Bitboards::allKnight(this->enemyKnights_);
-    this->enemyBishopAttacks_ = Bitboards::allBishop(this->enemyBishops_, occupied);
-    Bitboard enemyRookAttacks = Bitboards::allRook(this->enemyRooks_, occupied);
-    Bitboard enemyQueenAttacks = Bitboards::allQueen(this->enemyQueens_, occupied);
+    this->enemyPawnAttacks_ = Bitboards::allPawnAttacks<Enemy>(board.bitboard<Enemy>(PieceType::Pawn));
+    this->enemyKnightAttacks_ = Bitboards::allKnightAttacks(this->enemyKnights_);
+    this->enemyBishopAttacks_ = Bitboards::allBishopAttacks(this->enemyBishops_, occupied);
+    Bitboard enemyRookAttacks = Bitboards::allRookAttacks(this->enemyRooks_, occupied);
+    Bitboard enemyQueenAttacks = Bitboards::allQueenAttacks(this->enemyQueens_, occupied);
 
     this->enemyRookOrHigher_ = this->enemyRooks_ | this->enemyQueens_ | enemyKing;
     this->enemyBishopOrLowerAttacks_ = this->enemyBishopAttacks_ | this->enemyKnightAttacks_ | this->enemyPawnAttacks_;
@@ -65,7 +65,7 @@ int32_t MoveScorer<Side>::score(Move move) {
             score += (Table[move.to()] * 10);
 
             // The pawn attacks after this move
-            Bitboard pawnAttacks = Bitboards::pawn<Side>(move.to());
+            Bitboard pawnAttacks = Bitboards::pawnAttacks<Side>(move.to());
 
             // Attacking an enemy knight or rook is good because they cannot move diagonally, so they cannot capture
             // the pawn. So it doesn't matter if we are defended or not.
@@ -124,7 +124,7 @@ int32_t MoveScorer<Side>::score(Move move) {
             }
 
             // The knight attacks after this move
-            Bitboard knightAttacks = Bitboards::knight(move.to());
+            Bitboard knightAttacks = Bitboards::knightAttacks(move.to());
 
             // Forking enemy rooks, queens, and kings is good
             Bitboard forked = knightAttacks & this->enemyRookOrHigher_;

@@ -78,15 +78,7 @@ Board Board::copy() const {
 // TODO: This function is expensive.
 template<Color Side>
 bool Board::isInCheck() const {
-    constexpr Color Enemy = ~Side;
-
-    Bitboard occupied = this->occupied();
-    Bitboard attacks = Bitboards::allPawn<Enemy>(this->bitboard<Enemy>(PieceType::Pawn))
-        | Bitboards::allKnight(this->bitboard<Enemy>(PieceType::Knight))
-        | Bitboards::allBishop(this->bitboard<Enemy>(PieceType::Bishop), occupied)
-        | Bitboards::allRook(this->bitboard<Enemy>(PieceType::Rook), occupied)
-        | Bitboards::allQueen(this->bitboard<Enemy>(PieceType::Queen), occupied)
-        | Bitboards::king(this->king<Enemy>());
+    Bitboard attacks = Bitboards::allAttacks<~Side>(*this, this->occupied());
     Square king = this->king<Side>();
 
     return attacks.get(king);
