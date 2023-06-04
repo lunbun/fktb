@@ -30,6 +30,10 @@ std::string Bitboard::debug() const {
 
 
 
+// Table of bitboards with all the squares between two squares.
+// See https://www.chessprogramming.org/Square_Attacked_By#0x88_Difference
+std::array<Bitboard, 240> between0x88Table;
+
 // Using PEXT bitboards for generating sliding piece attacks: https://www.chessprogramming.org/BMI2#PEXTBitboards
 // (similar to magic bitboards, but without the magic :) )
 struct PextTableEntry {
@@ -51,6 +55,51 @@ std::array<uint16_t, 107648> slidingAttackTable;    // 210.25 KiB
 ColorMap<SquareMap<Bitboard>> pawnAttackTable;
 SquareMap<Bitboard> knightAttackTable;
 SquareMap<Bitboard> kingAttackTable;
+
+
+
+// No clue what this does but see https://www.chessprogramming.org/Square_Attacked_By#0x88_Difference
+INLINE uint8_t x88Diff(Square from, Square to) {
+    return to - from + (to | 7) - (from | 7) + 120;
+}
+
+// This is an expensive method, only call during initialization.
+Bitboard generateBetween(Square a, Square b) {
+    // Copied from https://www.chessprogramming.org/Square_Attacked_By#Pure_Calculation
+    // @formatter:off
+    constexpr uint64_t m1   = -1ULL;
+    constexpr uint64_t a2a7 = 0x0001010101010100ULL;
+    constexpr uint64_t b2g7 = 0x0040201008040200ULL;
+    constexpr uint64_t h1b7 = 0x0002040810204080ULL; /* Thanks Dustin, g2b7 did not work for c1-a3 */
+    uint64_t btwn, line, rank, file;
+
+    btwn  = (m1 << a) ^ (m1 << b);
+    file  =   (b & 7) - (a   & 7);
+    rank  =  ((b | 7) -  a) >> 3 ;
+    line  =      (   (file  &  7) - 1) & a2a7; /* a2a7 if same file */
+    line += 2 * ((   (rank  &  7) - 1) >> 58); /* b1g1 if same rank */
+    line += (((rank - file) & 15) - 1) & b2g7; /* b2g7 if same diagonal */
+    line += (((rank + file) & 15) - 1) & h1b7; /* h1b7 if same antidiag */
+    line *= btwn & -btwn; /* mul acts like shift by smaller square */
+    return line & btwn;   /* return the bits on that line in-between */
+    // @formatter:on
+}
+
+void initBetweenTable() {
+    for (uint8_t a = 0; a < 64; ++a) {
+        for (uint8_t b = 0; b < 64; ++b) {
+            if (a == b) {
+                continue;
+            }
+
+            uint8_t index = x88Diff(a, b);
+            Bitboard between = generateBetween(a, b);
+            between0x88Table[index] = Intrinsics::ror(between, a);
+        }
+    }
+}
+
+
 
 // This is an expensive method, only call during initialization.
 Bitboard generateRayAttacks(Square square, int8_t fileDelta, int8_t rankDelta, Bitboard blockers) {
@@ -272,6 +321,8 @@ void Bitboards::maybeInit() {
 
     isInitialized = true;
 
+    initBetweenTable();
+
     uint32_t attackOffset = 0;
     initDiagonalAttacks(attackOffset);
     initOrthogonalAttacks(attackOffset);
@@ -280,6 +331,12 @@ void Bitboards::maybeInit() {
     initPawnAttacks();
     initKnightAttacks();
     initKingAttacks();
+}
+
+
+
+Bitboard Bitboards::between(Square a, Square b) {
+    return Intrinsics::rol(between0x88Table[x88Diff(a, b)], a);
 }
 
 
@@ -316,6 +373,20 @@ Bitboard Bitboards::queenAttacks(Square square, Bitboard occupied) {
 
 Bitboard Bitboards::kingAttacks(Square square) {
     return kingAttackTable[square];
+}
+
+
+
+Bitboard Bitboards::bishopAttacksOnEmpty(Square square) {
+    return diagonalPextTable[square].attackMask;
+}
+
+Bitboard Bitboards::rookAttacksOnEmpty(Square square) {
+    return orthogonalPextTable[square].attackMask;
+}
+
+Bitboard Bitboards::queenAttacksOnEmpty(Square square) {
+    return bishopAttacksOnEmpty(square) | rookAttacksOnEmpty(square);
 }
 
 

@@ -36,14 +36,14 @@ static_assert(sizeof(MoveEntry) == 8, "MoveEntry must be 8 bytes");
 // is on the stack).
 class MoveList {
 public:
-    constexpr explicit MoveList(MoveEntry *entries) : end_(entries) { }
+    constexpr explicit MoveList(MoveEntry *entries) : pointer_(entries) { }
 
-    INLINE void push(Move move) { *(this->end_++) = { move, 0 }; }
+    INLINE void push(Move move) { *(this->pointer_++) = { move, 0 }; }
 
-    [[nodiscard]] INLINE constexpr MoveEntry *end() const { return this->end_; }
+    [[nodiscard]] INLINE constexpr MoveEntry *pointer() const { return this->pointer_; }
 
 private:
-    MoveEntry *end_;
+    MoveEntry *pointer_;
 };
 
 // A wrapper around a raw array of MoveEntries that provides a priority queue interface.

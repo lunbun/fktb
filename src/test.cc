@@ -54,8 +54,8 @@ void Tests::pseudoLegalMoveGenTest(const std::string &fen) {
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
     MoveEntry *movesEnd = (board.turn() == Color::White) ?
-        MoveGeneration::generatePseudoLegal<Color::White, false>(board, movesStart) :
-        MoveGeneration::generatePseudoLegal<Color::Black, false>(board, movesStart);
+        MoveGeneration::generate<Color::White, MoveGeneration::Type::PseudoLegal>(board, movesStart) :
+        MoveGeneration::generate<Color::Black, MoveGeneration::Type::PseudoLegal>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
     if (board.turn() == Color::White) {
@@ -199,7 +199,7 @@ uint32_t hashTestSearch(Board &board, uint16_t depth) {
     AlignedMoveEntry moveBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generateLegal<Side, false>(board, movesStart);
+    MoveEntry *movesEnd = MoveGeneration::generate<Side, MoveGeneration::Type::Legal>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
 
@@ -336,7 +336,7 @@ uint32_t perftSearch(Board &board, uint16_t depth) {
     AlignedMoveEntry moveBuffer[256];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generateLegal<Side, false>(board, movesStart);
+    MoveEntry *movesEnd = MoveGeneration::generate<Side, MoveGeneration::Type::Legal>(board, movesStart);
     if (depth == 1) {
         // If we are at the bottom of the search, just return the number of moves
         return movesEnd - movesStart;

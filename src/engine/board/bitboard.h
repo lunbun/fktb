@@ -97,10 +97,15 @@ namespace Bitboards {
 #define BB_RANK(rank) constexpr Bitboard Rank ## rank = 0xFFULL << (8 * (rank - 1));
     BB_RANK(1) BB_RANK(2) BB_RANK(3) BB_RANK(4) BB_RANK(5) BB_RANK(6) BB_RANK(7) BB_RANK(8)
 #undef BB_RANK
+
+    constexpr Bitboard All = 0xFFFFFFFFFFFFFFFFULL;
     // @formatter:on
 
     // Initialize the bitboard attack tables, if they haven't been initialized already.
     void maybeInit();
+
+    // Returns a bitboard with all the squares between the two given squares, exclusive.
+    Bitboard between(Square a, Square b);
 
     template<Color Side>
     Bitboard pawnAttacks(Square square);
@@ -109,6 +114,13 @@ namespace Bitboards {
     Bitboard rookAttacks(Square square, Bitboard occupied);
     Bitboard queenAttacks(Square square, Bitboard occupied);
     Bitboard kingAttacks(Square square);
+
+    // Slider attacks on an empty board.
+    Bitboard rookAttacksOnEmpty(Square square);
+    Bitboard bishopAttacksOnEmpty(Square square);
+    Bitboard queenAttacksOnEmpty(Square square);
+    template<PieceType Slider>
+    Bitboard sliderAttacksOnEmpty(Square square);
 
     // Returns a bitboard with all attacks of the given piece type.
     template<Color Side>
@@ -121,4 +133,17 @@ namespace Bitboards {
     // Returns a bitboard with all attacks of the given side.
     template<Color Side>
     Bitboard allAttacks(const Board &board, Bitboard occupied);
+}
+
+template <PieceType Slider>
+INLINE Bitboard Bitboards::sliderAttacksOnEmpty(Square square) {
+    if constexpr (Slider == PieceType::Bishop) {
+        return bishopAttacksOnEmpty(square);
+    } else if constexpr (Slider == PieceType::Rook) {
+        return rookAttacksOnEmpty(square);
+    } else if constexpr (Slider == PieceType::Queen) {
+        return queenAttacksOnEmpty(square);
+    } else {
+        static_assert(Slider == PieceType::Bishop || Slider == PieceType::Rook || Slider == PieceType::Queen);
+    }
 }

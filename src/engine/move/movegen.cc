@@ -11,17 +11,17 @@
 
 // Class is used for convenience so that we don't have to pass around the board, move list, and bitboards separately as
 // parameters.
-template<Color Side, bool ExcludeQuiet>
+template<Color Side, uint32_t Flags>
 class MoveGenerator {
 public:
     MoveGenerator() = delete;
-    MoveGenerator(const Board &board, MoveEntry *moves);
+    MoveGenerator(Board &board, MoveEntry *moves);
 
     // Returns the pointer to the end of the move list.
     [[nodiscard]] MoveEntry *generate();
 
 private:
-    const Board &board_;
+    Board &board_;
     MoveList list_;
 
     Bitboard friendly_;
@@ -29,11 +29,20 @@ private:
     Bitboard occupied_;
     Bitboard empty_;
 
+    Bitboard enemyAttacks_;
+
+    // Mobility of pieces. Pinned pieces have restricted mobility. If a piece is not pinned, will be set to Bitboards::All.
+    SquareMap<Bitboard> mobility_;
+
+    template<PieceType EnemySlider>
+    void calculatePins(Square king);
+
+    // Note: These do not mask pinned piece mobility, the caller must do that.
     void serializeQuiet(Square from, Bitboard quiet);
     void serializeCaptures(Square from, Bitboard captures);
     void serializePromotions(Square from, Bitboard promotions);
     void serializePromotionCaptures(Square from, Bitboard promoCaptures);
-    // Serializes all moves in a bitboard, both quiet and captures (will not serialize quiet if in ExcludeQuiet mode)
+    // Serializes all moves in a bitboard, both quiet and captures (will not serialize quiet if in tactical mode)
     void serializeBitboard(Square from, Bitboard bitboard);
 
     void generatePawnMoves(Square square);
@@ -48,31 +57,80 @@ private:
     void generateSlidingMoves(Piece piece);
 };
 
-template<Color Side, bool ExcludeQuiet>
-MoveGenerator<Side, ExcludeQuiet>::MoveGenerator(const Board &board, MoveEntry *moves) : board_(board), list_(moves) {
-    this->friendly_ = board.composite<Side>();
-    this->enemy_ = board.composite<~Side>();
-    this->occupied_ = this->friendly_ | this->enemy_;
-    this->empty_ = ~this->occupied_;
+
+
+template<Color Side, uint32_t Flags>
+template<PieceType EnemySlider>
+INLINE void MoveGenerator<Side, Flags>::calculatePins(Square king) {
+    static_assert(Flags & MoveGeneration::Flags::Legal, "Pinned pieces are only needed for legal move generation.");
+
+    Bitboard enemySliders = this->board_.template bitboard<~Side>(EnemySlider);
+    for (Square slider : enemySliders) {
+        Bitboard between = Bitboards::between(king, slider);
+
+        // Mask the between bitboard by the slider's attacks on an empty board, so that rooks cannot pin diagonally and bishops
+        // cannot pin orthogonally.
+        between &= Bitboards::sliderAttacksOnEmpty<EnemySlider>(slider);
+
+        Bitboard friendlyBetween = between & this->friendly_;
+
+        if (friendlyBetween.count() == 1) {
+            // The friendly piece is pinned.
+            Square pinned = Intrinsics::bsf(friendlyBetween);
+
+            // Allow the slider to be captured by the pinned piece.
+            between.set(slider);
+            this->mobility_[pinned] &= between;
+        }
+    }
 }
 
-template<Color Side, bool ExcludeQuiet>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeQuiet(Square from, Bitboard quiet) {
-    static_assert(!ExcludeQuiet, "Cannot serialize quiet moves in ExcludeQuiet mode");
+template<Color Side, uint32_t Flags>
+MoveGenerator<Side, Flags>::MoveGenerator(Board &board, MoveEntry *moves) : board_(board), list_(moves) {
+    constexpr Color Enemy = ~Side;
+
+    this->friendly_ = board.composite<Side>();
+    this->enemy_ = board.composite<Enemy>();
+    this->occupied_ = this->friendly_ | this->enemy_;
+    this->empty_ = ~this->occupied_;
+
+    if constexpr (Flags & MoveGeneration::Flags::Legal) {
+        // These are not needed for pseudo-legal move generation.
+        this->enemyAttacks_ = Bitboards::allAttacks<Enemy>(board, this->occupied_);
+
+        // Calculate mobility for pinned pieces.
+
+        // By default, all pieces have full mobility.
+        this->mobility_.fill(Bitboards::All);
+
+        // Calculate pinned pieces.
+        Square king = board.king<Side>();
+        this->calculatePins<PieceType::Bishop>(king);
+        this->calculatePins<PieceType::Rook>(king);
+        this->calculatePins<PieceType::Queen>(king);
+    }
+}
+
+
+
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::serializeQuiet(Square from, Bitboard quiet) {
+    static_assert(!(Flags & MoveGeneration::Flags::Tactical), "Cannot serialize quiet moves in tactical move generation.");
+
     for (Square to : quiet) {
         this->list_.push({ from, to, MoveFlag::Quiet });
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeCaptures(Square from, Bitboard captures) {
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::serializeCaptures(Square from, Bitboard captures) {
     for (Square to : captures) {
         this->list_.push({ from, to, MoveFlag::Capture });
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotions(Square from, Bitboard promotions) {
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::serializePromotions(Square from, Bitboard promotions) {
     for (Square to : promotions) {
         this->list_.push({ from, to, MoveFlag::KnightPromotion });
         this->list_.push({ from, to, MoveFlag::BishopPromotion });
@@ -81,8 +139,8 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotions(Square from, 
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotionCaptures(Square from, Bitboard promoCaptures) {
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::serializePromotionCaptures(Square from, Bitboard promoCaptures) {
     for (Square to : promoCaptures) {
         this->list_.push({ from, to, MoveFlag::KnightPromoCapture });
         this->list_.push({ from, to, MoveFlag::BishopPromoCapture });
@@ -91,13 +149,15 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::serializePromotionCaptures(Square
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::serializeBitboard(Square from, Bitboard bitboard) {
-    if constexpr (!ExcludeQuiet) {
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::serializeBitboard(Square from, Bitboard bitboard) {
+    if constexpr (!(Flags & MoveGeneration::Flags::Tactical)) {
         this->serializeQuiet(from, bitboard & this->empty_);
     }
     this->serializeCaptures(from, bitboard & this->enemy_);
 }
+
+
 
 // Returns the bitboard shifted one rank forward for the given side.
 template<Color Side>
@@ -109,8 +169,8 @@ INLINE Bitboard forwardOneRank(Bitboard pawn) {
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::generatePawnMoves(Square square) {
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::generatePawnMoves(Square square) {
     constexpr Bitboard PromotionRank = (Side == Color::White) ? Bitboards::Rank8 : Bitboards::Rank1;
     constexpr Bitboard DoublePushToRank = (Side == Color::White) ? Bitboards::Rank4 : Bitboards::Rank5;
 
@@ -119,11 +179,17 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generatePawnMoves(Square square) 
     // Pawn pushes
     // Single push (quiet, but needed to check for promotions, which are not quiet)
     Bitboard singlePush = forwardOneRank<Side>(1ULL << square) & empty;
+
+    if constexpr (Flags & MoveGeneration::Flags::Legal) {
+        // Mask pawns that are pinned.
+        singlePush &= this->mobility_[square];
+    }
+
     Bitboard promotions = singlePush & PromotionRank;
 
     this->serializePromotions(square, promotions);
 
-    if constexpr (!ExcludeQuiet) {
+    if constexpr (!(Flags & MoveGeneration::Flags::Tactical)) {
         this->serializeQuiet(square, singlePush ^ promotions);
 
         // Double push (always quiet)
@@ -133,85 +199,132 @@ INLINE void MoveGenerator<Side, ExcludeQuiet>::generatePawnMoves(Square square) 
 
     // Pawn captures
     Bitboard attacks = Bitboards::pawnAttacks<Side>(square) & this->enemy_;
+
+    if constexpr (Flags & MoveGeneration::Flags::Legal) {
+        // Mask pawns that are pinned.
+        attacks &= this->mobility_[square];
+    }
+
     Bitboard promotionsCaptures = attacks & PromotionRank;
     Bitboard captures = attacks ^ promotionsCaptures;
     this->serializePromotionCaptures(square, promotionsCaptures);
     this->serializeCaptures(square, captures);
 }
 
-template<Color Side, bool ExcludeQuiet>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::generateAllPawnMoves() {
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
     Bitboard pawns = this->board_.template bitboard<Side>(PieceType::Pawn);
     for (Square square : pawns) {
         this->generatePawnMoves(square);
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
-void MoveGenerator<Side, ExcludeQuiet>::generateKingMoves() {
+template<Color Side, uint32_t Flags>
+void MoveGenerator<Side, Flags>::generateKingMoves() {
     // Normal king moves
     Square king = this->board_.template king<Side>();
     Bitboard attacks = Bitboards::kingAttacks(king);
+
+    if constexpr (Flags & MoveGeneration::Flags::Legal) {
+        // Do not allow king to move into check
+        attacks &= ~this->enemyAttacks_;
+    }
+
     this->serializeBitboard(king, attacks);
 
     // Castling moves
-    if constexpr (!ExcludeQuiet) {
-        if constexpr (Side == Color::White) {
-            constexpr Bitboard F1G1 = Bitboards::F1 | Bitboards::G1;
-            constexpr Bitboard B1C1D1 = Bitboards::B1 | Bitboards::C1 | Bitboards::D1;
+    if constexpr (!(Flags & MoveGeneration::Flags::Tactical) && !(Flags & MoveGeneration::Flags::Evasion)) {
+        // From and to squares for castling
+        constexpr Square KingFrom = (Side == Color::White) ? Square::E1 : Square::E8;
+        constexpr Square KingSideTo = (Side == Color::White) ? Square::G1 : Square::G8;
+        constexpr Square QueenSideTo = (Side == Color::White) ? Square::C1 : Square::C8;
 
-            if (this->board_.castlingRights() & CastlingRights::WhiteKingSide) {
-                if (!(this->occupied_ & F1G1)) {
-                    this->list_.push({ Square::E1, Square::G1, MoveFlag::KingCastle });
-                }
+        // Castling rights bits
+        constexpr CastlingRights KingSide = (Side == Color::White)
+            ? CastlingRights::WhiteKingSide
+            : CastlingRights::BlackKingSide;
+        constexpr CastlingRights QueenSide = (Side == Color::White)
+            ? CastlingRights::WhiteQueenSide
+            : CastlingRights::BlackQueenSide;
+
+        // Squares that must be empty to castle (i.e. rook is visible to king)
+        constexpr Bitboard KingSideVisibility = (Side == Color::White)
+            ? Bitboards::F1 | Bitboards::G1
+            : Bitboards::F8 | Bitboards::G8;
+        constexpr Bitboard QueenSideVisibility = (Side == Color::White)
+            ? Bitboards::B1 | Bitboards::C1 | Bitboards::D1
+            : Bitboards::B8 | Bitboards::C8 | Bitboards::D8;
+
+        // Squares that must not be attacked to castle (no castling through, out of, or into check)
+        constexpr Bitboard KingSideCheck = (Side == Color::White)
+            ? Bitboards::E1 | Bitboards::F1 | Bitboards::G1
+            : Bitboards::E8 | Bitboards::F8 | Bitboards::G8;
+        constexpr Bitboard QueenSideCheck = (Side == Color::White)
+            ? Bitboards::E1 | Bitboards::D1 | Bitboards::C1
+            : Bitboards::E8 | Bitboards::D8 | Bitboards::C8;
+
+        // King-side castling
+        {
+            bool canCastle = (this->board_.castlingRights() & KingSide) && !(this->occupied_ & KingSideVisibility);
+
+            if constexpr (Flags & MoveGeneration::Flags::Legal) {
+                canCastle = canCastle && !(this->enemyAttacks_ & KingSideCheck);
             }
 
-            if (this->board_.castlingRights() & CastlingRights::WhiteQueenSide) {
-                if (!(this->occupied_ & B1C1D1)) {
-                    this->list_.push({ Square::E1, Square::C1, MoveFlag::QueenCastle });
-                }
+            if (canCastle) {
+                this->list_.push({ KingFrom, KingSideTo, MoveFlag::KingCastle });
             }
-        } else {
-            constexpr Bitboard F8G8 = Bitboards::F8 | Bitboards::G8;
-            constexpr Bitboard B8C8D8 = Bitboards::B8 | Bitboards::C8 | Bitboards::D8;
+        }
 
-            if (this->board_.castlingRights() & CastlingRights::BlackKingSide) {
-                if (!(this->occupied_ & F8G8)) {
-                    this->list_.push({ Square::E8, Square::G8, MoveFlag::KingCastle });
-                }
+        // Queen-side castling
+        {
+            bool canCastle = (this->board_.castlingRights() & QueenSide) && !(this->occupied_ & QueenSideVisibility);
+
+            if constexpr (Flags & MoveGeneration::Flags::Legal) {
+                canCastle = canCastle && !(this->enemyAttacks_ & QueenSideCheck);
             }
 
-            if (this->board_.castlingRights() & CastlingRights::BlackQueenSide) {
-                if (!(this->occupied_ & B8C8D8)) {
-                    this->list_.push({ Square::E8, Square::C8, MoveFlag::QueenCastle });
-                }
+            if (canCastle) {
+                this->list_.push({ KingFrom, QueenSideTo, MoveFlag::QueenCastle });
             }
         }
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
+template<Color Side, uint32_t Flags>
 template<Bitboard (*GenerateAttacks)(Square)>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::generateOffsetMoves(Piece piece) {
+INLINE void MoveGenerator<Side, Flags>::generateOffsetMoves(Piece piece) {
     Bitboard pieces = this->board_.template bitboard<Side>(piece.type());
     for (Square square : pieces) {
         Bitboard attacks = GenerateAttacks(square);
+
+        if constexpr (Flags & MoveGeneration::Flags::Legal) {
+            // Mask pinned piece mobility
+            attacks &= this->mobility_[square];
+        }
+
         this->serializeBitboard(square, attacks);
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
+template<Color Side, uint32_t Flags>
 template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
-INLINE void MoveGenerator<Side, ExcludeQuiet>::generateSlidingMoves(Piece piece) {
+INLINE void MoveGenerator<Side, Flags>::generateSlidingMoves(Piece piece) {
     Bitboard pieces = this->board_.template bitboard<Side>(piece.type());
     for (Square square : pieces) {
         Bitboard attacks = GenerateAttacks(square, this->occupied_);
+
+        if constexpr (Flags & MoveGeneration::Flags::Legal) {
+            // Mask pinned piece mobility
+            attacks &= this->mobility_[square];
+        }
+
         this->serializeBitboard(square, attacks);
     }
 }
 
-template<Color Side, bool ExcludeQuiet>
-INLINE MoveEntry *MoveGenerator<Side, ExcludeQuiet>::generate() {
+template<Color Side, uint32_t Flags>
+INLINE MoveEntry *MoveGenerator<Side, Flags>::generate() {
     this->generateAllPawnMoves();
     this->generateOffsetMoves<Bitboards::knightAttacks>(Piece::knight(Side));
     this->generateSlidingMoves<Bitboards::bishopAttacks>(Piece::bishop(Side));
@@ -219,8 +332,10 @@ INLINE MoveEntry *MoveGenerator<Side, ExcludeQuiet>::generate() {
     this->generateSlidingMoves<Bitboards::queenAttacks>(Piece::queen(Side));
     this->generateKingMoves();
 
-    return this->list_.end();
+    return this->list_.pointer();
 }
+
+
 
 template<Color Side>
 INLINE MoveEntry *filterLegal(Board &board, MoveEntry *start, MoveEntry *end) {
@@ -241,18 +356,24 @@ INLINE MoveEntry *filterLegal(Board &board, MoveEntry *start, MoveEntry *end) {
     return result;
 }
 
+template<Color Side, uint32_t Flags>
+MoveEntry *MoveGeneration::generate(Board &board, MoveEntry *moves) {
+    if constexpr (Flags & MoveGeneration::Flags::Legal) {
+        // If we are in check, switch to the evasion generator
+        if (board.isInCheck<Side>()) {
+            constexpr uint32_t EvasionFlags = Flags | MoveGeneration::Flags::Evasion;
 
+            MoveGenerator<Side, EvasionFlags> generator(board, moves);
+            MoveEntry *end = generator.generate();
 
-template<Color Side, bool ExcludeQuiet>
-MoveEntry *MoveGeneration::generatePseudoLegal(const Board &board, MoveEntry *moves) {
-    MoveGenerator<Side, ExcludeQuiet> generator(board, moves);
+            // For now, just have the evasion generator generate all moves and then filter them
+            // TODO: In the future, have specialized generation code for evasion generator
+            return filterLegal<Side>(board, moves, end);
+        }
+    }
+
+    MoveGenerator<Side, Flags> generator(board, moves);
     return generator.generate();
-}
-
-template<Color Side, bool ExcludeQuiet>
-MoveEntry *MoveGeneration::generateLegal(Board &board, MoveEntry *moves) {
-    MoveEntry *end = MoveGeneration::generatePseudoLegal<Side, ExcludeQuiet>(board, moves);
-    return filterLegal<Side>(board, moves, end);
 }
 
 RootMoveList MoveGeneration::generateLegalRoot(Board &board) {
@@ -261,16 +382,18 @@ RootMoveList MoveGeneration::generateLegalRoot(Board &board) {
 
     MoveEntry *movesEnd;
     if (board.turn() == Color::White) {
-        movesEnd = MoveGeneration::generateLegal<Color::White, false>(board, movesStart);
+        movesEnd = MoveGeneration::generate<Color::White, MoveGeneration::Type::Legal>(board, movesStart);
     } else {
-        movesEnd = MoveGeneration::generateLegal<Color::Black, false>(board, movesStart);
+        movesEnd = MoveGeneration::generate<Color::Black, MoveGeneration::Type::Legal>(board, movesStart);
     }
 
     // RootMoveList will copy the moves into its own buffer
     return { movesStart, movesEnd };
 }
 
-template MoveEntry *MoveGeneration::generateLegal<Color::White, false>(Board &board, MoveEntry *moves);
-template MoveEntry *MoveGeneration::generateLegal<Color::Black, false>(Board &board, MoveEntry *moves);
-template MoveEntry *MoveGeneration::generateLegal<Color::White, true>(Board &board, MoveEntry *moves);
-template MoveEntry *MoveGeneration::generateLegal<Color::Black, true>(Board &board, MoveEntry *moves);
+template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type::PseudoLegal>(Board &, MoveEntry *);
+template MoveEntry *MoveGeneration::generate<Color::Black, MoveGeneration::Type::PseudoLegal>(Board &, MoveEntry *);
+template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type::Tactical>(Board &, MoveEntry *);
+template MoveEntry *MoveGeneration::generate<Color::Black, MoveGeneration::Type::Tactical>(Board &, MoveEntry *);
+template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type::Legal>(Board &, MoveEntry *);
+template MoveEntry *MoveGeneration::generate<Color::Black, MoveGeneration::Type::Legal>(Board &, MoveEntry *);

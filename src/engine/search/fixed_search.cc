@@ -142,7 +142,7 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
     AlignedMoveEntry moveBuffer[MaxCaptureCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generateLegal<Turn, true>(board, movesStart);
+    MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Tactical>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
     moves.score<Turn>(board);
@@ -181,7 +181,7 @@ INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_
     AlignedMoveEntry moveBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generateLegal<Turn, false>(board, movesStart);
+    MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Legal>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
     moves.loadHashMove(board, this->table_);

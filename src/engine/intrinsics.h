@@ -30,6 +30,16 @@ namespace Intrinsics {
         return __builtin_bswap64(x);
     }
 
+    // Rotate left: rotates the bits of the integer to the left.
+    INLINE uint64_t rol(uint64_t x, uint8_t shift) {
+        return _rotl64(x, shift);
+    }
+
+    // Rotate right: rotates the bits of the integer to the right.
+    INLINE uint64_t ror(uint64_t x, uint8_t shift) {
+        return _rotr64(x, shift);
+    }
+
     // Reset lowest set bit: sets the least significant bit to zero.
     // Equivalent to x & (x - 1).
     INLINE uint64_t blsr(uint64_t x) {
