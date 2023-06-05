@@ -6,10 +6,11 @@
 
 #include "piece.h"
 #include "fen.h"
-#include "engine/hash/transposition.h"
 #include "engine/inline.h"
+#include "engine/hash/transposition.h"
+#include "engine/eval/piece_square_table.h"
 
-Board::Board(Color turn, CastlingRights castlingRights) : material_(), turn_(turn), hash_(0),
+Board::Board(Color turn, CastlingRights castlingRights) : material_(), pieceSquareEval_(), turn_(turn), hash_(0),
                                                           castlingRights_(castlingRights), pieces_(), bitboards_(),
                                                           kings_(Square::Invalid, Square::Invalid) {
     this->pieces_.fill(Piece::empty());
@@ -111,6 +112,7 @@ INLINE void Board::addPiece(Piece piece, Square square) {
     this->bitboard(piece.type(), piece.color()).set(square);
 
     this->material_[piece.color()] += piece.material();
+    this->pieceSquareEval_[piece.color()] += PieceSquareTables::evaluate(piece, square);
 
     if constexpr (UpdateHash) {
         this->hash_ ^= Zobrist::piece(piece, square);
@@ -126,6 +128,7 @@ INLINE void Board::removePiece(Piece piece, Square square) {
     this->bitboard(piece.type(), piece.color()).clear(square);
 
     this->material_[piece.color()] -= piece.material();
+    this->pieceSquareEval_[piece.color()] -= PieceSquareTables::evaluate(piece, square);
 
     if constexpr (UpdateHash) {
         this->hash_ ^= Zobrist::piece(piece, square);
@@ -174,6 +177,10 @@ INLINE void Board::movePiece(Piece piece, Square from, Square to) {
         bitboard.clear(from);
         bitboard.set(to);
     }
+
+    // Update piece square evaluation
+    this->pieceSquareEval_[piece.color()] -= PieceSquareTables::evaluate(piece, from);
+    this->pieceSquareEval_[piece.color()] += PieceSquareTables::evaluate(piece, to);
 
     if constexpr (UpdateHash) {
         this->hash_ ^= Zobrist::piece(piece, from);

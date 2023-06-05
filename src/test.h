@@ -2,14 +2,18 @@
 
 #include <cstdint>
 #include <string>
+#include <chrono>
 
 namespace Tests {
     // Prints out all the moves for a given position.
     void pseudoLegalMoveGenTest(const std::string &fen);
     void legalMoveGenTest(const std::string &fen);
 
+    // Runs a benchmark on the fixed depth search.
+    void benchmark();
+
     // Runs a fixed depth search on a given position.
-    void fixedDepthTest(const std::string &fen, uint16_t depth);
+    std::chrono::milliseconds fixedDepthTest(const std::string &fen, uint16_t depth);
 
     // Runs an iterative deepening search on a given position.
     void iterativeTest(const std::string &fen, uint16_t depth, uint32_t threads);

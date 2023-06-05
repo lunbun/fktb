@@ -17,7 +17,7 @@ namespace Intrinsics {
     // Bit scan reverse: returns the index of the most significant bit.
     INLINE uint8_t bsr(uint64_t x) {
         assert(x != 0);
-        return 63 - __builtin_clzll(x);
+        return 63 ^ __builtin_clzll(x);
     }
 
     // Population count: returns the number of set bits in the integer.

@@ -4,11 +4,11 @@
 #include <optional>
 
 #include "score.h"
-#include "evaluation.h"
 #include "engine/board/piece.h"
 #include "engine/move/move.h"
 #include "engine/move/move_list.h"
 #include "engine/move/movegen.h"
+#include "engine/eval/evaluation.h"
 
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table,
     SearchStatistics &stats) : board_(board.copy()), depth_(depth), table_(table), stats_(stats) { }

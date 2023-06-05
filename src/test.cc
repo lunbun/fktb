@@ -11,12 +11,12 @@
 #include <cassert>
 
 #include "engine/board/piece.h"
-#include "engine/move/move_list.h"
 #include "engine/move/movegen.h"
+#include "engine/move/move_list.h"
+#include "engine/eval/evaluation.h"
 #include "engine/hash/transposition.h"
 #include "engine/search/fixed_search.h"
 #include "engine/search/iterative_search.h"
-#include "engine/search/evaluation.h"
 
 std::string formatNumber(uint64_t number, uint64_t divisor, char suffix) {
     std::stringstream ss;
@@ -86,8 +86,24 @@ void Tests::legalMoveGenTest(const std::string &fen) {
 
 
 
+// Benchmark
+void Tests::benchmark() {
+    // Run the fixed depth search on starting position, depth 8 five times
+    std::chrono::milliseconds total;
+
+    for (int i = 0; i < 5; i++) {
+        total += fixedDepthTest(Board::StartingFen, 8);
+    }
+
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "Total time: " << total.count() << "ms" << std::endl;
+    std::cout << "Average time: " << total.count() / 5 << "ms" << std::endl;
+}
+
+
+
 // Fixed depth search test
-void Tests::fixedDepthTest(const std::string &fen, uint16_t depth) {
+std::chrono::milliseconds Tests::fixedDepthTest(const std::string &fen, uint16_t depth) {
     // Use mainly for benchmarking
     Board board = Board::fromFen(fen);
 
@@ -101,6 +117,8 @@ void Tests::fixedDepthTest(const std::string &fen, uint16_t depth) {
     std::cout << "Nodes: " << formatWithExact(stats.nodeCount()) << std::endl;
     std::cout << "Transposition hits: " << formatWithExact(stats.transpositionHits()) << std::endl;
     std::cout << "Time: " << stats.elapsed().count() << "ms" << std::endl;
+
+    return stats.elapsed();
 }
 
 

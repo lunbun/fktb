@@ -15,7 +15,7 @@ namespace {
 
     uint64_t blackToMoveNumber = 0;
     std::array<uint64_t, 16> castlingRightsNumbers;
-    ColorMap<std::array<SquareMap<uint64_t>, 6>> pieceNumbers;
+    ColorMap<PieceTypeMap<SquareMap<uint64_t>>> pieceNumbers;
 }
 
 void Zobrist::maybeInit() {
@@ -37,8 +37,8 @@ void Zobrist::maybeInit() {
 
     for (uint8_t piece = 0; piece < 6; piece++) {
         for (uint8_t square = 0; square < 64; square++) {
-            pieceNumbers.white()[piece][square] = generator();
-            pieceNumbers.black()[piece][square] = generator();
+            pieceNumbers.white()[static_cast<PieceType>(piece)][square] = generator();
+            pieceNumbers.black()[static_cast<PieceType>(piece)][square] = generator();
         }
     }
 }

@@ -28,11 +28,6 @@ public:
     constexpr ColorMap() = default;
     constexpr ColorMap(const T &white, const T &black) : values_{ white, black } { }
 
-    ColorMap(const ColorMap &other) = default;
-    ColorMap &operator=(const ColorMap &other) = default;
-    ColorMap(ColorMap &&other) noexcept = default;
-    ColorMap &operator=(ColorMap &&other) noexcept = default;
-
     [[nodiscard]] INLINE constexpr T &operator[](Color color) { return this->values_[color]; }
     [[nodiscard]] INLINE constexpr const T &operator[](Color color) const { return this->values_[color]; }
 

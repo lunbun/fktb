@@ -28,6 +28,7 @@ public:
     constexpr static const char *StartingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     constexpr static const char *KiwiPeteFen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
     constexpr static const char *EnPassantPinFen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
+    constexpr static const char *PawnEndgameFen = "8/k7/3p4/p2P1p2/P2P1P2/8/8/K7 w - - 0 1";
 
     explicit Board(Color turn, CastlingRights castlingRights);
     ~Board();
@@ -46,6 +47,8 @@ public:
 
     template<Color Side>
     [[nodiscard]] INLINE int32_t material() const { return this->material_[Side]; }
+    template<Color Side>
+    [[nodiscard]] INLINE int32_t pieceSquareEval() const { return this->pieceSquareEval_[Side]; }
     [[nodiscard]] INLINE Color turn() const { return this->turn_; }
     [[nodiscard]] INLINE uint64_t hash() const { return this->hash_; }
     [[nodiscard]] INLINE CastlingRights castlingRights() const { return this->castlingRights_; }
@@ -99,6 +102,7 @@ public:
 
 private:
     ColorMap<int32_t> material_;
+    ColorMap<int32_t> pieceSquareEval_;
     Color turn_;
     uint64_t hash_;
 

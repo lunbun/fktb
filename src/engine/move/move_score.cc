@@ -4,7 +4,7 @@
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
 #include "engine/board/bitboard.h"
-#include "engine/search/evaluation.h"
+#include "engine/eval/piece_square_table.h"
 
 template<Color Side>
 MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
@@ -61,7 +61,7 @@ int32_t MoveScorer<Side>::score(Move move) {
         // Pawn heuristics
         case PieceType::Pawn: {
             // Use piece-square tables
-            constexpr const PieceSquareTable &Table = Evaluation::pawnTable[Side];
+            constexpr const auto &Table = PieceSquareTables::Pawn[Side];
             score += (Table[move.to()] * 10);
 
             // The pawn attacks after this move
@@ -99,7 +99,7 @@ int32_t MoveScorer<Side>::score(Move move) {
         // Knight heuristics
         case PieceType::Knight: {
             // Use piece-square tables
-            constexpr const PieceSquareTable &Table = Evaluation::knightTable[Side];
+            constexpr const auto &Table = PieceSquareTables::Knight[Side];
             score += (Table[move.to()] * 10);
 
             // Moving a knight to a square defended by a friendly pawn is good
@@ -138,7 +138,7 @@ int32_t MoveScorer<Side>::score(Move move) {
         // Bishop heuristics
         case PieceType::Bishop: {
             // Use piece-square tables
-            constexpr const PieceSquareTable &Table = Evaluation::bishopTable[Side];
+            constexpr const auto &Table = PieceSquareTables::Bishop[Side];
             score += (Table[move.to()] * 10);
 
             // Moving a bishop to a square defended by a friendly pawn is good because it's a fortress
@@ -163,7 +163,7 @@ int32_t MoveScorer<Side>::score(Move move) {
         // Rook heuristics
         case PieceType::Rook: {
             // Use piece-square tables
-            constexpr const PieceSquareTable &Table = Evaluation::rookTable[Side];
+            constexpr const auto &Table = PieceSquareTables::Rook[Side];
             score += (Table[move.to()] * 10);
 
             // Moving a rook to a square defended by an enemy rook or lower is bad
@@ -182,7 +182,7 @@ int32_t MoveScorer<Side>::score(Move move) {
         // Queen heuristics
         case PieceType::Queen: {
             // Use piece-square tables
-            constexpr const PieceSquareTable &Table = Evaluation::queenTable[Side];
+            constexpr const auto &Table = PieceSquareTables::Queen[Side];
             score += (Table[move.to()] * 10);
 
             // Moving a queen to a square defended by an enemy queen or lower is bad
