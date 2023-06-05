@@ -44,15 +44,20 @@ bool MovePriorityQueue::empty() const {
     return !this->hashMove_.isValid() && this->end_ == this->start_;
 }
 
-// Loads the hash move from the previous iteration if the previous iteration is not nullptr.
-void MovePriorityQueue::loadHashMove(const Board &board, const TranspositionTable &table) {
-    TranspositionTable::LockedEntry entry = table.load(board.hash());
-
-    if (entry == nullptr) {
+// Removes the first instance of the move from the queue, if it exists.
+void MovePriorityQueue::remove(Move move) {
+    if (!move.isValid()) {
         return;
     }
 
-    this->hashMove_ = entry->bestMove();
+    for (MoveEntry *entry = this->start_; entry < this->end_; entry++) {
+        if (entry->move == move) {
+            // Because order does not matter in the buffer (since we sort it anyway), we can quickly remove a move from
+            // the queue by copying the move at the end of the queue into its place and decrementing the queue size.
+            *entry = *(--this->end_);
+            return;
+        }
+    }
 }
 
 // Scores the moves in the queue.

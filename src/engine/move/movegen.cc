@@ -131,8 +131,7 @@ INLINE MoveGenerator<Side, Flags>::MoveGenerator(Board &board, MoveEntry *moves)
 
 template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::serializeQuiet(Square from, Bitboard quiet) {
-    static_assert(!(Flags & MoveGeneration::Flags::Tactical), "Cannot serialize quiet moves in tactical move generation.");
-
+    static_assert(Flags & MoveGeneration::Flags::Quiet, "Quiet moves are only needed for quiet move generation.");
     for (Square to : quiet) {
         this->list_.push({ from, to, MoveFlag::Quiet });
     }
@@ -140,6 +139,7 @@ INLINE void MoveGenerator<Side, Flags>::serializeQuiet(Square from, Bitboard qui
 
 template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::serializeCaptures(Square from, Bitboard captures) {
+    static_assert(Flags & MoveGeneration::Flags::Tactical, "Captures are only needed for tactical move generation.");
     for (Square to : captures) {
         this->list_.push({ from, to, MoveFlag::Capture });
     }
@@ -147,10 +147,12 @@ INLINE void MoveGenerator<Side, Flags>::serializeCaptures(Square from, Bitboard 
 
 template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::serializeBitboard(Square from, Bitboard bitboard) {
-    if constexpr (!(Flags & MoveGeneration::Flags::Tactical)) {
+    if constexpr (Flags & MoveGeneration::Flags::Quiet) {
         this->serializeQuiet(from, bitboard & this->empty_);
     }
-    this->serializeCaptures(from, bitboard & this->enemy_);
+    if constexpr (Flags & MoveGeneration::Flags::Tactical) {
+        this->serializeCaptures(from, bitboard & this->enemy_);
+    }
 }
 
 
@@ -187,6 +189,7 @@ INLINE Square backwardRanks(Square square, uint8_t ranks) {
 
 template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::serializePromotion(Square from, Square to) {
+    static_assert(Flags & MoveGeneration::Flags::Tactical, "Promotions are only needed for tactical move generation.");
     this->list_.push({ from, to, MoveFlag::KnightPromotion });
     this->list_.push({ from, to, MoveFlag::BishopPromotion });
     this->list_.push({ from, to, MoveFlag::RookPromotion });
@@ -195,6 +198,7 @@ INLINE void MoveGenerator<Side, Flags>::serializePromotion(Square from, Square t
 
 template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::serializePromotionCapture(Square from, Square to) {
+    static_assert(Flags & MoveGeneration::Flags::Tactical, "Promotions are only needed for tactical move generation.");
     this->list_.push({ from, to, MoveFlag::KnightPromoCapture });
     this->list_.push({ from, to, MoveFlag::BishopPromoCapture });
     this->list_.push({ from, to, MoveFlag::RookPromoCapture });
@@ -236,12 +240,14 @@ INLINE void MoveGenerator<Side, Flags>::generatePinnedPawnMoves(Square pawn) {
 
     // Promotions
     Bitboard promotion = singlePush & PromotionRank;
-    if (promotion) {
-        this->serializePromotion(pawn, forwardRanks<Side>(pawn, 1));
+    if constexpr (Flags & MoveGeneration::Flags::Tactical) {
+        if (promotion) {
+            this->serializePromotion(pawn, forwardRanks<Side>(pawn, 1));
+        }
     }
 
     // Single and double pawn pushes
-    if constexpr (!(Flags & MoveGeneration::Flags::Tactical)) {
+    if constexpr (Flags & MoveGeneration::Flags::Quiet) {
         singlePush ^= promotion;
 
         if (singlePush) {
@@ -255,33 +261,37 @@ INLINE void MoveGenerator<Side, Flags>::generatePinnedPawnMoves(Square pawn) {
     }
 
     // Captures
-    Square enPassantSquare = this->board_.enPassantSquare();
+    if constexpr (Flags & MoveGeneration::Flags::Tactical) {
+        Square enPassantSquare = this->board_.enPassantSquare();
 
-    // Bitboard with pawn attacks, regardless of if there is an enemy piece there
-    Bitboard captures = Bitboards::pawnAttacks<Side>(pawn) & mobility;
-    if (enPassantSquare.isValid() && captures.get(enPassantSquare)) {
-        this->maybeSerializeEnPassant(pawn, enPassantSquare);
-    }
+        // Bitboard with pawn attacks, regardless of if there is an enemy piece there
+        Bitboard captures = Bitboards::pawnAttacks<Side>(pawn) & mobility;
+        if (enPassantSquare.isValid() && captures.get(enPassantSquare)) {
+            this->maybeSerializeEnPassant(pawn, enPassantSquare);
+        }
 
-    // Mask out any captures that are not to an enemy piece
-    captures &= this->enemy_;
+        // Mask out any captures that are not to an enemy piece
+        captures &= this->enemy_;
 
-    // Mask any promotion captures
-    Bitboard promotionCaptures = captures & PromotionRank;
+        // Mask any promotion captures
+        Bitboard promotionCaptures = captures & PromotionRank;
 
-    // Remove promotion captures from captures
-    captures ^= promotionCaptures;
+        // Remove promotion captures from captures
+        captures ^= promotionCaptures;
 
-    // Serialize captures and promotion captures
-    this->serializeCaptures(pawn, captures);
-    for (Square promoCapture : promotionCaptures) {
-        this->serializePromotionCapture(pawn, promoCapture);
+        // Serialize captures and promotion captures
+        this->serializeCaptures(pawn, captures);
+        for (Square promoCapture : promotionCaptures) {
+            this->serializePromotionCapture(pawn, promoCapture);
+        }
     }
 }
 
 template<Color Side, uint32_t Flags>
 template<bool Left>
 INLINE void MoveGenerator<Side, Flags>::generateAllPawnCapturesToSide(Bitboard forwardOne) {
+    static_assert(Flags & MoveGeneration::Flags::Tactical, "Captures are only needed for tactical move generation.");
+
     constexpr Bitboard PromotionRank = (Side == Color::White) ? Bitboards::Rank8 : Bitboards::Rank1;
     constexpr Bitboard CaptureFiles = Left ? (~Bitboards::FileA) : (~Bitboards::FileH);
     constexpr int8_t Offset = Left ? -1 : 1;
@@ -348,13 +358,15 @@ INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
 
     // Promotions
     Bitboard promotions = singlePushes & PromotionRank;
-    for (Square promotion : promotions) {
-        Square from = backwardRanks<Side>(promotion, 1);
-        this->serializePromotion(from, promotion);
+    if constexpr (Flags & MoveGeneration::Flags::Tactical) {
+        for (Square promotion : promotions) {
+            Square from = backwardRanks<Side>(promotion, 1);
+            this->serializePromotion(from, promotion);
+        }
     }
 
     // Single and double pawn pushes
-    if constexpr (!(Flags & MoveGeneration::Flags::Tactical)) {
+    if constexpr (Flags & MoveGeneration::Flags::Quiet) {
         singlePushes ^= promotions;
         for (Square singlePush : singlePushes) {
             this->list_.push({ backwardRanks<Side>(singlePush, 1), singlePush, MoveFlag::Quiet });
@@ -366,9 +378,11 @@ INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
         }
     }
 
-    // Captures left
-    this->generateAllPawnCapturesToSide<true>(forwardOne);
-    this->generateAllPawnCapturesToSide<false>(forwardOne);
+    // Captures
+    if constexpr (Flags & MoveGeneration::Flags::Tactical) {
+        this->generateAllPawnCapturesToSide<true>(forwardOne);
+        this->generateAllPawnCapturesToSide<false>(forwardOne);
+    }
 }
 
 
@@ -412,7 +426,7 @@ INLINE void MoveGenerator<Side, Flags>::maybeGenerateCastlingMove(Square from, S
 
 template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::generateAllCastlingMoves() {
-    static_assert(!(Flags & MoveGeneration::Flags::Tactical) && !(Flags & MoveGeneration::Flags::Evasion));
+    static_assert((Flags & MoveGeneration::Flags::Quiet) && !(Flags & MoveGeneration::Flags::Evasion));
 
     if constexpr (Side == Color::White) {
         constexpr Bitboard KingSideEmpty = Bitboards::F1 | Bitboards::G1;
@@ -451,7 +465,7 @@ void MoveGenerator<Side, Flags>::generateKingMoves() {
     this->serializeBitboard(king, attacks);
 
     // Castling moves
-    if constexpr (!(Flags & MoveGeneration::Flags::Tactical) && !(Flags & MoveGeneration::Flags::Evasion)) {
+    if constexpr ((Flags & MoveGeneration::Flags::Quiet) && !(Flags & MoveGeneration::Flags::Evasion)) {
         this->generateAllCastlingMoves();
     }
 }
@@ -546,6 +560,8 @@ RootMoveList MoveGeneration::generateLegalRoot(Board &board) {
 
 template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type::PseudoLegal>(Board &, MoveEntry *);
 template MoveEntry *MoveGeneration::generate<Color::Black, MoveGeneration::Type::PseudoLegal>(Board &, MoveEntry *);
+template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type::Quiet>(Board &, MoveEntry *);
+template MoveEntry *MoveGeneration::generate<Color::Black, MoveGeneration::Type::Quiet>(Board &, MoveEntry *);
 template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type::Tactical>(Board &, MoveEntry *);
 template MoveEntry *MoveGeneration::generate<Color::Black, MoveGeneration::Type::Tactical>(Board &, MoveEntry *);
 template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type::Legal>(Board &, MoveEntry *);

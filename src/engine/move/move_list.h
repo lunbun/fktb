@@ -58,8 +58,8 @@ public:
     [[nodiscard]] Move dequeue();
     [[nodiscard]] bool empty() const;
 
-    // Loads the hash move from the transposition table (if the hash move exists).
-    void loadHashMove(const Board &board, const TranspositionTable &table);
+    // Removes the first instance of the move from the queue, if it exists.
+    void remove(Move move);
 
     // Scores the moves in the queue.
     template<Color Side>

@@ -98,7 +98,6 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
-        // No need to update the turn since we do that manually with templates
         MakeMoveInfo moveInfo = board.makeMove<false>(move);
 
         int32_t score = -search<~Turn>(depth - 1, -INT32_MAX, -alpha);
@@ -168,13 +167,34 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
 }
 
 template<Color Turn>
-INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_t depth, int32_t &alpha, int32_t beta) {
+INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove, uint16_t depth, int32_t &alpha, int32_t beta) {
+    if (depth == 0) {
+        return this->searchQuiesce<Turn>(alpha, beta);
+    }
+
     this->stats_.incrementNodeCount();
 
     Board &board = this->board_;
 
-    if (depth == 0) {
-        return this->searchQuiesce<Turn>(alpha, beta);
+    int32_t bestScore = -INT32_MAX;
+
+    // Try the hash move first, if it exists. We can save all move generation entirely if the hash move causes a beta-cutoff.
+    if (hashMove.isValid()) {
+        MakeMoveInfo moveInfo = board.makeMove<false>(hashMove);
+
+        int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+
+        board.unmakeMove<false>(hashMove, moveInfo);
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = hashMove;
+            alpha = std::max(alpha, score);
+        }
+
+        if (score >= beta) {
+            return bestScore;
+        }
     }
 
     // Move generation and scoring
@@ -184,7 +204,6 @@ INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_
     MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Legal>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
-    moves.loadHashMove(board, this->table_);
 
     if (moves.empty()) {
         if (board.isInCheck<Turn>()) { // Checkmate
@@ -194,29 +213,28 @@ INLINE int32_t FixedDepthSearcher::searchNoTransposition(Move &bestMove, uint16_
         }
     }
 
-    moves.score<Turn>(board);
+    // We already tried the hash move, so remove it from the list of moves to search
+    moves.remove(hashMove);
 
-    // Search
-    int32_t bestScore = -INT32_MAX;
+    moves.score<Turn>(board);
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
-        // No need to update the turn since we do that manually with templates
         MakeMoveInfo moveInfo = board.makeMove<false>(move);
 
         int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
 
-        if (score > bestScore) {
-            bestMove = move;
-            bestScore = score;
-        }
-
         board.unmakeMove<false>(move, moveInfo);
 
-        if (score >= beta) {
-            break;
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = move;
+            alpha = std::max(alpha, score);
         }
-        alpha = std::max(alpha, score);
+
+        if (score >= beta) {
+            return bestScore;
+        }
     }
 
     return bestScore;
@@ -232,21 +250,26 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
     TranspositionTable &table = this->table_;
 
     // Transposition table lookup
+    Move hashMove = Move::invalid();
     {
         TranspositionTable::LockedEntry entry = table.load(board.hash());
-        if (entry != nullptr && entry->depth() >= depth) {
-            this->stats_.incrementTranspositionHits();
+        if (entry != nullptr) {
+            hashMove = entry->bestMove();
 
-            if (entry->flag() == TranspositionTable::Flag::Exact) {
-                return entry->bestScore();
-            } else if (entry->flag() == TranspositionTable::Flag::LowerBound) {
-                alpha = std::max(alpha, entry->bestScore());
-            } else if (entry->flag() == TranspositionTable::Flag::UpperBound) {
-                beta = std::min(beta, entry->bestScore());
-            }
+            if (entry->depth() >= depth) {
+                this->stats_.incrementTranspositionHits();
 
-            if (alpha >= beta) {
-                return entry->bestScore();
+                if (entry->flag() == TranspositionTable::Flag::Exact) {
+                    return entry->bestScore();
+                } else if (entry->flag() == TranspositionTable::Flag::LowerBound) {
+                    alpha = std::max(alpha, entry->bestScore());
+                } else if (entry->flag() == TranspositionTable::Flag::UpperBound) {
+                    beta = std::min(beta, entry->bestScore());
+                }
+
+                if (alpha >= beta) {
+                    return entry->bestScore();
+                }
             }
         }
     }
@@ -254,7 +277,7 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
     int32_t originalAlpha = alpha;
 
     Move bestMove = Move::invalid();
-    int32_t score = this->searchNoTransposition<Turn>(bestMove, depth, alpha, beta);
+    int32_t score = this->searchAlphaBeta<Turn>(bestMove, hashMove, depth, alpha, beta);
 
     // Transposition table store
     TranspositionTable::Flag flag;
