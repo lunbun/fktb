@@ -17,6 +17,7 @@ class Board;
 namespace MoveFlagNamespace {
     enum MoveFlag : uint8_t {
         Quiet               = 0b0000,
+        DoublePawnPush      = 0b0001,
 
         // IMPORTANT NOTE: Some promotion flags have the castle bits, so if you want to use CastleMask to check if a
         // move is a castle, you also have to make sure it's not a promotion.

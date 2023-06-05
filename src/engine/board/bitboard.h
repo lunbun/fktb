@@ -98,6 +98,7 @@ namespace Bitboards {
     BB_RANK(1) BB_RANK(2) BB_RANK(3) BB_RANK(4) BB_RANK(5) BB_RANK(6) BB_RANK(7) BB_RANK(8)
 #undef BB_RANK
 
+    constexpr Bitboard Empty = 0ULL;
     constexpr Bitboard All = 0xFFFFFFFFFFFFFFFFULL;
     // @formatter:on
 

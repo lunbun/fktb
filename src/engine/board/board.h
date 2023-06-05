@@ -26,8 +26,11 @@ struct MakeMoveInfo {
 class Board {
 public:
     constexpr static const char *StartingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+    // See https://www.chessprogramming.org/Perft_Results for some example FENs.
     constexpr static const char *KiwiPeteFen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
     constexpr static const char *EnPassantPinFen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
+    constexpr static const char *ChecksAndPinsFen = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
     constexpr static const char *PawnEndgameFen = "8/k7/3p4/p2P1p2/P2P1P2/8/8/K7 w - - 0 1";
 
     explicit Board(Color turn, CastlingRights castlingRights);

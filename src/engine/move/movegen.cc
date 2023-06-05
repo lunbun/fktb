@@ -31,6 +31,7 @@ private:
 
     Bitboard enemyAttacks_;
 
+    Bitboard pinned_;
     // Mobility of pieces. Pinned pieces have restricted mobility. If a piece is not pinned, will be set to Bitboards::All.
     SquareMap<Bitboard> mobility_;
 
@@ -40,18 +41,20 @@ private:
     // Note: These do not mask pinned piece mobility, the caller must do that.
     void serializeQuiet(Square from, Bitboard quiet);
     void serializeCaptures(Square from, Bitboard captures);
-    void serializePromotions(Square from, Bitboard promotions);
-    void serializePromotionCaptures(Square from, Bitboard promoCaptures);
     // Serializes all moves in a bitboard, both quiet and captures (will not serialize quiet if in tactical mode)
     void serializeBitboard(Square from, Bitboard bitboard);
 
-    void generatePawnMoves(Square square);
+    void serializePromotion(Square from, Square to);
+    void serializePromotionCapture(Square from, Square to);
+
+    void generatePinnedPawnMoves(Square pawn);
     void generateAllPawnMoves();
 
-    void generateKingMoves();
+    void generateAllKnightMoves();
 
-    template<Bitboard (*GenerateAttacks)(Square)>
-    void generateOffsetMoves(Piece piece);
+    void maybeGenerateCastlingMove(Square from, Square to, CastlingRights rights, MoveFlag flag, Bitboard empty, Bitboard check);
+    void generateAllCastlingMoves();
+    void generateKingMoves();
 
     template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
     void generateSlidingMoves(Piece piece);
@@ -72,11 +75,19 @@ INLINE void MoveGenerator<Side, Flags>::calculatePins(Square king) {
         // cannot pin orthogonally.
         between &= Bitboards::sliderAttacksOnEmpty<EnemySlider>(slider);
 
-        Bitboard friendlyBetween = between & this->friendly_;
+        // We have to mask all occupied pieces, not just friendly pieces because otherwise a slider could pin a friendly piece
+        // through an enemy piece.
+        //
+        // If we calculate a pin on an enemy piece to our king, then it is actually a discovered check, not a pin. But it doesn't
+        // matter since that entry in the pinned piece table won't ever be used, since we use the pinned piece table for
+        // generating moves for friendly pieces.
+        Bitboard piecesBetween = between & this->occupied_;
 
-        if (friendlyBetween.count() == 1) {
-            // The friendly piece is pinned.
-            Square pinned = Intrinsics::bsf(friendlyBetween);
+        if (piecesBetween.count() == 1) {
+            // The piece is pinned (the piece might be an enemy piece, in which case it's a discovered check).
+            Square pinned = Intrinsics::bsf(piecesBetween);
+
+            this->pinned_.set(pinned);
 
             // Allow the slider to be captured by the pinned piece.
             between.set(slider);
@@ -98,8 +109,7 @@ MoveGenerator<Side, Flags>::MoveGenerator(Board &board, MoveEntry *moves) : boar
         // These are not needed for pseudo-legal move generation.
         this->enemyAttacks_ = Bitboards::allAttacks<Enemy>(board, this->occupied_);
 
-        // Calculate mobility for pinned pieces.
-
+        this->pinned_ = Bitboards::Empty;
         // By default, all pieces have full mobility.
         this->mobility_.fill(Bitboards::All);
 
@@ -130,26 +140,6 @@ INLINE void MoveGenerator<Side, Flags>::serializeCaptures(Square from, Bitboard 
 }
 
 template<Color Side, uint32_t Flags>
-INLINE void MoveGenerator<Side, Flags>::serializePromotions(Square from, Bitboard promotions) {
-    for (Square to : promotions) {
-        this->list_.push({ from, to, MoveFlag::KnightPromotion });
-        this->list_.push({ from, to, MoveFlag::BishopPromotion });
-        this->list_.push({ from, to, MoveFlag::RookPromotion });
-        this->list_.push({ from, to, MoveFlag::QueenPromotion });
-    }
-}
-
-template<Color Side, uint32_t Flags>
-INLINE void MoveGenerator<Side, Flags>::serializePromotionCaptures(Square from, Bitboard promoCaptures) {
-    for (Square to : promoCaptures) {
-        this->list_.push({ from, to, MoveFlag::KnightPromoCapture });
-        this->list_.push({ from, to, MoveFlag::BishopPromoCapture });
-        this->list_.push({ from, to, MoveFlag::RookPromoCapture });
-        this->list_.push({ from, to, MoveFlag::QueenPromoCapture });
-    }
-}
-
-template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::serializeBitboard(Square from, Bitboard bitboard) {
     if constexpr (!(Flags & MoveGeneration::Flags::Tactical)) {
         this->serializeQuiet(from, bitboard & this->empty_);
@@ -169,53 +159,217 @@ INLINE Bitboard forwardOneRank(Bitboard pawn) {
     }
 }
 
+// Returns the square shifted n ranks forward for the given side.
+template<Color Side>
+INLINE Square forwardRanks(Square square, uint8_t ranks) {
+    if constexpr (Side == Color::White) {
+        return square + (ranks * 8);
+    } else {
+        return square - (ranks * 8);
+    }
+}
+
+// Returns the square shifted n ranks backward for the given side.
+template<Color Side>
+INLINE Square backwardRanks(Square square, uint8_t ranks) {
+    if constexpr (Side == Color::White) {
+        return square - (ranks * 8);
+    } else {
+        return square + (ranks * 8);
+    }
+}
+
 template<Color Side, uint32_t Flags>
-INLINE void MoveGenerator<Side, Flags>::generatePawnMoves(Square square) {
+void MoveGenerator<Side, Flags>::serializePromotion(Square from, Square to) {
+    this->list_.push({ from, to, MoveFlag::KnightPromotion });
+    this->list_.push({ from, to, MoveFlag::BishopPromotion });
+    this->list_.push({ from, to, MoveFlag::RookPromotion });
+    this->list_.push({ from, to, MoveFlag::QueenPromotion });
+}
+
+template<Color Side, uint32_t Flags>
+void MoveGenerator<Side, Flags>::serializePromotionCapture(Square from, Square to) {
+    this->list_.push({ from, to, MoveFlag::KnightPromoCapture });
+    this->list_.push({ from, to, MoveFlag::BishopPromoCapture });
+    this->list_.push({ from, to, MoveFlag::RookPromoCapture });
+    this->list_.push({ from, to, MoveFlag::QueenPromoCapture });
+}
+
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::generatePinnedPawnMoves(Square pawn) {
+    static_assert(Flags & MoveGeneration::Flags::Legal, "Pinned pieces are only in legal move generation.");
+
     constexpr Bitboard PromotionRank = (Side == Color::White) ? Bitboards::Rank8 : Bitboards::Rank1;
-    constexpr Bitboard DoublePushToRank = (Side == Color::White) ? Bitboards::Rank4 : Bitboards::Rank5;
+    constexpr Bitboard DoublePushRank = (Side == Color::White) ? Bitboards::Rank4 : Bitboards::Rank5;
 
-    Bitboard empty = this->empty_;
+    Bitboard bitboard = (1ULL << pawn);
+    Bitboard mobility = this->mobility_[pawn];
 
-    // Pawn pushes
-    // Single push (quiet, but needed to check for promotions, which are not quiet)
-    Bitboard singlePush = forwardOneRank<Side>(1ULL << square) & empty;
+    Bitboard singlePush = forwardOneRank<Side>(bitboard) & this->empty_ & mobility;
 
-    if constexpr (Flags & MoveGeneration::Flags::Legal) {
-        // Mask pawns that are pinned.
-        singlePush &= this->mobility_[square];
+    // Promotions
+    Bitboard promotion = singlePush & PromotionRank;
+    if (promotion) {
+        this->serializePromotion(pawn, forwardRanks<Side>(pawn, 1));
     }
 
-    Bitboard promotions = singlePush & PromotionRank;
-
-    this->serializePromotions(square, promotions);
-
+    // Single and double pawn pushes
     if constexpr (!(Flags & MoveGeneration::Flags::Tactical)) {
-        this->serializeQuiet(square, singlePush ^ promotions);
+        singlePush ^= promotion;
 
-        // Double push (always quiet)
-        Bitboard doublePush = forwardOneRank<Side>(singlePush) & empty & DoublePushToRank;
-        this->serializeQuiet(square, doublePush);
+        if (singlePush) {
+            this->list_.push({ pawn, forwardRanks<Side>(pawn, 1), MoveFlag::Quiet });
+
+            Bitboard doublePush = forwardOneRank<Side>(singlePush) & this->empty_ & mobility & DoublePushRank;
+            if (doublePush) {
+                this->list_.push({ pawn, forwardRanks<Side>(pawn, 2), MoveFlag::DoublePawnPush });
+            }
+        }
     }
 
-    // Pawn captures
-    Bitboard attacks = Bitboards::pawnAttacks<Side>(square) & this->enemy_;
+    // Captures
+    Bitboard captures = Bitboards::pawnAttacks<Side>(pawn) & this->enemy_ & mobility;
+    Bitboard promotionCaptures = captures & PromotionRank;
+    captures ^= promotionCaptures;
 
-    if constexpr (Flags & MoveGeneration::Flags::Legal) {
-        // Mask pawns that are pinned.
-        attacks &= this->mobility_[square];
+    this->serializeCaptures(pawn, captures);
+    for (Square promoCapture : promotionCaptures) {
+        this->serializePromotionCapture(pawn, promoCapture);
     }
-
-    Bitboard promotionsCaptures = attacks & PromotionRank;
-    Bitboard captures = attacks ^ promotionsCaptures;
-    this->serializePromotionCaptures(square, promotionsCaptures);
-    this->serializeCaptures(square, captures);
 }
 
 template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
+    constexpr Bitboard PromotionRank = (Side == Color::White) ? Bitboards::Rank8 : Bitboards::Rank1;
+    constexpr Bitboard DoublePushRank = (Side == Color::White) ? Bitboards::Rank4 : Bitboards::Rank5;
+    constexpr Bitboard NonAFile = ~Bitboards::FileA;
+    constexpr Bitboard NonHFile = ~Bitboards::FileH;
+
     Bitboard pawns = this->board_.template bitboard<Side>(PieceType::Pawn);
-    for (Square square : pawns) {
-        this->generatePawnMoves(square);
+
+    if constexpr (Flags & MoveGeneration::Flags::Legal) {
+        // Pinned pawns are treated specially.
+        Bitboard pinnedPawns = pawns & this->pinned_;
+        for (Square pinnedPawn : pinnedPawns) {
+            this->generatePinnedPawnMoves(pinnedPawn);
+        }
+
+        // Remove pinned pawns from the list of pawns.
+        pawns ^= pinnedPawns;
+    }
+
+    Bitboard forwardOne = forwardOneRank<Side>(pawns);
+
+    Bitboard singlePushes = forwardOne & this->empty_;
+
+    // Promotions
+    Bitboard promotions = singlePushes & PromotionRank;
+    for (Square promotion : promotions) {
+        Square from = backwardRanks<Side>(promotion, 1);
+        this->serializePromotion(from, promotion);
+    }
+
+    // Single and double pawn pushes
+    if constexpr (!(Flags & MoveGeneration::Flags::Tactical)) {
+        singlePushes ^= promotions;
+        for (Square singlePush : singlePushes) {
+            this->list_.push({ backwardRanks<Side>(singlePush, 1), singlePush, MoveFlag::Quiet });
+        }
+
+        Bitboard doublePushes = forwardOneRank<Side>(singlePushes) & this->empty_ & DoublePushRank;
+        for (Square doublePush : doublePushes) {
+            this->list_.push({ backwardRanks<Side>(doublePush, 2), doublePush, MoveFlag::DoublePawnPush });
+        }
+    }
+
+    // Captures left
+    Bitboard capturesLeft = ((forwardOne & NonAFile) >> 1) & this->enemy_;
+    Bitboard promoCapturesLeft = capturesLeft & PromotionRank;
+    capturesLeft ^= promoCapturesLeft;
+    for (Square capture : capturesLeft) {
+        Square from = backwardRanks<Side>(capture, 1) + 1;
+        this->list_.push({ from, capture, MoveFlag::Capture });
+    }
+    for (Square promoCapture : promoCapturesLeft) {
+        this->serializePromotionCapture(backwardRanks<Side>(promoCapture, 1) + 1, promoCapture);
+    }
+
+    // Captures right
+    Bitboard capturesRight = ((forwardOne & NonHFile) << 1) & this->enemy_;
+    Bitboard promoCapturesRight = capturesRight & PromotionRank;
+    capturesRight ^= promoCapturesRight;
+    for (Square capture : capturesRight) {
+        Square from = backwardRanks<Side>(capture, 1) - 1;
+        this->list_.push({ from, capture, MoveFlag::Capture });
+    }
+    for (Square promoCapture : promoCapturesRight) {
+        this->serializePromotionCapture(backwardRanks<Side>(promoCapture, 1) - 1, promoCapture);
+    }
+}
+
+
+
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::generateAllKnightMoves() {
+    Bitboard pieces = this->board_.template bitboard<Side>(PieceType::Knight);
+    for (Square square : pieces) {
+        Bitboard attacks = Bitboards::knightAttacks(square);
+
+        if constexpr (Flags & MoveGeneration::Flags::Legal) {
+            // Mask pinned piece mobility
+            attacks &= this->mobility_[square];
+        }
+
+        this->serializeBitboard(square, attacks);
+    }
+}
+
+
+
+// Generates a castling move if it is legal and valid.
+// Parameters:
+//  - rights: Castling rights to check
+//  - flag: Move flag to use if castling is valid
+//  - empty: Squares that must be empty for the king and rook to see each other
+//  - check: Squares that must not be attacked for the king to castle (since cannot castle out of, though, or into check)
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::maybeGenerateCastlingMove(Square from, Square to, CastlingRights rights, MoveFlag flag,
+    Bitboard empty, Bitboard check) {
+    bool canCastle = (this->board_.castlingRights() & rights) && !(this->occupied_ & empty);
+
+    if constexpr (Flags & MoveGeneration::Flags::Legal) {
+        canCastle = canCastle && !(this->enemyAttacks_ & check);
+    }
+
+    if (canCastle) {
+        this->list_.push({ from, to, flag });
+    }
+}
+
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::generateAllCastlingMoves() {
+    static_assert(!(Flags & MoveGeneration::Flags::Tactical) && !(Flags & MoveGeneration::Flags::Evasion));
+
+    if constexpr (Side == Color::White) {
+        constexpr Bitboard KingSideEmpty = Bitboards::F1 | Bitboards::G1;
+        constexpr Bitboard QueenSideEmpty = Bitboards::B1 | Bitboards::C1 | Bitboards::D1;
+        constexpr Bitboard KingSideCheck = Bitboards::E1 | Bitboards::F1 | Bitboards::G1;
+        constexpr Bitboard QueenSideCheck = Bitboards::C1 | Bitboards::D1 | Bitboards::E1;
+
+        this->maybeGenerateCastlingMove(Square::E1, Square::G1, CastlingRights::WhiteKingSide, MoveFlag::KingCastle,
+            KingSideEmpty, KingSideCheck);
+        this->maybeGenerateCastlingMove(Square::E1, Square::C1, CastlingRights::WhiteQueenSide, MoveFlag::QueenCastle,
+            QueenSideEmpty, QueenSideCheck);
+    } else {
+        constexpr Bitboard KingSideEmpty = Bitboards::F8 | Bitboards::G8;
+        constexpr Bitboard QueenSideEmpty = Bitboards::B8 | Bitboards::C8 | Bitboards::D8;
+        constexpr Bitboard KingSideCheck = Bitboards::E8 | Bitboards::F8 | Bitboards::G8;
+        constexpr Bitboard QueenSideCheck = Bitboards::C8 | Bitboards::D8 | Bitboards::E8;
+
+        this->maybeGenerateCastlingMove(Square::E8, Square::G8, CastlingRights::BlackKingSide, MoveFlag::KingCastle,
+            KingSideEmpty, KingSideCheck);
+        this->maybeGenerateCastlingMove(Square::E8, Square::C8, CastlingRights::BlackQueenSide, MoveFlag::QueenCastle,
+            QueenSideEmpty, QueenSideCheck);
     }
 }
 
@@ -234,78 +388,11 @@ void MoveGenerator<Side, Flags>::generateKingMoves() {
 
     // Castling moves
     if constexpr (!(Flags & MoveGeneration::Flags::Tactical) && !(Flags & MoveGeneration::Flags::Evasion)) {
-        // From and to squares for castling
-        constexpr Square KingFrom = (Side == Color::White) ? Square::E1 : Square::E8;
-        constexpr Square KingSideTo = (Side == Color::White) ? Square::G1 : Square::G8;
-        constexpr Square QueenSideTo = (Side == Color::White) ? Square::C1 : Square::C8;
-
-        // Castling rights bits
-        constexpr CastlingRights KingSide = (Side == Color::White)
-            ? CastlingRights::WhiteKingSide
-            : CastlingRights::BlackKingSide;
-        constexpr CastlingRights QueenSide = (Side == Color::White)
-            ? CastlingRights::WhiteQueenSide
-            : CastlingRights::BlackQueenSide;
-
-        // Squares that must be empty to castle (i.e. rook is visible to king)
-        constexpr Bitboard KingSideVisibility = (Side == Color::White)
-            ? Bitboards::F1 | Bitboards::G1
-            : Bitboards::F8 | Bitboards::G8;
-        constexpr Bitboard QueenSideVisibility = (Side == Color::White)
-            ? Bitboards::B1 | Bitboards::C1 | Bitboards::D1
-            : Bitboards::B8 | Bitboards::C8 | Bitboards::D8;
-
-        // Squares that must not be attacked to castle (no castling through, out of, or into check)
-        constexpr Bitboard KingSideCheck = (Side == Color::White)
-            ? Bitboards::E1 | Bitboards::F1 | Bitboards::G1
-            : Bitboards::E8 | Bitboards::F8 | Bitboards::G8;
-        constexpr Bitboard QueenSideCheck = (Side == Color::White)
-            ? Bitboards::E1 | Bitboards::D1 | Bitboards::C1
-            : Bitboards::E8 | Bitboards::D8 | Bitboards::C8;
-
-        // King-side castling
-        {
-            bool canCastle = (this->board_.castlingRights() & KingSide) && !(this->occupied_ & KingSideVisibility);
-
-            if constexpr (Flags & MoveGeneration::Flags::Legal) {
-                canCastle = canCastle && !(this->enemyAttacks_ & KingSideCheck);
-            }
-
-            if (canCastle) {
-                this->list_.push({ KingFrom, KingSideTo, MoveFlag::KingCastle });
-            }
-        }
-
-        // Queen-side castling
-        {
-            bool canCastle = (this->board_.castlingRights() & QueenSide) && !(this->occupied_ & QueenSideVisibility);
-
-            if constexpr (Flags & MoveGeneration::Flags::Legal) {
-                canCastle = canCastle && !(this->enemyAttacks_ & QueenSideCheck);
-            }
-
-            if (canCastle) {
-                this->list_.push({ KingFrom, QueenSideTo, MoveFlag::QueenCastle });
-            }
-        }
+        this->generateAllCastlingMoves();
     }
 }
 
-template<Color Side, uint32_t Flags>
-template<Bitboard (*GenerateAttacks)(Square)>
-INLINE void MoveGenerator<Side, Flags>::generateOffsetMoves(Piece piece) {
-    Bitboard pieces = this->board_.template bitboard<Side>(piece.type());
-    for (Square square : pieces) {
-        Bitboard attacks = GenerateAttacks(square);
 
-        if constexpr (Flags & MoveGeneration::Flags::Legal) {
-            // Mask pinned piece mobility
-            attacks &= this->mobility_[square];
-        }
-
-        this->serializeBitboard(square, attacks);
-    }
-}
 
 template<Color Side, uint32_t Flags>
 template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
@@ -323,10 +410,12 @@ INLINE void MoveGenerator<Side, Flags>::generateSlidingMoves(Piece piece) {
     }
 }
 
+
+
 template<Color Side, uint32_t Flags>
 INLINE MoveEntry *MoveGenerator<Side, Flags>::generate() {
     this->generateAllPawnMoves();
-    this->generateOffsetMoves<Bitboards::knightAttacks>(Piece::knight(Side));
+    this->generateAllKnightMoves();
     this->generateSlidingMoves<Bitboards::bishopAttacks>(Piece::bishop(Side));
     this->generateSlidingMoves<Bitboards::rookAttacks>(Piece::rook(Side));
     this->generateSlidingMoves<Bitboards::queenAttacks>(Piece::queen(Side));
@@ -366,7 +455,7 @@ MoveEntry *MoveGeneration::generate(Board &board, MoveEntry *moves) {
             MoveGenerator<Side, EvasionFlags> generator(board, moves);
             MoveEntry *end = generator.generate();
 
-            // For now, just have the evasion generator generate all moves and then filter them
+            // For now, just have the evasion generator generate all moves and then filter them by legality
             // TODO: In the future, have specialized generation code for evasion generator
             return filterLegal<Side>(board, moves, end);
         }
