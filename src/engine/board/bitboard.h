@@ -33,6 +33,11 @@ public:
     INLINE Bitboard &operator>>=(uint8_t shift) { this->set_ >>= shift; return *this; }
     // @formatter:on
 
+    // Shifts the bitboard forward by the given number of ranks. Forward is towards the 8th rank for white and towards the 1st
+    // rank for black.
+    template<Color Side>
+    [[nodiscard]] INLINE constexpr Bitboard shiftForward(uint8_t ranks) const;
+
     // Iterates over all the bits in the bitboard using a C++ iterator.
     //
     // Tested in godbolt, when compiled with -O3, the iterator produces the exact same assembly as a while loop like this:
@@ -73,6 +78,15 @@ public:
 private:
     uint64_t set_;
 };
+
+template<Color Side>
+INLINE constexpr Bitboard Bitboard::shiftForward(uint8_t ranks) const {
+    if constexpr (Side == Color::White) {
+        return this->set_ << (ranks * 8);
+    } else {
+        return this->set_ >> (ranks * 8);
+    }
+}
 
 
 

@@ -157,16 +157,6 @@ INLINE void MoveGenerator<Side, Flags>::serializeBitboard(Square from, Bitboard 
 
 
 
-// Returns the bitboard shifted one rank forward for the given side.
-template<Color Side>
-INLINE Bitboard forwardOneRank(Bitboard pawn) {
-    if constexpr (Side == Color::White) {
-        return pawn << 8;
-    } else {
-        return pawn >> 8;
-    }
-}
-
 // Returns the square shifted n ranks forward for the given side.
 template<Color Side>
 INLINE Square forwardRanks(Square square, uint8_t ranks) {
@@ -236,7 +226,7 @@ INLINE void MoveGenerator<Side, Flags>::generatePinnedPawnMoves(Square pawn) {
     Bitboard bitboard = (1ULL << pawn);
     Bitboard mobility = this->mobility_[pawn];
 
-    Bitboard singlePush = forwardOneRank<Side>(bitboard) & this->empty_ & mobility;
+    Bitboard singlePush = bitboard.shiftForward<Side>(1) & this->empty_ & mobility;
 
     // Promotions
     Bitboard promotion = singlePush & PromotionRank;
@@ -253,7 +243,7 @@ INLINE void MoveGenerator<Side, Flags>::generatePinnedPawnMoves(Square pawn) {
         if (singlePush) {
             this->list_.push({ pawn, forwardRanks<Side>(pawn, 1), MoveFlag::Quiet });
 
-            Bitboard doublePush = forwardOneRank<Side>(singlePush) & this->empty_ & mobility & DoublePushRank;
+            Bitboard doublePush = singlePush.shiftForward<Side>(1) & this->empty_ & mobility & DoublePushRank;
             if (doublePush) {
                 this->list_.push({ pawn, forwardRanks<Side>(pawn, 2), MoveFlag::DoublePawnPush });
             }
@@ -352,7 +342,7 @@ INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
         pawns ^= pinnedPawns;
     }
 
-    Bitboard forwardOne = forwardOneRank<Side>(pawns);
+    Bitboard forwardOne = pawns.shiftForward<Side>(1);
 
     Bitboard singlePushes = forwardOne & this->empty_;
 
@@ -372,7 +362,7 @@ INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
             this->list_.push({ backwardRanks<Side>(singlePush, 1), singlePush, MoveFlag::Quiet });
         }
 
-        Bitboard doublePushes = forwardOneRank<Side>(singlePushes) & this->empty_ & DoublePushRank;
+        Bitboard doublePushes = singlePushes.shiftForward<Side>(1) & this->empty_ & DoublePushRank;
         for (Square doublePush : doublePushes) {
             this->list_.push({ backwardRanks<Side>(doublePush, 2), doublePush, MoveFlag::DoublePawnPush });
         }
