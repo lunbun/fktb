@@ -59,6 +59,10 @@ private:
     void handleStop(TokenStream &tokens);
     void handleQuit(TokenStream &tokens);
 
+    void handleTest(TokenStream &tokens);
+    void handleTestMoveGen(TokenStream &tokens);
+    void handleTestPrintFen(TokenStream &tokens);
+
 
 
     void startSearch(const SearchOptions &options);

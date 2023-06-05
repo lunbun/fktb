@@ -350,7 +350,7 @@ void Tests::transpositionLockTest() {
 
 // Perft test
 template<Color Side>
-uint32_t perftSearch(Board &board, uint16_t depth) {
+uint64_t perftSearch(Board &board, uint16_t depth) {
     AlignedMoveEntry moveBuffer[256];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
@@ -360,7 +360,7 @@ uint32_t perftSearch(Board &board, uint16_t depth) {
         return movesEnd - movesStart;
     }
 
-    uint32_t nodeCount = 0;
+    uint64_t nodeCount = 0;
 
     while (movesEnd != movesStart) {
         Move move = (--movesEnd)->move;
@@ -380,7 +380,7 @@ void Tests::perft(const std::string &fen, uint16_t depth) {
 
     auto start = std::chrono::steady_clock::now();
 
-    uint32_t nodeCount;
+    uint64_t nodeCount;
     if (board.turn() == Color::White) {
         nodeCount = perftSearch<Color::White>(board, depth);
     } else {

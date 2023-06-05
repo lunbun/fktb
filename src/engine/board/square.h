@@ -21,10 +21,15 @@ public:
     constexpr static uint8_t Invalid = 64;
     // @formatter:on
 
+    static Square fromUci(const std::string &uci);
+    static Square fromFen(const std::string &fen);
+
     INLINE constexpr Square() : index_(0) { }
     INLINE constexpr Square(uint8_t index) : index_(index) { } // NOLINT(google-explicit-constructor)
     INLINE constexpr Square(uint8_t file, uint8_t rank) : index_(file | (rank << 3)) { }
     INLINE constexpr operator uint8_t() const { return this->index_; } // NOLINT(google-explicit-constructor)
+
+    [[nodiscard]] INLINE constexpr bool isValid() const { return this->index_ != Square::Invalid; }
 
     [[nodiscard]] INLINE constexpr static uint8_t file(Square square) { return square & 7; }
     [[nodiscard]] INLINE constexpr static uint8_t rank(Square square) { return square >> 3; };
@@ -33,6 +38,7 @@ public:
     [[nodiscard]] INLINE constexpr uint8_t rank() const { return Square::rank(this->index_); }
 
     [[nodiscard]] std::string uci() const;
+    [[nodiscard]] std::string fen() const;
     [[nodiscard]] std::string debugName() const;
 
 private:

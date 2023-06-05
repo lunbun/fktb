@@ -16,6 +16,7 @@ namespace Zobrist {
 
     uint64_t blackToMove();
     uint64_t castlingRights(CastlingRights castlingRights);
+    uint64_t enPassantSquare(Square square);
     uint64_t piece(Piece piece, Square square);
 }
 

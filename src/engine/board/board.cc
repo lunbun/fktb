@@ -10,17 +10,20 @@
 #include "engine/hash/transposition.h"
 #include "engine/eval/piece_square_table.h"
 
-Board::Board(Color turn, CastlingRights castlingRights) : material_(), pieceSquareEval_(), turn_(turn), hash_(0),
-                                                          castlingRights_(castlingRights), pieces_(), bitboards_(),
-                                                          kings_(Square::Invalid, Square::Invalid) {
+Board::Board(Color turn, CastlingRights castlingRights, Square enPassantSquare) : material_(), pieceSquareEval_(), turn_(turn),
+                                                                                  hash_(0), castlingRights_(castlingRights),
+                                                                                  enPassantSquare_(enPassantSquare), pieces_(),
+                                                                                  bitboards_(),
+                                                                                  kings_(Square::Invalid, Square::Invalid) {
     this->pieces_.fill(Piece::empty());
     this->bitboards_.white().fill(0);
     this->bitboards_.black().fill(0);
 
-    this->hash_ ^= Zobrist::castlingRights(castlingRights);
     if (turn == Color::Black) {
         this->hash_ ^= Zobrist::blackToMove();
     }
+    this->hash_ ^= Zobrist::castlingRights(castlingRights);
+    this->hash_ ^= Zobrist::enPassantSquare(enPassantSquare);
 }
 
 Board::~Board() = default;
@@ -31,7 +34,7 @@ Board Board::startingPosition() {
 
 Board Board::fromFen(const std::string &fen) {
     FenReader reader(fen);
-    Board board(reader.turn(), reader.castlingRights());
+    Board board(reader.turn(), reader.castlingRights(), reader.enPassantSquare());
 
     while (reader.hasNext()) {
         auto entry = reader.next();
@@ -66,6 +69,7 @@ std::string Board::toFen() const {
 
     writer.turn(this->turn_);
     writer.castlingRights(this->castlingRights_);
+    writer.enPassantSquare(this->enPassantSquare_);
 
     return writer.fen();
 }
@@ -95,7 +99,7 @@ INLINE void Board::addKing(Color color, Square square) {
     assert(this->pieceAt(square).isEmpty());
     this->pieces_[square] = Piece(PieceType::King, color);
 
-    assert(this->kings_[color] == Square::Invalid);
+    assert(!this->kings_[color].isValid());
     this->kings_[color] = square;
 
     if constexpr (UpdateHash) {
@@ -154,6 +158,14 @@ INLINE void Board::maybeRevokeCastlingRightsForRookSquare(Square square) {
 
     CastlingRights revokedRights = CastlingRights::fromRookSquare(square);
     this->castlingRights(this->castlingRights_.without(revokedRights));
+}
+
+// Updates the hash and en passant square.
+INLINE void Board::enPassantSquare(Square newEnPassantSquare) {
+    this->hash_ ^= Zobrist::enPassantSquare(this->enPassantSquare_);
+    this->hash_ ^= Zobrist::enPassantSquare(newEnPassantSquare);
+
+    this->enPassantSquare_ = newEnPassantSquare;
 }
 
 // Moves a piece from one square to another.
@@ -253,14 +265,33 @@ INLINE void Board::makeQuietMove(Move move) {
     // Move/unmove the piece
     Piece piece = this->moveOrUnmovePiece<IsMake>(move.from(), move.to());
 
-    // Update castling rights if necessary
+    // Update castling rights or en passant square if necessary
     if constexpr (IsMake) {
-        if (piece.type() == PieceType::Rook) {
-            // Update castling rights if necessary
-            this->maybeRevokeCastlingRightsForRookSquare(move.from());
-        } else if (piece.type() == PieceType::King) {
-            // Update castling rights
-            this->castlingRights(this->castlingRights_.without(piece.color()));
+        switch (piece.type()) {
+            case PieceType::Pawn: {
+                // Update en passant square if double pawn push
+                if (move.isDoublePawnPush()) {
+                    // TODO: There's probably a better way of getting the en passant square, but for now, just average the from
+                    //  and to squares
+                    Square enPassantSquare(move.to().file(), (move.to().rank() + move.from().rank()) / 2);
+                    this->enPassantSquare(enPassantSquare);
+                }
+                break;
+            }
+
+            case PieceType::Rook: {
+                // Update castling rights if necessary
+                this->maybeRevokeCastlingRightsForRookSquare(move.from());
+                break;
+            }
+
+            case PieceType::King: {
+                // Update castling rights
+                this->castlingRights(this->castlingRights_.without(piece.color()));
+                break;
+            }
+
+            default: break;
         }
     }
 }
@@ -269,21 +300,29 @@ template<bool UpdateTurn>
 MakeMoveInfo Board::makeMove(Move move) {
     uint64_t oldHash = this->hash_;
     CastlingRights oldCastlingRights = this->castlingRights_;
+    Square oldEnPassantSquare = this->enPassantSquare_;
 
+    // Reset en passant square (if the move is a double pawn push, will be set to correct value later during makeQuietMove)
+    this->enPassantSquare(Square::Invalid);
+
+    // Captures
     Piece captured = Piece::empty();
-    if (move.isCapture()) { // Captures
+    if (move.isCapture()) {
+        Square capturedSquare = move.capturedSquare();
+
         // Check if the move is a capture before getting the captured piece to avoid unnecessary calls to pieceAt
         // (avoids unnecessary memory reads)
-        captured = this->pieceAt(move.to());
+        captured = this->pieceAt(capturedSquare);
         assert(captured.type() != PieceType::King);
-        this->removePiece<true>(captured, move.to());
+        this->removePiece<true>(captured, capturedSquare);
 
         // If a rook is captured, update castling rights if necessary
         if (captured.type() == PieceType::Rook) {
-            this->maybeRevokeCastlingRightsForRookSquare(move.to());
+            this->maybeRevokeCastlingRightsForRookSquare(capturedSquare);
         }
     }
 
+    // Make the move
     if (move.isCastle()) { // Castling
         this->makeCastlingMove<true>(move);
     } else if (move.isPromotion()) { // Promotions
@@ -298,12 +337,12 @@ MakeMoveInfo Board::makeMove(Move move) {
         this->turn_ = ~this->turn_;
     }
 
-    return { oldHash, oldCastlingRights, captured };
+    return { oldHash, oldCastlingRights, oldEnPassantSquare, captured };
 }
 
 template<bool UpdateTurn>
 void Board::unmakeMove(Move move, MakeMoveInfo info) {
-    // We don't need to do any hash updates or castling rights updates here since we just restore the old hash and
+    // We don't need to do any hash, castling rights, or en passant square updates here since we just restore the old hash and
     // castling rights from MakeMoveInfo
 
     if (move.isCastle()) { // Castling
@@ -316,12 +355,13 @@ void Board::unmakeMove(Move move, MakeMoveInfo info) {
 
     if (move.isCapture()) { // Captures
         // Add the captured piece back
-        this->addPiece<false>(info.captured, move.to());
+        this->addPiece<false>(info.captured, move.capturedSquare());
     }
 
-    // Restore the old hash and castling rights
+    // Restore the old hash, castling rights, and en passant square
     this->hash_ = info.oldHash;
     this->castlingRights_ = info.oldCastlingRights;
+    this->enPassantSquare_ = info.oldEnPassantSquare;
 
     // Switch the turn if necessary
     if constexpr (UpdateTurn) {

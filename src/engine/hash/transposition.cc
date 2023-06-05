@@ -15,6 +15,7 @@ namespace {
 
     uint64_t blackToMoveNumber = 0;
     std::array<uint64_t, 16> castlingRightsNumbers;
+    std::array<uint64_t, 9> enPassantFileNumbers; // Index 0 is for no en passant.
     ColorMap<PieceTypeMap<SquareMap<uint64_t>>> pieceNumbers;
 }
 
@@ -31,8 +32,12 @@ void Zobrist::maybeInit() {
 
     blackToMoveNumber = generator();
 
-    for (uint8_t castlingRights = 0; castlingRights < 16; castlingRights++) {
-        castlingRightsNumbers[castlingRights] = generator();
+    for (uint64_t &castlingRightsNumber : castlingRightsNumbers) {
+        castlingRightsNumber = generator();
+    }
+
+    for (uint64_t &enPassantFileNumber : enPassantFileNumbers) {
+        enPassantFileNumber = generator();
     }
 
     for (uint8_t piece = 0; piece < 6; piece++) {
@@ -49,6 +54,18 @@ uint64_t Zobrist::blackToMove() {
 
 uint64_t Zobrist::castlingRights(CastlingRights castlingRights) {
     return castlingRightsNumbers[castlingRights];
+}
+
+uint64_t Zobrist::enPassantSquare(Square square) {
+    // Avoiding using branches here.
+    //
+    // (square >> 6) tells us if square is valid or not. (valid if 0, invalid if 1)
+    // The file of an invalid square is 0.
+    //
+    // If square is invalid:        square = 64, so (64.file() + 1) - (64 >> 6) = 1 - 1 = 0 (index of no en passant)
+    // If square is valid e.g. a6:  square = 40, so (40.file() + 1) - (40 >> 6) = 1 - 0 = 1 (index of A file en passant)
+    uint8_t index = (square.file() + 1) - (square >> 6);
+    return enPassantFileNumbers[index];
 }
 
 uint64_t Zobrist::piece(Piece piece, Square square) {

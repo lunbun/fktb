@@ -7,6 +7,7 @@
 #include <optional>
 #include <thread>
 
+#include "test.h"
 #include "engine/board/board.h"
 #include "engine/search/score.h"
 #include "engine/search/iterative_search.h"
@@ -82,6 +83,8 @@ void UciHandler::handleInput(const std::string &input) {
         this->handleStop(tokens);
     } else if (command == "quit") {
         this->handleQuit(tokens);
+    } else if (command == "test") {
+        this->handleTest(tokens);
     } else {
         return this->error("Unknown command: " + command);
     }
@@ -214,6 +217,36 @@ void UciHandler::handleQuit(TokenStream &tokens) {
     }
 
     std::exit(0);
+}
+
+
+
+void UciHandler::handleTest(TokenStream &tokens) {
+    const std::string &command = tokens.next();
+
+    if (command == "movegen") {
+        this->handleTestMoveGen(tokens);
+    } else if (command == "print_fen") {
+        this->handleTestPrintFen(tokens);
+    } else {
+        return this->error("Unknown test command: " + command);
+    }
+}
+
+void UciHandler::handleTestMoveGen(TokenStream &tokens) {
+    if (this->board_ == nullptr) {
+        return this->error("No board set");
+    }
+
+    Tests::legalMoveGenTest(this->board_->toFen());
+}
+
+void UciHandler::handleTestPrintFen(TokenStream &tokens) {
+    if (this->board_ == nullptr) {
+        return this->error("No board set");
+    }
+
+    std::cout << this->board_->toFen() << std::endl;
 }
 
 

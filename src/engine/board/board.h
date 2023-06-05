@@ -18,6 +18,7 @@
 struct MakeMoveInfo {
     uint64_t oldHash;
     CastlingRights oldCastlingRights;
+    Square oldEnPassantSquare;
     Piece captured;
 
     MakeMoveInfo() = delete;
@@ -31,9 +32,11 @@ public:
     constexpr static const char *KiwiPeteFen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ";
     constexpr static const char *EnPassantPinFen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ";
     constexpr static const char *ChecksAndPinsFen = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
+    constexpr static const char *CapturedCastlingRookFen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
+    constexpr static const char *MirroredFen = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
     constexpr static const char *PawnEndgameFen = "8/k7/3p4/p2P1p2/P2P1P2/8/8/K7 w - - 0 1";
 
-    explicit Board(Color turn, CastlingRights castlingRights);
+    Board(Color turn, CastlingRights castlingRights, Square enPassantSquare);
     ~Board();
 
     Board(const Board &other) = delete;
@@ -55,6 +58,7 @@ public:
     [[nodiscard]] INLINE Color turn() const { return this->turn_; }
     [[nodiscard]] INLINE uint64_t hash() const { return this->hash_; }
     [[nodiscard]] INLINE CastlingRights castlingRights() const { return this->castlingRights_; }
+    [[nodiscard]] INLINE Square enPassantSquare() const { return this->enPassantSquare_; }
 
     template<Color Side>
     [[nodiscard]] INLINE Square king() const { return this->kings_[Side]; }
@@ -111,6 +115,7 @@ private:
 
     ColorMap<Square> kings_;
     CastlingRights castlingRights_;
+    Square enPassantSquare_;
     SquareMap<Piece> pieces_;
     ColorMap<std::array<Bitboard, 5>> bitboards_;
 
@@ -119,6 +124,9 @@ private:
 
     // Removes the relevant castling rights if the given square is a rook square.
     void maybeRevokeCastlingRightsForRookSquare(Square square);
+
+    // Updates the hash and en passant square.
+    void enPassantSquare(Square newEnPassantSquare);
 
     // Moves a piece from one square to another.
     template<bool UpdateHash>

@@ -46,8 +46,14 @@ private:
 
     void serializePromotion(Square from, Square to);
     void serializePromotionCapture(Square from, Square to);
+    // Serializes an en passant move, only if it is legal (or if in pseudo-legal mode). En passant is not legal if it reveals a
+    // check on the king.
+    void maybeSerializeEnPassant(Square from, Square to);
 
     void generatePinnedPawnMoves(Square pawn);
+    // Generates all pawn captures to either the left or right.
+    template<bool Left>
+    void generateAllPawnCapturesToSide(Bitboard forwardOne);
     void generateAllPawnMoves();
 
     void generateAllKnightMoves();
@@ -97,7 +103,7 @@ INLINE void MoveGenerator<Side, Flags>::calculatePins(Square king) {
 }
 
 template<Color Side, uint32_t Flags>
-MoveGenerator<Side, Flags>::MoveGenerator(Board &board, MoveEntry *moves) : board_(board), list_(moves) {
+INLINE MoveGenerator<Side, Flags>::MoveGenerator(Board &board, MoveEntry *moves) : board_(board), list_(moves) {
     constexpr Color Enemy = ~Side;
 
     this->friendly_ = board.composite<Side>();
@@ -180,7 +186,7 @@ INLINE Square backwardRanks(Square square, uint8_t ranks) {
 }
 
 template<Color Side, uint32_t Flags>
-void MoveGenerator<Side, Flags>::serializePromotion(Square from, Square to) {
+INLINE void MoveGenerator<Side, Flags>::serializePromotion(Square from, Square to) {
     this->list_.push({ from, to, MoveFlag::KnightPromotion });
     this->list_.push({ from, to, MoveFlag::BishopPromotion });
     this->list_.push({ from, to, MoveFlag::RookPromotion });
@@ -188,11 +194,32 @@ void MoveGenerator<Side, Flags>::serializePromotion(Square from, Square to) {
 }
 
 template<Color Side, uint32_t Flags>
-void MoveGenerator<Side, Flags>::serializePromotionCapture(Square from, Square to) {
+INLINE void MoveGenerator<Side, Flags>::serializePromotionCapture(Square from, Square to) {
     this->list_.push({ from, to, MoveFlag::KnightPromoCapture });
     this->list_.push({ from, to, MoveFlag::BishopPromoCapture });
     this->list_.push({ from, to, MoveFlag::RookPromoCapture });
     this->list_.push({ from, to, MoveFlag::QueenPromoCapture });
+}
+
+template<Color Side, uint32_t Flags>
+INLINE void MoveGenerator<Side, Flags>::maybeSerializeEnPassant(Square from, Square to) {
+    Move move(from, to, MoveFlag::EnPassant);
+
+    bool isLegal = true;
+
+    if constexpr (Flags & MoveGeneration::Flags::Legal) {
+        // For en passant captures, don't do any fancy pin calculation, instead just make the move and see if it leaves the king
+        // in check.
+        MakeMoveInfo info = this->board_.template makeMove<false>(move);
+
+        isLegal = !(this->board_.template isInCheck<Side>());
+
+        this->board_.template unmakeMove<false>(move, info);
+    }
+
+    if (isLegal) {
+        this->list_.push(move);
+    }
 }
 
 template<Color Side, uint32_t Flags>
@@ -228,10 +255,24 @@ INLINE void MoveGenerator<Side, Flags>::generatePinnedPawnMoves(Square pawn) {
     }
 
     // Captures
-    Bitboard captures = Bitboards::pawnAttacks<Side>(pawn) & this->enemy_ & mobility;
+    Square enPassantSquare = this->board_.enPassantSquare();
+
+    // Bitboard with pawn attacks, regardless of if there is an enemy piece there
+    Bitboard captures = Bitboards::pawnAttacks<Side>(pawn) & mobility;
+    if (enPassantSquare.isValid() && captures.get(enPassantSquare)) {
+        this->maybeSerializeEnPassant(pawn, enPassantSquare);
+    }
+
+    // Mask out any captures that are not to an enemy piece
+    captures &= this->enemy_;
+
+    // Mask any promotion captures
     Bitboard promotionCaptures = captures & PromotionRank;
+
+    // Remove promotion captures from captures
     captures ^= promotionCaptures;
 
+    // Serialize captures and promotion captures
     this->serializeCaptures(pawn, captures);
     for (Square promoCapture : promotionCaptures) {
         this->serializePromotionCapture(pawn, promoCapture);
@@ -239,11 +280,54 @@ INLINE void MoveGenerator<Side, Flags>::generatePinnedPawnMoves(Square pawn) {
 }
 
 template<Color Side, uint32_t Flags>
+template<bool Left>
+INLINE void MoveGenerator<Side, Flags>::generateAllPawnCapturesToSide(Bitboard forwardOne) {
+    constexpr Bitboard PromotionRank = (Side == Color::White) ? Bitboards::Rank8 : Bitboards::Rank1;
+    constexpr Bitboard CaptureFiles = Left ? (~Bitboards::FileA) : (~Bitboards::FileH);
+    constexpr int8_t Offset = Left ? -1 : 1;
+
+    Square enPassantSquare = this->board_.enPassantSquare();
+
+    // Bitboard with all pawn attacks, regardless of if there is an enemy piece there
+    Bitboard captures = (forwardOne & CaptureFiles);
+    if constexpr (Left) {
+        captures >>= 1;
+    } else {
+        captures <<= 1;
+    }
+
+    // Check for en passant captures
+    if (enPassantSquare.isValid() && captures.get(enPassantSquare)) {
+        Square from = backwardRanks<Side>(enPassantSquare, 1) - Offset;
+        this->maybeSerializeEnPassant(from, enPassantSquare);
+    }
+
+    // Mask out any captures that are not to an enemy piece
+    captures &= this->enemy_;
+
+    // Mask any promotion captures
+    Bitboard promoCaptures = captures & PromotionRank;
+
+    // Remove promotion captures from captures
+    captures ^= promoCaptures;
+
+    // Serialize captures
+    for (Square capture : captures) {
+        Square from = backwardRanks<Side>(capture, 1) - Offset;
+        this->list_.push({ from, capture, MoveFlag::Capture });
+    }
+
+    // Serialize promotion captures
+    for (Square promoCapture : promoCaptures) {
+        Square from = backwardRanks<Side>(promoCapture, 1) - Offset;
+        this->serializePromotionCapture(from, promoCapture);
+    }
+}
+
+template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
     constexpr Bitboard PromotionRank = (Side == Color::White) ? Bitboards::Rank8 : Bitboards::Rank1;
     constexpr Bitboard DoublePushRank = (Side == Color::White) ? Bitboards::Rank4 : Bitboards::Rank5;
-    constexpr Bitboard NonAFile = ~Bitboards::FileA;
-    constexpr Bitboard NonHFile = ~Bitboards::FileH;
 
     Bitboard pawns = this->board_.template bitboard<Side>(PieceType::Pawn);
 
@@ -283,28 +367,8 @@ INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
     }
 
     // Captures left
-    Bitboard capturesLeft = ((forwardOne & NonAFile) >> 1) & this->enemy_;
-    Bitboard promoCapturesLeft = capturesLeft & PromotionRank;
-    capturesLeft ^= promoCapturesLeft;
-    for (Square capture : capturesLeft) {
-        Square from = backwardRanks<Side>(capture, 1) + 1;
-        this->list_.push({ from, capture, MoveFlag::Capture });
-    }
-    for (Square promoCapture : promoCapturesLeft) {
-        this->serializePromotionCapture(backwardRanks<Side>(promoCapture, 1) + 1, promoCapture);
-    }
-
-    // Captures right
-    Bitboard capturesRight = ((forwardOne & NonHFile) << 1) & this->enemy_;
-    Bitboard promoCapturesRight = capturesRight & PromotionRank;
-    capturesRight ^= promoCapturesRight;
-    for (Square capture : capturesRight) {
-        Square from = backwardRanks<Side>(capture, 1) - 1;
-        this->list_.push({ from, capture, MoveFlag::Capture });
-    }
-    for (Square promoCapture : promoCapturesRight) {
-        this->serializePromotionCapture(backwardRanks<Side>(promoCapture, 1) - 1, promoCapture);
-    }
+    this->generateAllPawnCapturesToSide<true>(forwardOne);
+    this->generateAllPawnCapturesToSide<false>(forwardOne);
 }
 
 

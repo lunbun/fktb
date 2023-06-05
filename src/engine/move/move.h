@@ -25,7 +25,9 @@ namespace MoveFlagNamespace {
         KingCastle          = 0b0010,
         QueenCastle         = 0b0011,
 
+        CaptureMask         = 0b0100,
         Capture             = 0b0100,
+        EnPassant           = 0b0101,
 
         PromotionMask       = 0b1000,
         KnightPromotion     = 0b1000,
@@ -33,10 +35,10 @@ namespace MoveFlagNamespace {
         RookPromotion       = 0b1010,
         QueenPromotion      = 0b1011,
 
-        KnightPromoCapture  = KnightPromotion  | Capture,
-        BishopPromoCapture  = BishopPromotion  | Capture,
-        RookPromoCapture    = RookPromotion    | Capture,
-        QueenPromoCapture   = QueenPromotion   | Capture,
+        KnightPromoCapture  = KnightPromotion  | CaptureMask,
+        BishopPromoCapture  = BishopPromotion  | CaptureMask,
+        RookPromoCapture    = RookPromotion    | CaptureMask,
+        QueenPromoCapture   = QueenPromotion   | CaptureMask,
     };
 }
 using MoveFlag = MoveFlagNamespace::MoveFlag;
@@ -60,24 +62,31 @@ public:
     [[nodiscard]] INLINE constexpr MoveFlag flags() const { return static_cast<MoveFlag>((this->bits_ >> 12) & 0x0F); }
 
     [[nodiscard]] INLINE constexpr bool isValid() const { return this->from() != this->to(); }
+    [[nodiscard]] INLINE constexpr bool isDoublePawnPush() const { return this->flags() == MoveFlag::DoublePawnPush; }
     [[nodiscard]] INLINE constexpr bool isCastle() const {
         // Some promotion flags also have the castle bits, so we have to explicitly check that it's not a promotion.
         return this->flags() & MoveFlag::CastleMask && !this->isPromotion();
     }
-    [[nodiscard]] INLINE constexpr bool isCapture() const { return this->flags() & MoveFlag::Capture; }
+    [[nodiscard]] INLINE constexpr bool isCapture() const { return this->flags() & MoveFlag::CaptureMask; }
+    [[nodiscard]] INLINE constexpr bool isEnPassant() const { return this->flags() == MoveFlag::EnPassant; }
     [[nodiscard]] INLINE constexpr bool isPromotion() const { return this->flags() & MoveFlag::PromotionMask; }
+
+    // Returns the square of the captured piece.
+    // For normal capture moves, this is just the square that the piece was moved to. For en passant moves, this is the square of
+    // the captured pawn.
+    [[nodiscard]] INLINE constexpr Square capturedSquare() const;
+
+    // Returns the square of the captured pawn in an en passant move.
+    // Assumes that the move is an en passant, will return a garbage value otherwise.
+    [[nodiscard]] INLINE constexpr Square enPassantCapturedSquare() const;
 
     // Returns the side that the castle is on.
     // Assumes that the move is a castle, will return a garbage value otherwise.
-    [[nodiscard]] INLINE constexpr CastlingSide castlingSide() const {
-        return static_cast<CastlingSide>((this->flags() & 1) + CastlingSide::King);
-    }
+    [[nodiscard]] INLINE constexpr CastlingSide castlingSide() const;
 
     // Returns the piece type that the pawn is promoted to.
     // Assumes that the move is a promotion, will return a garbage value otherwise.
-    [[nodiscard]] INLINE constexpr PieceType promotion() const {
-        return static_cast<PieceType>((this->flags() & 3) + PieceType::Knight);
-    }
+    [[nodiscard]] INLINE constexpr PieceType promotion() const;
 
     [[nodiscard]] INLINE constexpr bool operator==(Move other) const { return this->bits_ == other.bits_; }
 
@@ -87,5 +96,22 @@ public:
 private:
     uint16_t bits_;
 };
+
+INLINE constexpr Square Move::capturedSquare() const {
+    // TODO: Is branching here bad?
+    return this->isEnPassant() ? this->enPassantCapturedSquare() : this->to();
+}
+
+INLINE constexpr Square Move::enPassantCapturedSquare() const {
+    return { this->to().file(), this->from().rank() };
+}
+
+INLINE constexpr CastlingSide Move::castlingSide() const {
+    return static_cast<CastlingSide>((this->flags() & 1) + CastlingSide::King);
+}
+
+INLINE constexpr PieceType Move::promotion() const {
+    return static_cast<PieceType>((this->flags() & 3) + PieceType::Knight);
+}
 
 static_assert(sizeof(Move) == 2, "Move must be 2 bytes");

@@ -29,6 +29,8 @@ public:
     INLINE Bitboard &operator|=(Bitboard other) { this->set_ |= other.set_; return *this; }
     INLINE Bitboard &operator&=(Bitboard other) { this->set_ &= other.set_; return *this; }
     INLINE Bitboard &operator^=(Bitboard other) { this->set_ ^= other.set_; return *this; }
+    INLINE Bitboard &operator<<=(uint8_t shift) { this->set_ <<= shift; return *this; }
+    INLINE Bitboard &operator>>=(uint8_t shift) { this->set_ >>= shift; return *this; }
     // @formatter:on
 
     // Iterates over all the bits in the bitboard using a C++ iterator.
@@ -121,7 +123,7 @@ namespace Bitboards {
     Bitboard bishopAttacksOnEmpty(Square square);
     Bitboard queenAttacksOnEmpty(Square square);
     template<PieceType Slider>
-    Bitboard sliderAttacksOnEmpty(Square square);
+    INLINE Bitboard sliderAttacksOnEmpty(Square square);
 
     // Returns a bitboard with all attacks of the given piece type.
     template<Color Side>

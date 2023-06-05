@@ -46,6 +46,14 @@ Move Move::fromUci(const std::string &uci, const Board &board) {
 
     uint8_t flags = MoveFlag::Quiet;
 
+    // Check for double pawn push
+    if (piece.type() == PieceType::Pawn) {
+        int32_t rankDiff = to.rank() - from.rank();
+        if (std::abs(rankDiff) == 2) {
+            flags |= MoveFlag::DoublePawnPush;
+        }
+    }
+
     // Check for castling
     if (piece.type() == PieceType::King) {
         int32_t fileDiff = to.file() - from.file();
@@ -60,6 +68,11 @@ Move Move::fromUci(const std::string &uci, const Board &board) {
     Piece captured = board.pieceAt(to);
     if (!captured.isEmpty()) {
         flags |= MoveFlag::Capture;
+    }
+
+    // Check for en passant
+    if (piece.type() == PieceType::Pawn && to == board.enPassantSquare()) {
+        flags |= MoveFlag::EnPassant;
     }
 
     // Check for promotions
@@ -100,10 +113,14 @@ std::string Move::debugName(const Board &board) const {
     }
 
     if (this->isCapture()) {
-        Piece captured = board.pieceAt(this->to());
+        Piece captured = board.pieceAt(this->capturedSquare());
 
         name += " capturing ";
         name += captured.debugName();
+
+        if (this->isEnPassant()) {
+            name += " en passant";
+        }
     }
 
     if (this->isPromotion()) {

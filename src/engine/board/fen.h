@@ -27,6 +27,7 @@ public:
 
     [[nodiscard]] Color turn() const;
     [[nodiscard]] CastlingRights castlingRights() const;
+    [[nodiscard]] Square enPassantSquare() const;
 
 private:
     std::vector<std::string> fields_;
@@ -53,6 +54,7 @@ public:
 
     void turn(Color color);
     void castlingRights(CastlingRights castlingRights);
+    void enPassantSquare(Square square);
 
     // Returns the FEN string.
     [[nodiscard]] const std::string &fen() const { return this->fen_; }

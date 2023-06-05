@@ -128,6 +128,19 @@ CastlingRights FenReader::castlingRights() const {
     return result;
 }
 
+Square FenReader::enPassantSquare() const {
+    if (this->fields_.size() < 4) {
+        return Square::Invalid;
+    }
+
+    const std::string &enPassantSquare = this->fields_[3];
+    if (enPassantSquare == "-") {
+        return Square::Invalid;
+    }
+
+    return Square::fromFen(this->fields_[3]);
+}
+
 
 
 FenWriter::FenWriter() : rank_(7), file_(0), emptyFilesInARow_(0), fen_() { }
@@ -201,6 +214,17 @@ void FenWriter::castlingRights(CastlingRights castlingRights) {
     if (castlingRights.has(CastlingRights::BlackKingSide))  this->fen_ += 'k';
     if (castlingRights.has(CastlingRights::BlackQueenSide)) this->fen_ += 'q';
     // @formatter:on
+}
+
+void FenWriter::enPassantSquare(Square square) {
+    this->fen_ += ' ';
+
+    if (!square.isValid()) {
+        this->fen_ += '-';
+        return;
+    }
+
+    this->fen_ += square.fen();
 }
 
 void FenWriter::maybeAddEmptyFilesToFen() {
