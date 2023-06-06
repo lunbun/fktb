@@ -16,7 +16,7 @@ INLINE int32_t evaluatePawnShieldWithMask(const Board &board) {
 
     int32_t score = 0;
 
-    Bitboard pawns = board.bitboard<Side>(PieceType::Pawn);
+    Bitboard pawns = board.bitboard(Piece::pawn(Side));
     Bitboard pawnShield1 = pawns & Mask;
     Bitboard pawnShield2 = pawns & Mask2;
 
@@ -36,7 +36,7 @@ INLINE int32_t evaluatePawnShieldWithMask(const Board &board) {
 
 template<>
 INLINE int32_t evaluatePawnShield<Color::White>(const Board &board) {
-    Square king = board.king<Color::White>();
+    Square king = board.king(Color::White);
 
     // Only evaluate pawn shield if king is on first two ranks.
     if (king.rank() > 1) {
@@ -54,7 +54,7 @@ INLINE int32_t evaluatePawnShield<Color::White>(const Board &board) {
 
 template<>
 INLINE int32_t evaluatePawnShield<Color::Black>(const Board &board) {
-    Square king = board.king<Color::Black>();
+    Square king = board.king(Color::Black);
 
     // Only evaluate pawn shield if king is on first two ranks.
     if (king.rank() < 6) {
@@ -86,13 +86,13 @@ INLINE int32_t evaluateForSide(const Board &board) {
     int32_t score = 0;
 
     // Material
-    score += board.material<Side>();
+    score += board.material(Side);
 
     // Bonus for having a bishop pair
-    score += PieceMaterial::BishopPair * (board.bitboard<Side>(PieceType::Bishop).count() >= 2);
+    score += PieceMaterial::BishopPair * (board.bitboard(Piece::bishop(Side)).count() >= 2);
 
     // Piece square tables
-    score += board.pieceSquareEval<Side>();
+    score += board.pieceSquareEval(Side);
 
     // King safety
     score += evaluateKingSafety<Side>(board);

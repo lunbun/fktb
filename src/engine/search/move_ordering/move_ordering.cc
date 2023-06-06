@@ -57,16 +57,16 @@ MoveScorer<Side, Flags>::MoveScorer(const Board &board, const HistoryTable *hist
 
     Bitboard occupied = board.occupied();
 
-    this->friendlyPawnAttacks_ = Bitboards::allPawnAttacks<Side>(board.bitboard<Side>(PieceType::Pawn));
-    this->friendlyKnightAttacks_ = Bitboards::allKnightAttacks(board.bitboard<Side>(PieceType::Knight));
+    this->friendlyPawnAttacks_ = Bitboards::allPawnAttacks<Side>(board.bitboard(Piece::pawn(Side)));
+    this->friendlyKnightAttacks_ = Bitboards::allKnightAttacks(board.bitboard(Piece::knight(Side)));
 
-    this->enemyKnights_ = board.bitboard<Enemy>(PieceType::Knight);
-    this->enemyBishops_ = board.bitboard<Enemy>(PieceType::Bishop);
-    this->enemyRooks_ = board.bitboard<Enemy>(PieceType::Rook);
-    this->enemyQueens_ = board.bitboard<Enemy>(PieceType::Queen);
-    Bitboard enemyKing = (1ULL << board.king<Enemy>());
+    this->enemyKnights_ = board.bitboard(Piece::knight(Enemy));
+    this->enemyBishops_ = board.bitboard(Piece::bishop(Enemy));
+    this->enemyRooks_ = board.bitboard(Piece::rook(Enemy));
+    this->enemyQueens_ = board.bitboard(Piece::queen(Enemy));
+    Bitboard enemyKing = (1ULL << board.king(Enemy));
 
-    this->enemyPawnAttacks_ = Bitboards::allPawnAttacks<Enemy>(board.bitboard<Enemy>(PieceType::Pawn));
+    this->enemyPawnAttacks_ = Bitboards::allPawnAttacks<Enemy>(board.bitboard(Piece::pawn(Enemy)));
     this->enemyKnightAttacks_ = Bitboards::allKnightAttacks(this->enemyKnights_);
     this->enemyBishopAttacks_ = Bitboards::allBishopAttacks(this->enemyBishops_, occupied);
     Bitboard enemyRookAttacks = Bitboards::allRookAttacks(this->enemyRooks_, occupied);
@@ -98,7 +98,7 @@ int32_t MoveScorer<Side, Flags>::score(Move move) {
     } else {
         // History heuristics
         if constexpr (Flags & MoveOrdering::Flags::History) {
-            score += this->history().template moveScoreAt<Side>(piece.type(), move.to());
+            score += this->history().score(Side, piece.type(), move.to(), 5000);
         }
     }
 

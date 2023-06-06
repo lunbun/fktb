@@ -193,11 +193,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
 
         if (score >= beta) {
-            if (!hashMove.isCapture()) {
-                // Update history heuristic
-                this->history_.add<Turn>(board.pieceAt(hashMove.from()).type(), hashMove.to(), depth);
-            }
-
+            this->history_.maybeAdd(Turn, board, hashMove, depth);
             return bestScore;
         }
     }
@@ -238,11 +234,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
 
         if (score >= beta) {
-            if (!move.isCapture()) {
-                // Update history heuristic
-                this->history_.add<Turn>(board.pieceAt(move.from()).type(), move.to(), depth);
-            }
-
+            this->history_.maybeAdd(Turn, board, move, depth);
             return bestScore;
         }
     }

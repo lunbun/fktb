@@ -73,7 +73,7 @@ template<PieceType EnemySlider, Bitboard (*GenerateAttacksOnEmpty)(Square)>
 INLINE void MoveGenerator<Side, Flags>::calculatePins(Square king) {
     static_assert(Flags & MoveGeneration::Flags::Legal, "Pinned pieces are only needed for legal move generation.");
 
-    Bitboard enemySliders = this->board_.template bitboard<~Side>(EnemySlider);
+    Bitboard enemySliders = this->board_.bitboard({ ~Side, EnemySlider });
     for (Square slider : enemySliders) {
         Bitboard between = Bitboards::between(king, slider);
 
@@ -106,8 +106,8 @@ template<Color Side, uint32_t Flags>
 INLINE MoveGenerator<Side, Flags>::MoveGenerator(Board &board, MoveEntry *moves) : board_(board), list_(moves) {
     constexpr Color Enemy = ~Side;
 
-    this->friendly_ = board.composite<Side>();
-    this->enemy_ = board.composite<Enemy>();
+    this->friendly_ = board.composite(Side);
+    this->enemy_ = board.composite(Enemy);
     this->occupied_ = this->friendly_ | this->enemy_;
     this->empty_ = ~this->occupied_;
 
@@ -120,7 +120,7 @@ INLINE MoveGenerator<Side, Flags>::MoveGenerator(Board &board, MoveEntry *moves)
         this->mobility_.fill(Bitboards::All);
 
         // Calculate pinned pieces.
-        Square king = board.king<Side>();
+        Square king = board.king(Side);
         this->calculatePins<PieceType::Bishop, Bitboards::bishopAttacksOnEmpty>(king);
         this->calculatePins<PieceType::Rook, Bitboards::rookAttacksOnEmpty>(king);
         this->calculatePins<PieceType::Queen, Bitboards::queenAttacksOnEmpty>(king);
@@ -329,7 +329,7 @@ INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
     constexpr Bitboard PromotionRank = (Side == Color::White) ? Bitboards::Rank8 : Bitboards::Rank1;
     constexpr Bitboard DoublePushRank = (Side == Color::White) ? Bitboards::Rank4 : Bitboards::Rank5;
 
-    Bitboard pawns = this->board_.template bitboard<Side>(PieceType::Pawn);
+    Bitboard pawns = this->board_.bitboard(Piece::pawn(Side));
 
     if constexpr (Flags & MoveGeneration::Flags::Legal) {
         // Pinned pawns are treated specially.
@@ -379,7 +379,7 @@ INLINE void MoveGenerator<Side, Flags>::generateAllPawnMoves() {
 
 template<Color Side, uint32_t Flags>
 INLINE void MoveGenerator<Side, Flags>::generateAllKnightMoves() {
-    Bitboard pieces = this->board_.template bitboard<Side>(PieceType::Knight);
+    Bitboard pieces = this->board_.bitboard(Piece::knight(Side));
     for (Square square : pieces) {
         Bitboard attacks = Bitboards::knightAttacks(square);
 
@@ -444,7 +444,7 @@ INLINE void MoveGenerator<Side, Flags>::generateAllCastlingMoves() {
 template<Color Side, uint32_t Flags>
 void MoveGenerator<Side, Flags>::generateKingMoves() {
     // Normal king moves
-    Square king = this->board_.template king<Side>();
+    Square king = this->board_.king(Side);
     Bitboard attacks = Bitboards::kingAttacks(king);
 
     if constexpr (Flags & MoveGeneration::Flags::Legal) {
@@ -465,7 +465,7 @@ void MoveGenerator<Side, Flags>::generateKingMoves() {
 template<Color Side, uint32_t Flags>
 template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
 INLINE void MoveGenerator<Side, Flags>::generateSlidingMoves(Piece piece) {
-    Bitboard pieces = this->board_.template bitboard<Side>(piece.type());
+    Bitboard pieces = this->board_.bitboard(piece);
     for (Square square : pieces) {
         Bitboard attacks = GenerateAttacks(square, this->occupied_);
 

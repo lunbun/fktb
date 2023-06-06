@@ -185,7 +185,7 @@ void Tests::unmakeMoveTest(const std::string &fen) {
                 auto color = static_cast<Color>(i);
                 auto type = static_cast<PieceType>(j);
 
-                if (board.bitboard(type, color) != beforeBoard.bitboard(type, color)) {
+                if (board.bitboard({ color, type }) != beforeBoard.bitboard({ color, type })) {
                     throw std::runtime_error("Bitboard does not match after unmake move. Fen: " + beforeFen);
                 }
             }

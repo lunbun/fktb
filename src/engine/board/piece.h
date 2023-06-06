@@ -71,20 +71,21 @@ namespace PieceMaterial {
 
 
 
-struct Piece {
-    INLINE constexpr static Piece empty() { return { PieceType::Empty, Color::White }; }
-    INLINE constexpr static Piece pawn(Color color) { return { PieceType::Pawn, color }; }
-    INLINE constexpr static Piece knight(Color color) { return { PieceType::Knight, color }; }
-    INLINE constexpr static Piece bishop(Color color) { return { PieceType::Bishop, color }; }
-    INLINE constexpr static Piece rook(Color color) { return { PieceType::Rook, color }; }
-    INLINE constexpr static Piece queen(Color color) { return { PieceType::Queen, color }; }
-    INLINE constexpr static Piece king(Color color) { return { PieceType::King, color }; }
+class Piece {
+public:
+    INLINE constexpr static Piece empty() { return { Color::White, PieceType::Empty }; }
+    INLINE constexpr static Piece pawn(Color color) { return { color, PieceType::Pawn }; }
+    INLINE constexpr static Piece knight(Color color) { return { color, PieceType::Knight }; }
+    INLINE constexpr static Piece bishop(Color color) { return { color, PieceType::Bishop }; }
+    INLINE constexpr static Piece rook(Color color) { return { color, PieceType::Rook }; }
+    INLINE constexpr static Piece queen(Color color) { return { color, PieceType::Queen }; }
+    INLINE constexpr static Piece king(Color color) { return { color, PieceType::King }; }
 
-    INLINE constexpr static Piece white(PieceType type) { return { type, Color::White }; }
-    INLINE constexpr static Piece black(PieceType type) { return { type, Color::Black }; }
+    INLINE constexpr static Piece white(PieceType type) { return { Color::White, type }; }
+    INLINE constexpr static Piece black(PieceType type) { return { Color::Black, type }; }
 
-    INLINE constexpr Piece() : Piece(PieceType::Empty, Color::White) { }
-    INLINE constexpr Piece(PieceType type, Color color) : bits_((color << 3) | type) { }
+    INLINE constexpr Piece() : Piece(Color::White, PieceType::Empty) { }
+    INLINE constexpr Piece(Color color, PieceType type) : bits_((color << 3) | type) { }
 
     [[nodiscard]] INLINE constexpr Color color() const { return static_cast<Color>(this->bits_ >> 3); }
     [[nodiscard]] INLINE constexpr PieceType type() const { return static_cast<PieceType>(this->bits_ & 7); }

@@ -445,12 +445,12 @@ Bitboard Bitboards::allQueenAttacks(Bitboard queens, Bitboard occupied) {
 
 template<Color Side>
 Bitboard Bitboards::allAttacks(const Board &board, Bitboard occupied) {
-    return allPawnAttacks<Side>(board.bitboard<Side>(PieceType::Pawn))
-        | allKnightAttacks(board.bitboard<Side>(PieceType::Knight))
-        | allBishopAttacks(board.bitboard<Side>(PieceType::Bishop), occupied)
-        | allRookAttacks(board.bitboard<Side>(PieceType::Rook), occupied)
-        | allQueenAttacks(board.bitboard<Side>(PieceType::Queen), occupied)
-        | kingAttacks(board.king<Side>());
+    return allPawnAttacks<Side>(board.bitboard(Piece::pawn(Side)))
+        | allKnightAttacks(board.bitboard(Piece::knight(Side)))
+        | allBishopAttacks(board.bitboard(Piece::bishop(Side)), occupied)
+        | allRookAttacks(board.bitboard(Piece::rook(Side)), occupied)
+        | allQueenAttacks(board.bitboard(Piece::queen(Side)), occupied)
+        | kingAttacks(board.king(Side));
 }
 
 template Bitboard Bitboards::allAttacks<Color::White>(const Board &board, Bitboard occupied);

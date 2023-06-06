@@ -84,7 +84,7 @@ Board Board::copy() const {
 template<Color Side>
 bool Board::isInCheck() const {
     Bitboard attacks = Bitboards::allAttacks<~Side>(*this, this->occupied());
-    Square king = this->king<Side>();
+    Square king = this->king(Side);
 
     return attacks.get(king);
 }
@@ -97,7 +97,7 @@ template bool Board::isInCheck<Color::Black>() const;
 template<bool UpdateHash>
 INLINE void Board::addKing(Color color, Square square) {
     assert(this->pieceAt(square).isEmpty());
-    this->pieces_[square] = Piece(PieceType::King, color);
+    this->pieces_[square] = Piece::king(color);
 
     assert(!this->kings_[color].isValid());
     this->kings_[color] = square;
@@ -112,8 +112,8 @@ INLINE void Board::addPiece(Piece piece, Square square) {
     assert(this->pieceAt(square).isEmpty());
     this->pieces_[square] = piece;
 
-    assert(!this->bitboard(piece.type(), piece.color()).get(square));
-    this->bitboard(piece.type(), piece.color()).set(square);
+    assert(!this->bitboard(piece).get(square));
+    this->bitboard(piece).set(square);
 
     this->material_[piece.color()] += piece.material();
     this->pieceSquareEval_[piece.color()] += PieceSquareTables::evaluate(piece, square);
@@ -128,8 +128,8 @@ INLINE void Board::removePiece(Piece piece, Square square) {
     assert(this->pieceAt(square) == piece);
     this->pieces_[square] = Piece::empty();
 
-    assert(this->bitboard(piece.type(), piece.color()).get(square));
-    this->bitboard(piece.type(), piece.color()).clear(square);
+    assert(this->bitboard(piece).get(square));
+    this->bitboard(piece).clear(square);
 
     this->material_[piece.color()] -= piece.material();
     this->pieceSquareEval_[piece.color()] -= PieceSquareTables::evaluate(piece, square);
@@ -183,7 +183,7 @@ INLINE void Board::movePiece(Piece piece, Square from, Square to) {
         assert(this->kings_[piece.color()] == from);
         this->kings_[piece.color()] = to;
     } else { // Other piece move
-        Bitboard &bitboard = this->bitboard(piece.type(), piece.color());
+        Bitboard &bitboard = this->bitboard(piece);
         assert(bitboard.get(from));
         assert(!bitboard.get(to));
         bitboard.clear(from);
@@ -246,7 +246,7 @@ INLINE void Board::makePromotionMove(Move move) {
         this->removePiece<true>(pawn, move.from());
 
         // Add the new piece
-        Piece promotion = Piece(move.promotion(), pawn.color());
+        Piece promotion(pawn.color(), move.promotion());
         this->addPiece<true>(promotion, move.to());
     } else {
         Piece promotion = this->pieceAt(move.to());

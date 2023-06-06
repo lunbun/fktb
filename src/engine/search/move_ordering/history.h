@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "engine/inline.h"
+#include "engine/move/move.h"
 #include "engine/board/color.h"
 #include "engine/board/square.h"
 #include "engine/board/piece.h"
@@ -13,35 +14,38 @@ class HistoryTable {
 public:
     INLINE constexpr HistoryTable();
 
-    // Adds to the history table. Call on beta-cutoffs.
-    template<Color Side>
-    INLINE void add(PieceType type, Square to, uint16_t depth);
+    // Increments the history table if the move is not a capture. Call this on beta-cutoffs.
+    INLINE void maybeAdd(Color color, const Board &board, Move move, uint16_t depth);
 
-    // Returns the history score for the given move. The history score is normalized based off of total_, so that at higher
-    // depths the history score isn't insanely high compared to at lower depths.
-    template<Color Side>
-    [[nodiscard]] INLINE int32_t moveScoreAt(PieceType type, Square to) const;
+    // Returns the history score for the given move. The returned score is normalized based off of the total sum of all history
+    // scores so that at higher depths, the history scores aren't insanely high compared to at lower depths.
+    [[nodiscard]] INLINE int32_t score(Color color, PieceType type, Square to, uint32_t scale) const;
 
 private:
-    ColorMap<uint32_t> total_; // Sum of all entries in the table.
+    ColorMap<uint32_t> total_; // Sum of all history scores for each color.
     ColorMap<PieceTypeMap<SquareMap<uint32_t>>> table_;
 };
 
-// Total starts at 1 to avoid division by 0. This won't really affect the results.
+
+
+// Initialize the totals to start at 1 to avoid division by zero. This won't really affect the results.
 INLINE constexpr HistoryTable::HistoryTable() : total_(1, 1), table_() { }
 
-template<Color Side>
-INLINE void HistoryTable::add(PieceType type, Square to, uint16_t depth) {
-    uint16_t score = depth * depth;
+// Increments the history table if the move is not a capture. Call this on beta-cutoffs.
+INLINE void HistoryTable::maybeAdd(Color color, const Board &board, Move move, uint16_t depth) {
+    if (!move.isCapture()) {
+        uint16_t score = depth * depth;
 
-    this->total_[Side] += score;
-    this->table_[Side][type][to] += score;
+        this->total_[color] += score;
+        this->table_[color][board.pieceAt(move.from()).type()][move.to()] += score;
+    }
 }
 
-template<Color Side>
-[[nodiscard]] INLINE int32_t HistoryTable::moveScoreAt(PieceType type, Square to) const {
-    uint64_t score = this->table_[Side][type][to];
-    score *= 5000ULL;   // TODO: Further tune this to maximize pruning.
-    score /= this->total_[Side];
+// Returns the history score for the given move. The returned score is normalized based off of the total sum of all history scores
+// so that at higher depths, the history scores aren't insanely high compared to at lower depths.
+[[nodiscard]] INLINE int32_t HistoryTable::score(Color color, PieceType type, Square to, uint32_t scale) const {
+    uint64_t score = this->table_[color][type][to];
+    score *= scale;
+    score /= this->total_[color];
     return static_cast<int32_t>(score);
 }

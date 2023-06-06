@@ -51,42 +51,27 @@ public:
 
     [[nodiscard]] Board copy() const;
 
-    template<Color Side>
-    [[nodiscard]] INLINE int32_t material() const { return this->material_[Side]; }
-    template<Color Side>
-    [[nodiscard]] INLINE int32_t pieceSquareEval() const { return this->pieceSquareEval_[Side]; }
+    [[nodiscard]] INLINE int32_t material(Color color) const { return this->material_[color]; }
+    [[nodiscard]] INLINE int32_t pieceSquareEval(Color color) const { return this->pieceSquareEval_[color]; }
     [[nodiscard]] INLINE Color turn() const { return this->turn_; }
     [[nodiscard]] INLINE uint64_t hash() const { return this->hash_; }
     [[nodiscard]] INLINE CastlingRights castlingRights() const { return this->castlingRights_; }
     [[nodiscard]] INLINE Square enPassantSquare() const { return this->enPassantSquare_; }
 
-    template<Color Side>
-    [[nodiscard]] INLINE Square king() const { return this->kings_[Side]; }
+    [[nodiscard]] INLINE Square king(Color color) const { return this->kings_[color]; }
     [[nodiscard]] INLINE Piece pieceAt(Square square) const { return this->pieces_[square]; }
 
     // Returns the bitboard with all given pieces.
-    [[nodiscard]] INLINE Bitboard &bitboard(PieceType pieceType, Color color) {
-        assert(pieceType != PieceType::King);
-        assert(pieceType != PieceType::Empty);
-        return this->bitboards_[color][pieceType];
-    }
-    template<Color Side>
-    [[nodiscard]] INLINE Bitboard bitboard(PieceType pieceType) const {
-        assert(pieceType != PieceType::King);
-        assert(pieceType != PieceType::Empty);
-        return this->bitboards_[Side][pieceType];
-    }
+    //
+    // No need to worry about performance losses with constructing lots of Piece objects to pass to this function; GCC with -O3
+    // can optimize away the construction if the piece is constant (tested on godbolt).
+    [[nodiscard]] INLINE Bitboard &bitboard(Piece piece);
+    [[nodiscard]] INLINE Bitboard bitboard(Piece piece) const;
 
     // Returns the composite bitboard with all pieces of the given color.
-    template<Color Side>
-    [[nodiscard]] INLINE Bitboard composite() const {
-        const auto &bitboards = this->bitboards_[Side];
-        return bitboards[0] | bitboards[1] | bitboards[2] | bitboards[3] | bitboards[4] | (1ULL << this->king<Side>());
-    }
+    [[nodiscard]] INLINE Bitboard composite(Color color) const;
     // Returns the bitboard of all occupied squares.
-    [[nodiscard]] INLINE Bitboard occupied() const {
-        return this->composite<Color::White>() | this->composite<Color::Black>();
-    }
+    [[nodiscard]] INLINE Bitboard occupied() const { return this->composite(Color::White) | this->composite(Color::Black); }
     // Returns the bitboard of all empty squares.
     [[nodiscard]] INLINE Bitboard empty() const { return ~this->occupied(); }
 
@@ -149,3 +134,22 @@ private:
     template<bool IsMake>
     void makeQuietMove(Move move);
 };
+
+
+
+INLINE Bitboard &Board::bitboard(Piece piece) {
+    assert(piece.type() != PieceType::King);
+    assert(piece.type() != PieceType::Empty);
+    return this->bitboards_[piece.color()][piece.type()];
+}
+
+INLINE Bitboard Board::bitboard(Piece piece) const {
+    assert(piece.type() != PieceType::King);
+    assert(piece.type() != PieceType::Empty);
+    return this->bitboards_[piece.color()][piece.type()];
+}
+
+Bitboard Board::composite(Color color) const {
+    const auto &bitboards = this->bitboards_[color];
+    return bitboards[0] | bitboards[1] | bitboards[2] | bitboards[3] | bitboards[4] | (1ULL << this->king(color));
+}
