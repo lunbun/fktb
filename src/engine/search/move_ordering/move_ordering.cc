@@ -1,14 +1,59 @@
-#include "move_score.h"
+#include "move_ordering.h"
 
-#include "move.h"
+#include <cassert>
+
+#include "engine/move/move.h"
+#include "engine/move/move_list.h"
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
 #include "engine/board/bitboard.h"
 #include "engine/eval/piece_square_table.h"
 
-template<Color Side>
-MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
+// Class is used for convenience so that we don't have to pass around the board, history table, and bitboards separately as
+// parameters.
+template<Color Side, uint32_t Flags>
+class MoveScorer {
+public:
+    explicit MoveScorer(const Board &board, const HistoryTable *history);
+
+    [[nodiscard]] int32_t score(Move move);
+
+private:
+    const Board &board_;
+    const HistoryTable *history_;
+
+    Bitboard friendlyPawnAttacks_;
+    Bitboard friendlyKnightAttacks_;
+
+    Bitboard enemyKnights_;
+    Bitboard enemyBishops_;
+    Bitboard enemyRooks_;
+    Bitboard enemyQueens_;
+
+    Bitboard enemyPawnAttacks_;
+    Bitboard enemyKnightAttacks_;
+    Bitboard enemyBishopAttacks_;
+
+    Bitboard enemyRookOrHigher_; // Rooks, queens, or kings
+    Bitboard enemyBishopOrLowerAttacks_; // Bishop, knight, or pawn attacks
+    Bitboard enemyRookOrLowerAttacks_; // Rook, bishop, knight, or pawn attacks
+    Bitboard enemyQueenOrLowerAttacks_; // Queen, rook, bishop, knight, or pawn attacks
+
+    [[nodiscard]] INLINE const HistoryTable &history() const {
+        static_assert(Flags & MoveOrdering::Flags::History, "History flag is not set.");
+        return *this->history_;
+    }
+};
+
+template<Color Side, uint32_t Flags>
+MoveScorer<Side, Flags>::MoveScorer(const Board &board, const HistoryTable *history) : board_(board), history_(history) {
     constexpr Color Enemy = ~Side;
+
+    if constexpr (Flags & MoveOrdering::Flags::History) {
+        assert(history != nullptr && "History flag is set but history table is null.");
+    } else {
+        assert(history == nullptr && "History flag is not set but history table is not null.");
+    }
 
     Bitboard occupied = board.occupied();
 
@@ -33,8 +78,8 @@ MoveScorer<Side>::MoveScorer(const Board &board) : board_(board) {
     this->enemyQueenOrLowerAttacks_ = enemyQueenAttacks | this->enemyRookOrLowerAttacks_;
 }
 
-template<Color Side>
-int32_t MoveScorer<Side>::score(Move move) {
+template<Color Side, uint32_t Flags>
+int32_t MoveScorer<Side, Flags>::score(Move move) {
     int32_t score = 0;
 
     const Board &board = this->board_;
@@ -50,6 +95,11 @@ int32_t MoveScorer<Side>::score(Move move) {
     if (move.isCapture()) {
         Piece captured = board.pieceAt(move.to());
         score += (captured.material() * 10 - piece.material());
+    } else {
+        // History heuristics
+        if constexpr (Flags & MoveOrdering::Flags::History) {
+            score += this->history().template moveScoreAt<Side>(piece.type(), move.to());
+        }
     }
 
     // Promotions
@@ -207,5 +257,41 @@ int32_t MoveScorer<Side>::score(Move move) {
 
 
 
-template class MoveScorer<Color::White>;
-template class MoveScorer<Color::Black>;
+template<Color Side, uint32_t Flags>
+void MoveOrdering::score(MovePriorityQueue &moves, const Board &board, const HistoryTable *history) {
+    MoveScorer<Side, Flags> scorer(board, history);
+
+    for (MoveEntry *entry = moves.start(); entry != moves.end(); ++entry) {
+        entry->score = scorer.score(entry->move);
+    }
+}
+
+
+
+template<Color Side, uint32_t Flags>
+INLINE void scoreRoot(RootMoveList &moves, const Board &board, const HistoryTable *history) {
+    MoveScorer<Side, Flags> scorer(board, history);
+
+    for (MoveEntry &entry : moves.moves()) {
+        entry.score = scorer.score(entry.move);
+    }
+}
+
+template<uint32_t Flags>
+void MoveOrdering::score(RootMoveList &moves, const Board &board, const HistoryTable *history) {
+    if (board.turn() == Color::White) {
+        scoreRoot<Color::White, Flags>(moves, board, history);
+    } else {
+        scoreRoot<Color::Black, Flags>(moves, board, history);
+    }
+}
+
+// @formatter:off
+template void MoveOrdering::score<Color::White, MoveOrdering::Type::NoHistory>(MovePriorityQueue &, const Board &, const HistoryTable *);
+template void MoveOrdering::score<Color::Black, MoveOrdering::Type::NoHistory>(MovePriorityQueue &, const Board &, const HistoryTable *);
+template void MoveOrdering::score<Color::White, MoveOrdering::Type::History>(MovePriorityQueue &, const Board &, const HistoryTable *);
+template void MoveOrdering::score<Color::Black, MoveOrdering::Type::History>(MovePriorityQueue &, const Board &, const HistoryTable *);
+
+template void MoveOrdering::score<MoveOrdering::Type::NoHistory>(RootMoveList &, const Board &, const HistoryTable *);
+template void MoveOrdering::score<MoveOrdering::Type::History>(RootMoveList &, const Board &, const HistoryTable *);
+// @formatter:on

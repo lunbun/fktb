@@ -59,9 +59,9 @@ void Tests::pseudoLegalMoveGenTest(const std::string &fen) {
 
     MovePriorityQueue moves(movesStart, movesEnd);
     if (board.turn() == Color::White) {
-        moves.score<Color::White>(board);
+        MoveOrdering::score<Color::White, MoveOrdering::Type::NoHistory>(moves, board, nullptr);
     } else {
-        moves.score<Color::Black>(board);
+        MoveOrdering::score<Color::Black, MoveOrdering::Type::NoHistory>(moves, board, nullptr);
     }
 
     while (!moves.empty()) {
@@ -75,7 +75,7 @@ void Tests::legalMoveGenTest(const std::string &fen) {
 
     RootMoveList moves = MoveGeneration::generateLegalRoot(board);
 
-    moves.score(board);
+    MoveOrdering::score<MoveOrdering::Type::NoHistory>(moves, board, nullptr);
     moves.sort();
 
     while (!moves.empty()) {
@@ -108,8 +108,9 @@ std::chrono::milliseconds Tests::fixedDepthTest(const std::string &fen, uint16_t
     Board board = Board::fromFen(fen);
 
     TranspositionTable table(2097152);
+    HistoryTable history;
     SearchStatistics stats;
-    FixedDepthSearcher searcher(board, depth, table, stats);
+    FixedDepthSearcher searcher(board, depth, table, history, stats);
     SearchLine bestLine = searcher.search();
 
     std::cout << "Best move: " << bestLine.moves[0].debugName(board) << std::endl;

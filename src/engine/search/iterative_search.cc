@@ -11,6 +11,7 @@
 #include "fixed_search.h"
 #include "statistics.h"
 #include "engine/move/movegen.h"
+#include "engine/search/move_ordering/move_ordering.h"
 
 SearchResult::SearchResult() : depth(0), bestLine(), score(0), nodeCount(0), transpositionHits(0), elapsed() { }
 
@@ -31,12 +32,12 @@ struct SearchTask {
     std::optional<RootMoveList> rootMoveOrder = std::nullopt;
     bool canUseHashMove = false;
     TranspositionTable &table;
+    HistoryTable history;
     SearchStatistics &stats;
     std::unique_ptr<FixedDepthSearcher> iteration = nullptr;
 
-    SearchTask(const Board &board, TranspositionTable &table, SearchStatistics &stats) : board(board.copy()),
-                                                                                            table(table),
-                                                                                            stats(stats) { }
+    SearchTask(const Board &board, TranspositionTable &table, SearchStatistics &stats) : board(board.copy()), table(table),
+                                                                                         history(), stats(stats) { }
 };
 
 
@@ -156,7 +157,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
         }
 
         // Create a new searcher
-        task.iteration = std::make_unique<FixedDepthSearcher>(task.board, task.depth, task.table, task.stats);
+        task.iteration = std::make_unique<FixedDepthSearcher>(task.board, task.depth, task.table, task.history, task.stats);
 
         iteration = task.iteration.get();
     }
@@ -247,7 +248,7 @@ void IterativeSearcher::start(const Board &board) {
             // First thread is our "primary" thread, so it should not randomize anything and should use the hash move.
             rootMoveOrder = rootMoves;
 
-            rootMoveOrder.score(board);
+            MoveOrdering::score<MoveOrdering::Type::NoHistory>(rootMoveOrder, board, nullptr);
             rootMoveOrder.sort();
 
             task->depth = 1;
@@ -276,7 +277,7 @@ void IterativeSearcher::start(const Board &board) {
                 std::shuffle(rootMoveOrder.moves().begin(), rootMoveOrder.moves().end(), generator);
             } else {
                 // Other threads have similar move order to the primary thread, but with some randomization
-                rootMoveOrder.score(board);
+                MoveOrdering::score<MoveOrdering::Type::NoHistory>(rootMoveOrder, board, nullptr);
 
                 // Add a small random value to the score of each move
                 int32_t range = (25 * static_cast<int32_t>(i));

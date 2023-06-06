@@ -11,7 +11,7 @@
 #include "engine/board/color.h"
 #include "engine/board/piece.h"
 #include "engine/move/move.h"
-#include "engine/move/move_score.h"
+#include "engine/search/move_ordering/move_ordering.h"
 #include "engine/move/move_list.h"
 #include "engine/hash/transposition.h"
 
@@ -37,7 +37,7 @@ struct SearchLine {
 
 class FixedDepthSearcher {
 public:
-    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, SearchStatistics &stats);
+    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HistoryTable &history, SearchStatistics &stats);
 
     [[nodiscard]] SearchLine search();
 
@@ -59,6 +59,7 @@ private:
     Board board_;
     uint16_t depth_;
     TranspositionTable &table_;
+    HistoryTable &history_;
     SearchStatistics &stats_;
 
     template<Color Turn>

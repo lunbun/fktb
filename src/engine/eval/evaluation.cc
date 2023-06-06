@@ -9,6 +9,7 @@
 template<Color Side>
 INLINE int32_t evaluatePawnShield(const Board &board);
 
+// TODO: More complex king safety evaluation.
 template<Color Side, uint64_t Mask>
 INLINE int32_t evaluatePawnShieldWithMask(const Board &board) {
     constexpr Bitboard Mask2 = Bitboard(Mask).shiftForward<Side>(1);

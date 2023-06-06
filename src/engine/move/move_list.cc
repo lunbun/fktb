@@ -4,7 +4,6 @@
 #include <algorithm>
 
 #include "move.h"
-#include "move_score.h"
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
 #include "engine/hash/transposition.h"
@@ -60,19 +59,6 @@ void MovePriorityQueue::remove(Move move) {
     }
 }
 
-// Scores the moves in the queue.
-template<Color Side>
-void MovePriorityQueue::score(const Board &board) {
-    MoveScorer<Side> scorer(board);
-
-    for (MoveEntry *entry = this->start_; entry < this->end_; entry++) {
-        entry->score = scorer.score(entry->move);
-    }
-}
-
-template void MovePriorityQueue::score<Color::White>(const Board &board);
-template void MovePriorityQueue::score<Color::Black>(const Board &board);
-
 
 
 RootMoveList::RootMoveList(MoveEntry *start, MoveEntry *end) : moves_(start, end) { }
@@ -104,23 +90,6 @@ void RootMoveList::loadHashMove(const Board &board, const TranspositionTable &ta
     }
 
     this->moves_.push_back({ entry->bestMove(), 0 });
-}
-
-template<Color Side>
-void RootMoveList::score(const Board &board) {
-    MoveScorer<Side> scorer(board);
-
-    for (MoveEntry &entry : this->moves_) {
-        entry.score = scorer.score(entry.move);
-    }
-}
-
-void RootMoveList::score(const Board &board) {
-    if (board.turn() == Color::White) {
-        this->score<Color::White>(board);
-    } else {
-        this->score<Color::Black>(board);
-    }
 }
 
 void RootMoveList::sort() {

@@ -35,7 +35,7 @@ private:
     // Mobility of pieces. Pinned pieces have restricted mobility. If a piece is not pinned, will be set to Bitboards::All.
     SquareMap<Bitboard> mobility_;
 
-    template<PieceType EnemySlider>
+    template<PieceType EnemySlider, Bitboard (*GenerateAttacksOnEmpty)(Square)>
     void calculatePins(Square king);
 
     // Note: These do not mask pinned piece mobility, the caller must do that.
@@ -69,7 +69,7 @@ private:
 
 
 template<Color Side, uint32_t Flags>
-template<PieceType EnemySlider>
+template<PieceType EnemySlider, Bitboard (*GenerateAttacksOnEmpty)(Square)>
 INLINE void MoveGenerator<Side, Flags>::calculatePins(Square king) {
     static_assert(Flags & MoveGeneration::Flags::Legal, "Pinned pieces are only needed for legal move generation.");
 
@@ -79,7 +79,7 @@ INLINE void MoveGenerator<Side, Flags>::calculatePins(Square king) {
 
         // Mask the between bitboard by the slider's attacks on an empty board, so that rooks cannot pin diagonally and bishops
         // cannot pin orthogonally.
-        between &= Bitboards::sliderAttacksOnEmpty<EnemySlider>(slider);
+        between &= GenerateAttacksOnEmpty(slider);
 
         // We have to mask all occupied pieces, not just friendly pieces because otherwise a slider could pin a friendly piece
         // through an enemy piece.
@@ -121,9 +121,9 @@ INLINE MoveGenerator<Side, Flags>::MoveGenerator(Board &board, MoveEntry *moves)
 
         // Calculate pinned pieces.
         Square king = board.king<Side>();
-        this->calculatePins<PieceType::Bishop>(king);
-        this->calculatePins<PieceType::Rook>(king);
-        this->calculatePins<PieceType::Queen>(king);
+        this->calculatePins<PieceType::Bishop, Bitboards::bishopAttacksOnEmpty>(king);
+        this->calculatePins<PieceType::Rook, Bitboards::rookAttacksOnEmpty>(king);
+        this->calculatePins<PieceType::Queen, Bitboards::queenAttacksOnEmpty>(king);
     }
 }
 

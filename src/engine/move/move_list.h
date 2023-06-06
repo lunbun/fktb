@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "move.h"
-#include "move_score.h"
 #include "engine/inline.h"
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
@@ -61,9 +60,8 @@ public:
     // Removes the first instance of the move from the queue, if it exists.
     void remove(Move move);
 
-    // Scores the moves in the queue.
-    template<Color Side>
-    void score(const Board &board);
+    [[nodiscard]] INLINE MoveEntry *start() const { return this->start_; }
+    [[nodiscard]] INLINE MoveEntry *end() const { return this->end_; }
 
 private:
     Move hashMove_;
@@ -89,9 +87,6 @@ public:
     // moves.
     void loadHashMove(const Board &board, const TranspositionTable &table);
 
-    // Scores the moves in the list using the default move ordering.
-    void score(const Board &board);
-
     // Sorts the moves in the list (assumes they are already scored).
     void sort();
 
@@ -100,7 +95,4 @@ public:
 
 private:
     std::vector<MoveEntry> moves_;
-
-    template<Color Side>
-    void score(const Board &board);
 };

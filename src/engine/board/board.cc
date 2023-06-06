@@ -369,7 +369,7 @@ void Board::unmakeMove(Move move, MakeMoveInfo info) {
     }
 }
 
-template MakeMoveInfo Board::makeMove<false>(Move move);
-template MakeMoveInfo Board::makeMove<true>(Move move);
-template void Board::unmakeMove<false>(Move move, MakeMoveInfo info);
-template void Board::unmakeMove<true>(Move move, MakeMoveInfo info);
+template MakeMoveInfo Board::makeMove<false>(Move);
+template MakeMoveInfo Board::makeMove<true>(Move);
+template void Board::unmakeMove<false>(Move, MakeMoveInfo);
+template void Board::unmakeMove<true>(Move, MakeMoveInfo);

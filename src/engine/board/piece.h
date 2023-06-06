@@ -29,7 +29,7 @@ using PieceType = PieceTypeNamespace::PieceType;
 template<typename T>
 class PieceTypeMap {
 public:
-    constexpr PieceTypeMap() = default;
+    constexpr PieceTypeMap() : values_{ } { }
     constexpr PieceTypeMap(const T &pawn, const T &knight, const T &bishop, const T &rook, const T &queen, const T &king)
         : values_{ pawn, knight, bishop, rook, queen, king } { }
 

@@ -10,8 +10,8 @@
 #include "engine/move/movegen.h"
 #include "engine/eval/evaluation.h"
 
-FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table,
-    SearchStatistics &stats) : board_(board.copy()), depth_(depth), table_(table), stats_(stats) { }
+FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HistoryTable &history,
+    SearchStatistics &stats) : board_(board.copy()), depth_(depth), table_(table), history_(history), stats_(stats) { }
 
 void FixedDepthSearcher::halt() {
     this->isHalted_ = true;
@@ -22,7 +22,7 @@ void FixedDepthSearcher::halt() {
 SearchLine FixedDepthSearcher::search() {
     RootMoveList moves = MoveGeneration::generateLegalRoot(this->board_);
 
-    moves.score(this->board_);
+    MoveOrdering::score<MoveOrdering::Type::History>(moves, this->board_, &this->history_);
     moves.sort();
     moves.loadHashMove(this->board_, this->table_);
 
@@ -144,7 +144,7 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
     MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Tactical>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
-    moves.score<Turn>(board);
+    MoveOrdering::score<Turn, MoveOrdering::Type::NoHistory>(moves, board, nullptr);
 
     // Capture search
     while (!moves.empty()) {
@@ -193,6 +193,11 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
 
         if (score >= beta) {
+            if (!hashMove.isCapture()) {
+                // Update history heuristic
+                this->history_.add<Turn>(board.pieceAt(hashMove.from()).type(), hashMove.to(), depth);
+            }
+
             return bestScore;
         }
     }
@@ -216,7 +221,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
     // We already tried the hash move, so remove it from the list of moves to search
     moves.remove(hashMove);
 
-    moves.score<Turn>(board);
+    MoveOrdering::score<Turn, MoveOrdering::Type::History>(moves, board, &this->history_);
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
@@ -233,6 +238,11 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
 
         if (score >= beta) {
+            if (!move.isCapture()) {
+                // Update history heuristic
+                this->history_.add<Turn>(board.pieceAt(move.from()).type(), move.to(), depth);
+            }
+
             return bestScore;
         }
     }

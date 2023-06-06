@@ -25,7 +25,7 @@ INLINE constexpr Color operator~(Color color) {
 template<typename T>
 class ColorMap {
 public:
-    constexpr ColorMap() = default;
+    constexpr ColorMap() : values_{ } { }
     constexpr ColorMap(const T &white, const T &black) : values_{ white, black } { }
 
     [[nodiscard]] INLINE constexpr T &operator[](Color color) { return this->values_[color]; }
