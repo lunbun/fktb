@@ -86,6 +86,25 @@ void Tests::legalMoveGenTest(const std::string &fen) {
 
 
 
+// Move ordering test
+void Tests::moveOrderingTest(const std::string &fen) {
+    Board board = Board::fromFen(fen);
+
+    RootMoveList movesList = MoveGeneration::generateLegalRoot(board);
+
+    MoveOrdering::score<MoveOrdering::Type::NoHistory>(movesList, board, nullptr);
+    movesList.sort();
+
+    const std::vector<MoveEntry> &moves = movesList.moves();
+
+    // Iterate in reverse order, since the moves are sorted from smallest to largest (this was done to optimize dequeueing)
+    for (auto it = moves.rbegin(); it != moves.rend(); it++) {
+        std::cout << it->move.debugName(board) << " " << it->score << std::endl;
+    }
+}
+
+
+
 // Benchmark
 void Tests::benchmark() {
     // Run the fixed depth search on starting position, depth 8 five times

@@ -9,6 +9,9 @@ namespace Tests {
     void pseudoLegalMoveGenTest(const std::string &fen);
     void legalMoveGenTest(const std::string &fen);
 
+    // Prints out all moves and their ordering scores for a given position.
+    void moveOrderingTest(const std::string &fen);
+
     // Runs a benchmark on the fixed depth search.
     void benchmark();
 
