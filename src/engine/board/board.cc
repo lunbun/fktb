@@ -373,3 +373,27 @@ template MakeMoveInfo Board::makeMove<false>(Move);
 template MakeMoveInfo Board::makeMove<true>(Move);
 template void Board::unmakeMove<false>(Move, MakeMoveInfo);
 template void Board::unmakeMove<true>(Move, MakeMoveInfo);
+
+
+
+// Makes/unmakes a null move WITHOUT updating turn_ (updates the hash's turn, but not the turn_ field itself).
+MakeMoveInfo Board::makeNullMove() {
+    uint64_t oldHash = this->hash_;
+    CastlingRights oldCastlingRights = this->castlingRights_;
+    Square oldEnPassantSquare = this->enPassantSquare_;
+
+    // Reset en passant square
+    this->enPassantSquare(Square::Invalid);
+
+    // Switch the turn
+    this->hash_ ^= Zobrist::blackToMove();
+
+    return { oldHash, oldCastlingRights, oldEnPassantSquare, Piece::empty() };
+}
+
+void Board::unmakeNullMove(MakeMoveInfo info) {
+    // Restore the old hash, castling rights, and en passant square
+    this->hash_ = info.oldHash;
+    this->castlingRights_ = info.oldCastlingRights;
+    this->enPassantSquare_ = info.oldEnPassantSquare;
+}

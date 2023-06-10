@@ -176,6 +176,23 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     Board &board = this->board_;
 
+    // Null move pruning
+    // TODO: Make this less risky (e.g. zugzwang detection?)
+    if (depth >= 3 && !board.isInCheck<Turn>()) {
+        MakeMoveInfo info = board.makeNullMove();
+
+        // TODO: Is it safe to pass -beta + 1 as the beta parameter here?
+        //  This is just what Copilot spit out, it seems to work fine but I'm not sure if it's correct. It definitely causes more
+        //  pruning than just passing -alpha though.
+        int32_t score = -this->search<~Turn>(depth - 3, -beta, -beta + 1);
+
+        board.unmakeNullMove(info);
+
+        if (score >= beta) {
+            return beta;
+        }
+    }
+
     int32_t bestScore = -INT32_MAX;
 
     // Try the hash move first, if it exists. We can save all move generation entirely if the hash move causes a beta-cutoff.
@@ -282,15 +299,17 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
     int32_t score = this->searchAlphaBeta<Turn>(bestMove, hashMove, depth, alpha, beta);
 
     // Transposition table store
-    TranspositionTable::Flag flag;
-    if (score <= originalAlpha) {
-        flag = TranspositionTable::Flag::UpperBound;
-    } else if (score >= beta) {
-        flag = TranspositionTable::Flag::LowerBound;
-    } else {
-        flag = TranspositionTable::Flag::Exact;
+    if (bestMove.isValid()) {
+        TranspositionTable::Flag flag;
+        if (score <= originalAlpha) {
+            flag = TranspositionTable::Flag::UpperBound;
+        } else if (score >= beta) {
+            flag = TranspositionTable::Flag::LowerBound;
+        } else {
+            flag = TranspositionTable::Flag::Exact;
+        }
+        table.store(board.hash(), depth, flag, bestMove, score);
     }
-    table.store(board.hash(), depth, flag, bestMove, score);
 
     return score;
 }

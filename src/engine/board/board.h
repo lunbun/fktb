@@ -86,11 +86,16 @@ public:
     template<bool UpdateHash>
     void removePiece(Piece piece, Square square);
 
-    // Makes/unmakes a move without updating the turn (updates the hash's turn, but not the turn_ field itself).
+    // Makes/unmakes a move with/without updating the turn (if no turn update, the hash's turn will still update, but not the
+    // turn_ field).
     template<bool UpdateTurn>
     MakeMoveInfo makeMove(Move move);
     template<bool UpdateTurn>
     void unmakeMove(Move move, MakeMoveInfo info);
+
+    // Makes/unmakes a null move WITHOUT updating turn_ (updates the hash's turn, but not the turn_ field itself).
+    MakeMoveInfo makeNullMove();
+    void unmakeNullMove(MakeMoveInfo info);
 
 private:
     ColorMap<int32_t> material_;
