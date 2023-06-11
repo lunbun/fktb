@@ -33,10 +33,12 @@ public:
     INLINE Bitboard &operator>>=(uint8_t shift) { this->set_ >>= shift; return *this; }
     // @formatter:on
 
-    // Shifts the bitboard forward by the given number of ranks. Forward is towards the 8th rank for white and towards the 1st
-    // rank for black.
+    // Shifts the bitboard forward/backward by the given number of ranks. Forward is towards the 8th rank for white and towards
+    // the 1st rank for black.
     template<Color Side>
     [[nodiscard]] INLINE constexpr Bitboard shiftForward(uint8_t ranks) const;
+    template<Color Side>
+    [[nodiscard]] INLINE constexpr Bitboard shiftBackward(uint8_t ranks) const;
 
     // Iterates over all the bits in the bitboard using a C++ iterator.
     //
@@ -88,6 +90,12 @@ INLINE constexpr Bitboard Bitboard::shiftForward(uint8_t ranks) const {
     }
 }
 
+template<Color Side>
+INLINE constexpr Bitboard Bitboard::shiftBackward(uint8_t ranks) const {
+    // Shifting backward is equivalent to shifting forward in the opposite direction.
+    return this->shiftForward<~Side>(ranks);
+}
+
 
 
 class Board;
@@ -116,6 +124,9 @@ namespace Bitboards {
 
     constexpr Bitboard Empty = 0ULL;
     constexpr Bitboard All = 0xFFFFFFFFFFFFFFFFULL;
+
+    INLINE constexpr Bitboard file(uint8_t file) { return FileA << file; }
+    INLINE constexpr Bitboard rank(uint8_t rank) { return Rank1 << (8 * (rank - 1)); }
     // @formatter:on
 
     // Initialize the bitboard attack tables, if they haven't been initialized already.

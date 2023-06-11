@@ -3,13 +3,14 @@
 #include <cstdint>
 #include <array>
 
+#include "game_phase.h"
 #include "engine/inline.h"
 #include "engine/board/color.h"
 #include "engine/board/piece.h"
 #include "engine/board/square.h"
 
-constexpr SquareMap<int8_t> flipVertical(const SquareMap<int8_t> &table) {
-    SquareMap<int8_t> flippedTable = { 0 };
+constexpr SquareMap<int16_t> flipVertical(const SquareMap<int16_t> &table) {
+    SquareMap<int16_t> flippedTable = { 0 };
     for (uint8_t rank = 0; rank < 8; rank++) {
         for (uint8_t file = 0; file < 8; file++) {
             uint8_t index = rank * 8 + file;
@@ -22,15 +23,18 @@ constexpr SquareMap<int8_t> flipVertical(const SquareMap<int8_t> &table) {
 
 class PieceSquareTable {
 public:
-    constexpr explicit PieceSquareTable(SquareMap<int8_t> table) : table_(flipVertical(table), table) { }
+    constexpr PieceSquareTable(SquareMap<int16_t> middleGame, SquareMap<int16_t> endGame)
+        : table_(ColorMap(flipVertical(middleGame), middleGame), ColorMap(flipVertical(endGame), endGame)) { }
 
-    [[nodiscard]] INLINE constexpr const auto &operator[](Color color) const { return this->table_[color]; }
+    [[nodiscard]] INLINE constexpr const auto &operator[](GamePhase phase) const { return this->table_[phase]; }
 
-    template<Color Side>
-    [[nodiscard]] INLINE constexpr int8_t get(Square square) const { return this->table_[Side][square]; }
+    [[nodiscard]] INLINE constexpr int16_t interpolate(Color color, Square square, uint16_t phase) const {
+        return static_cast<int16_t>(TaperedEval::interpolate(this->table_[GamePhase::Middle][color][square],
+            this->table_[GamePhase::End][color][square], phase));
+    }
 
 private:
-    ColorMap<SquareMap<int8_t>> table_;
+    GamePhaseMap<ColorMap<SquareMap<int16_t>>> table_;
 };
 
 namespace PieceSquareTables {
@@ -41,9 +45,11 @@ namespace PieceSquareTables {
     extern const PieceSquareTable Queen;
     extern const PieceSquareTable King;
     extern const PieceTypeMap<const PieceSquareTable *> Tables;
-    // TODO: Add king endgame table.
 
-    [[nodiscard]] INLINE int8_t evaluate(Piece piece, Square square) {
-        return (*Tables[piece.type()])[piece.color()][square];
+    [[nodiscard]] INLINE int16_t evaluate(GamePhase phase, Piece piece, Square square) {
+        return (*Tables[piece.type()])[phase][piece.color()][square];
+    }
+    [[nodiscard]] INLINE int16_t interpolate(Piece piece, Square square, uint16_t phase) {
+        return (*Tables[piece.type()]).interpolate(piece.color(), square, phase);
     }
 }

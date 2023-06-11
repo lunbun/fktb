@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "game_phase.h"
 #include "engine/inline.h"
 #include "engine/board/square.h"
 #include "engine/board/bitboard.h"
@@ -9,9 +10,11 @@
 template<Color Side>
 INLINE int32_t evaluatePawnShield(const Board &board);
 
-// TODO: More complex king safety evaluation.
+// Evaluates the pawn shield for the given side, with a bitboard mask for the first pawn shield (i.e. the pawns on the starting
+// rank in front of the king).
 template<Color Side, uint64_t Mask>
 INLINE int32_t evaluatePawnShieldWithMask(const Board &board) {
+    constexpr Color Enemy = ~Side;
     constexpr Bitboard Mask2 = Bitboard(Mask).shiftForward<Side>(1);
 
     int32_t score = 0;
@@ -23,13 +26,31 @@ INLINE int32_t evaluatePawnShieldWithMask(const Board &board) {
     // Remove doubled pawns from the second pawn shield.
     pawnShield2 &= ~pawnShield1.shiftForward<Side>(1);
 
+    Bitboard missingShields = ~(pawnShield1 | pawnShield2.shiftBackward<Side>(1)) & Mask;
+
     uint8_t pawnShield1Count = pawnShield1.count();
     uint8_t pawnShield2Count = pawnShield2.count();
-    uint8_t missingShields = 3 - (pawnShield1Count + pawnShield2Count);
+    uint8_t missingShieldCount = missingShields.count();
 
-    score += 8 * pawnShield1Count;
-    score += 4 * pawnShield2Count;
-    score -= 10 * missingShields;
+    score += 10 * pawnShield1Count;
+    score += 8 * pawnShield2Count;
+    score -= 8 * missingShieldCount;
+
+    Bitboard enemyPawns = board.bitboard(Piece::pawn(Enemy));
+    Bitboard enemyRooks = board.bitboard(Piece::rook(Enemy));
+    for (Square missingShield : missingShields) {
+        Bitboard file = Bitboards::file(missingShield.file());
+
+        // Penalty for enemy having an open file on the same file as a missing pawn shield.
+        if (!(enemyPawns & file)) {
+            score -= 8;
+
+            // Even larger penalty if there is a rook on the file.
+            if (enemyRooks & file) {
+                score -= 8;
+            }
+        }
+    }
 
     return score;
 }
@@ -70,18 +91,118 @@ INLINE int32_t evaluatePawnShield<Color::Black>(const Board &board) {
     }
 }
 
-template<Color Side>
-INLINE int32_t evaluateKingSafety(const Board &board) {
-    int32_t score = 0;
 
-    // Pawn shield
-    score += evaluatePawnShield<Side>(board);
+
+struct KingAttackSquareData {
+    uint16_t attackerCount;
+    uint16_t attackerWeight;
+};
+
+struct KingAttack {
+    Bitboard kingZone;
+    SquareMap<KingAttackSquareData> kingZoneAttacks;
+    uint16_t totalAttackerCount;
+
+    explicit KingAttack(Bitboard kingZone) : kingZone(kingZone), kingZoneAttacks(), totalAttackerCount(0) { }
+};
+
+// The king zone is the important squares that must be protected for the king to be safe.
+//
+// It is the squares the king can reach, extended towards the enemy side one square.
+template<Color Side>
+INLINE Bitboard calculateKingZone(Square king) {
+    // Squares the king can reach.
+    Bitboard kingZone = Bitboards::kingAttacks(king) | (1ULL << king);
+
+    // Extend the king zone towards the enemy side.
+    kingZone |= kingZone.shiftForward<Side>(1);
+
+    return kingZone;
+}
+
+// Adds the king zone attacks to the king attack if there are any.
+INLINE void maybeAddKingZoneAttacksToKingAttack(KingAttack &attack, Bitboard attacks, int32_t material) {
+    Bitboard kingZoneAttacks = attacks & attack.kingZone;
+
+    // If there are no king zone attacks, then we don't need to add anything.
+    if (!kingZoneAttacks) {
+        return;
+    }
+
+    attack.totalAttackerCount++;
+
+    for (Square attackedSquare : kingZoneAttacks) {
+        attack.kingZoneAttacks[attackedSquare].attackerCount++;
+        attack.kingZoneAttacks[attackedSquare].attackerWeight += material;
+    }
+}
+
+// Evaluates the enemy's attack on our king. Returns a negative value in centipawns if the enemy is attacking our king. The more
+// dangerous the attack is, the larger the negative value will be.
+template<Color Side>
+INLINE int32_t evaluateKingAttack(const Board &board) {
+    constexpr Color Enemy = ~Side;
+
+    Bitboard occupied = board.occupied();
+
+    KingAttack attack(calculateKingZone<Side>(board.king(Side)));
+
+    // Add the king zone attacks from all enemy pieces.
+    // TODO: X-ray attacks.
+    // TODO: If a friendly piece is defending the attacked square, then the attack is not as dangerous.
+    for (Square knight : board.bitboard(Piece::knight(Enemy))) {
+        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::knightAttacks(knight), PieceMaterial::Knight);
+    }
+    for (Square bishop : board.bitboard(Piece::bishop(Enemy))) {
+        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::bishopAttacks(bishop, occupied), PieceMaterial::Bishop);
+    }
+    for (Square rook : board.bitboard(Piece::rook(Enemy))) {
+        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::rookAttacks(rook, occupied), PieceMaterial::Rook);
+    }
+    for (Square queen : board.bitboard(Piece::queen(Enemy))) {
+        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::queenAttacks(queen, occupied), PieceMaterial::Queen);
+    }
+
+    // One piece cannot checkmate on its own, so there is no attack if there is one or fewer attackers.
+    if (attack.totalAttackerCount <= 1) {
+        return 0;
+    }
+
+    int32_t score = 0;
+    for (Square kingZoneSquare : attack.kingZone) {
+        const KingAttackSquareData &data = attack.kingZoneAttacks[kingZoneSquare];
+
+        // The more pieces lined up on a square, the more dangerous it is. If the pieces are attacking separate squares, then it
+        // is not as dangerous (but still dangerous).
+        score -= data.attackerWeight * data.attackerWeight * data.attackerCount / 50000;
+    }
 
     return score;
 }
 
-// Evaluates the board for the given side.
+
+
+// Evaluates the king safety for the given side.
 template<Color Side>
+INLINE int32_t evaluateKingSafety(const Board &board) {
+    int32_t score = 0;
+
+    // Penalty for being in the center.
+    Square king = board.king(Side);
+    if ((3 <= king.file()) && (king.file() <= 4)) {
+        score -= 40;
+    }
+
+    score += evaluatePawnShield<Side>(board);
+    score += evaluateKingAttack<Side>(board);
+
+    return score;
+}
+
+
+
+// Evaluates the board for the given side and game phase.
+template<GamePhase Phase, Color Side>
 INLINE int32_t evaluateForSide(const Board &board) {
     int32_t score = 0;
 
@@ -92,21 +213,39 @@ INLINE int32_t evaluateForSide(const Board &board) {
     score += PieceMaterial::BishopPair * (board.bitboard(Piece::bishop(Side)).count() >= 2);
 
     // Piece square tables
-    score += board.pieceSquareEval(Side);
+    score += board.pieceSquareEval(Phase, Side);
 
-    // King safety
-    score += evaluateKingSafety<Side>(board);
+    if constexpr (Phase == GamePhase::Middle) {
+        // King safety
+        score += evaluateKingSafety<Side>(board);
+    }
 
     return score;
 }
 
-// Evaluates the board for the given side, subtracting the evaluation for the other side.
-template<Color Turn>
-int32_t Evaluation::evaluate(const Board &board) {
-    return evaluateForSide<Turn>(board) - evaluateForSide<~Turn>(board);
+// Evaluates the board for the given side and game phase, subtracting the evaluation for the other side.
+template<GamePhase Phase, Color Side>
+int32_t evaluate(const Board &board) {
+    return evaluateForSide<Phase, Side>(board) - evaluateForSide<Phase, ~Side>(board);
 }
 
+// Evaluates the board for the given side, subtracting the evaluation for the other side. Interpolates between the middle and end
+// game phases.
+template<Color Side>
+int32_t Evaluation::evaluate(const Board &board) {
+    uint16_t phase = TaperedEval::calculateContinuousPhase(board);
 
+    if (phase == GamePhase::Middle) { // Strictly middle game
+        return evaluate<GamePhase::Middle, Side>(board);
+    } else if (phase == GamePhase::End) { // Strictly end game
+        return evaluate<GamePhase::End, Side>(board);
+    } else { // Interpolate between middle and end game
+        int32_t middleScore = evaluate<GamePhase::Middle, Side>(board);
+        int32_t endScore = evaluate<GamePhase::End, Side>(board);
+
+        return TaperedEval::interpolate(middleScore, endScore, phase);
+    }
+}
 
 template int32_t Evaluation::evaluate<Color::White>(const Board &board);
 template int32_t Evaluation::evaluate<Color::Black>(const Board &board);

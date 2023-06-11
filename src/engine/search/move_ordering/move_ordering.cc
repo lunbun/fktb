@@ -7,6 +7,7 @@
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
 #include "engine/board/bitboard.h"
+#include "engine/eval/game_phase.h"
 #include "engine/eval/piece_square_table.h"
 
 // Class is used for convenience so that we don't have to pass around the board, history table, and bitboards separately as
@@ -21,6 +22,8 @@ public:
 private:
     const Board &board_;
     const HistoryTable *history_;
+
+    uint16_t gamePhase_;
 
     Bitboard friendlyPawnAttacks_;
     Bitboard friendlyKnightAttacks_;
@@ -54,7 +57,8 @@ private:
 };
 
 template<Color Side, uint32_t Flags>
-MoveScorer<Side, Flags>::MoveScorer(const Board &board, const HistoryTable *history) : board_(board), history_(history) {
+MoveScorer<Side, Flags>::MoveScorer(const Board &board, const HistoryTable *history) : board_(board), history_(history),
+                                                                                       gamePhase_(0) {
     constexpr Color Enemy = ~Side;
 
     if constexpr (Flags & MoveOrdering::Flags::History) {
@@ -64,6 +68,8 @@ MoveScorer<Side, Flags>::MoveScorer(const Board &board, const HistoryTable *hist
     }
 
     Bitboard occupied = board.occupied();
+
+    this->gamePhase_ = TaperedEval::calculateContinuousPhase(board);
 
     this->friendlyPawnAttacks_ = Bitboards::allPawnAttacks<Side>(board.bitboard(Piece::pawn(Side)));
     this->friendlyKnightAttacks_ = Bitboards::allKnightAttacks(board.bitboard(Piece::knight(Side)));
@@ -93,8 +99,8 @@ INLINE int32_t MoveScorer<Side, Flags>::scorePawnMove(Move move) {
     int32_t score = 0;
 
     // Piece-square tables
-    constexpr const auto &Table = PieceSquareTables::Pawn[Side];
-    score += (Table[move.to()] - Table[move.from()]) * 15;
+    constexpr const auto &Table = PieceSquareTables::Pawn;
+    score += (Table.interpolate(Side, move.to(), this->gamePhase_) - Table.interpolate(Side, move.from(), this->gamePhase_)) * 15;
 
     // Promotions
     if (move.isPromotion()) {
@@ -138,8 +144,8 @@ INLINE int32_t MoveScorer<Side, Flags>::scoreKnightMove(Move move) {
     int32_t score = 0;
 
     // Piece-square tables
-    constexpr const auto &Table = PieceSquareTables::Knight[Side];
-    score += (Table[move.to()] - Table[move.from()]) * 8;
+    constexpr const auto &Table = PieceSquareTables::Knight;
+    score += (Table.interpolate(Side, move.to(), this->gamePhase_) - Table.interpolate(Side, move.from(), this->gamePhase_)) * 8;
 
     // Mutual knight defense is good
     if (this->friendlyKnightAttacks_.get(move.to())) {
@@ -174,8 +180,8 @@ INLINE int32_t MoveScorer<Side, Flags>::scoreBishopMove(Move move) {
     int32_t score = 0;
 
     // Piece-square tables
-    constexpr const auto &Table = PieceSquareTables::Bishop[Side];
-    score += (Table[move.to()] - Table[move.from()]) * 8;
+    constexpr const auto &Table = PieceSquareTables::Bishop;
+    score += (Table.interpolate(Side, move.to(), this->gamePhase_) - Table.interpolate(Side, move.from(), this->gamePhase_)) * 8;
 
     // Moving a bishop to a square defended by a friendly pawn is good because it's a fortress
     if (this->friendlyPawnAttacks_.get(move.to())) {
@@ -201,8 +207,8 @@ INLINE int32_t MoveScorer<Side, Flags>::scoreRookMove(Move move) {
     int32_t score = 0;
 
     // Piece-square tables
-    constexpr const auto &Table = PieceSquareTables::Rook[Side];
-    score += (Table[move.to()] - Table[move.from()]) * 8;
+    constexpr const auto &Table = PieceSquareTables::Rook;
+    score += (Table.interpolate(Side, move.to(), this->gamePhase_) - Table.interpolate(Side, move.from(), this->gamePhase_)) * 8;
 
     // Moving a rook to a square defended by an enemy rook or lower is bad
     if (this->enemyRookOrLowerAttacks_.get(move.to())) {
@@ -222,8 +228,8 @@ INLINE int32_t MoveScorer<Side, Flags>::scoreQueenMove(Move move) {
     int32_t score = 0;
 
     // Piece-square tables
-    constexpr const auto &Table = PieceSquareTables::Queen[Side];
-    score += (Table[move.to()] - Table[move.from()]) * 8;
+    constexpr const auto &Table = PieceSquareTables::Queen;
+    score += (Table.interpolate(Side, move.to(), this->gamePhase_) - Table.interpolate(Side, move.from(), this->gamePhase_)) * 8;
 
     // Moving a queen to a square defended by an enemy queen or lower is bad
     if (this->enemyQueenOrLowerAttacks_.get(move.to())) {
@@ -244,8 +250,8 @@ INLINE int32_t MoveScorer<Side, Flags>::scoreKingMove(Move move) {
     int32_t score = 0;
 
     // Piece-square tables
-    constexpr const auto &Table = PieceSquareTables::King[Side];
-    score += (Table[move.to()] - Table[move.from()]) * 8;
+    constexpr const auto &Table = PieceSquareTables::King;
+    score += (Table.interpolate(Side, move.to(), this->gamePhase_) - Table.interpolate(Side, move.from(), this->gamePhase_)) * 8;
 
     // Castling
     if (move.isCastle()) {
@@ -273,7 +279,7 @@ int32_t MoveScorer<Side, Flags>::score(Move move) {
         score += (captured.material() * 10 - piece.material());
 
         // Piece-square table score for the captured piece
-        score += (PieceSquareTables::evaluate(captured, capturedSquare) * 5);
+        score += (PieceSquareTables::interpolate(captured, capturedSquare, this->gamePhase_) * 5);
     } else {
         // History heuristics
         if constexpr (Flags & MoveOrdering::Flags::History) {

@@ -14,6 +14,7 @@
 #include "bitboard.h"
 #include "engine/inline.h"
 #include "engine/move/move.h"
+#include "engine/eval/game_phase.h"
 
 struct MakeMoveInfo {
     uint64_t oldHash;
@@ -52,7 +53,7 @@ public:
     [[nodiscard]] Board copy() const;
 
     [[nodiscard]] INLINE int32_t material(Color color) const { return this->material_[color]; }
-    [[nodiscard]] INLINE int32_t pieceSquareEval(Color color) const { return this->pieceSquareEval_[color]; }
+    [[nodiscard]] INLINE int32_t pieceSquareEval(GamePhase phase, Color color) const;
     [[nodiscard]] INLINE Color turn() const { return this->turn_; }
     [[nodiscard]] INLINE uint64_t hash() const { return this->hash_; }
     [[nodiscard]] INLINE CastlingRights castlingRights() const { return this->castlingRights_; }
@@ -70,6 +71,8 @@ public:
 
     // Returns the composite bitboard with all pieces of the given color.
     [[nodiscard]] INLINE Bitboard composite(Color color) const;
+    // Returns the composite bitboard with all pieces of the given type.
+    [[nodiscard]] INLINE Bitboard composite(PieceType type) const;
     // Returns the bitboard of all occupied squares.
     [[nodiscard]] INLINE Bitboard occupied() const { return this->composite(Color::White) | this->composite(Color::Black); }
     // Returns the bitboard of all empty squares.
@@ -99,7 +102,7 @@ public:
 
 private:
     ColorMap<int32_t> material_;
-    ColorMap<int32_t> pieceSquareEval_;
+    GamePhaseMap<ColorMap<int32_t>> pieceSquareEval_;
     Color turn_;
     uint64_t hash_;
 
@@ -142,6 +145,10 @@ private:
 
 
 
+INLINE int32_t Board::pieceSquareEval(GamePhase phase, Color color) const {
+    return this->pieceSquareEval_[phase][color];
+}
+
 INLINE Bitboard &Board::bitboard(Piece piece) {
     assert(piece.type() != PieceType::King);
     assert(piece.type() != PieceType::Empty);
@@ -157,4 +164,8 @@ INLINE Bitboard Board::bitboard(Piece piece) const {
 Bitboard Board::composite(Color color) const {
     const auto &bitboards = this->bitboards_[color];
     return bitboards[0] | bitboards[1] | bitboards[2] | bitboards[3] | bitboards[4] | (1ULL << this->king(color));
+}
+
+Bitboard Board::composite(PieceType type) const {
+    return this->bitboards_[Color::White][type] | this->bitboards_[Color::Black][type];
 }

@@ -15,6 +15,4 @@ int main() {
     EngineInit::init();
 
     uci();
-
-//    return 0;
 }
