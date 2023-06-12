@@ -62,8 +62,8 @@ private:
     void generateAllCastlingMoves();
     void generateKingMoves();
 
-    template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
-    void generateSlidingMoves(Piece piece);
+    template<PieceType Slider>
+    void generateSlidingMoves();
 };
 
 
@@ -204,11 +204,13 @@ INLINE void MoveGenerator<Side, Flags>::maybeSerializeEnPassant(Square from, Squ
     if constexpr (Flags & MoveGeneration::Flags::Legal) {
         // For en passant captures, don't do any fancy pin calculation, instead just make the move and see if it leaves the king
         // in check.
-        MakeMoveInfo info = this->board_.template makeMove<false>(move);
+        Board &board = this->board_;
 
-        isLegal = !(this->board_.template isInCheck<Side>());
+        MakeMoveInfo info = board.makeMove<false>(move);
 
-        this->board_.template unmakeMove<false>(move, info);
+        isLegal = !board.isInCheck<Side>();
+
+        board.unmakeMove<false>(move, info);
     }
 
     if (isLegal) {
@@ -463,11 +465,11 @@ void MoveGenerator<Side, Flags>::generateKingMoves() {
 
 
 template<Color Side, uint32_t Flags>
-template<Bitboard (*GenerateAttacks)(Square, Bitboard)>
-INLINE void MoveGenerator<Side, Flags>::generateSlidingMoves(Piece piece) {
-    Bitboard pieces = this->board_.bitboard(piece);
+template<PieceType Slider>
+INLINE void MoveGenerator<Side, Flags>::generateSlidingMoves() {
+    Bitboard pieces = this->board_.bitboard({ Side, Slider });
     for (Square square : pieces) {
-        Bitboard attacks = GenerateAttacks(square, this->occupied_);
+        Bitboard attacks = Bitboards::sliderAttacks(Slider, square, this->occupied_);
 
         if constexpr (Flags & MoveGeneration::Flags::Legal) {
             // Mask pinned piece mobility
@@ -484,9 +486,9 @@ template<Color Side, uint32_t Flags>
 INLINE MoveEntry *MoveGenerator<Side, Flags>::generate() {
     this->generateAllPawnMoves();
     this->generateAllKnightMoves();
-    this->generateSlidingMoves<Bitboards::bishopAttacks>(Piece::bishop(Side));
-    this->generateSlidingMoves<Bitboards::rookAttacks>(Piece::rook(Side));
-    this->generateSlidingMoves<Bitboards::queenAttacks>(Piece::queen(Side));
+    this->generateSlidingMoves<PieceType::Bishop>();
+    this->generateSlidingMoves<PieceType::Rook>();
+    this->generateSlidingMoves<PieceType::Queen>();
     this->generateKingMoves();
 
     return this->list_.pointer();

@@ -143,6 +143,10 @@ namespace Bitboards {
     Bitboard queenAttacks(Square square, Bitboard occupied);
     Bitboard kingAttacks(Square square);
 
+    INLINE constexpr Bitboard sliderAttacks(PieceType slider, Square square, Bitboard occupied);
+    template<Color Side>
+    INLINE constexpr Bitboard pieceAttacks(PieceType type, Square square, Bitboard occupied);
+
     // Slider attacks on an empty board.
     Bitboard rookAttacksOnEmpty(Square square);
     Bitboard bishopAttacksOnEmpty(Square square);
@@ -159,4 +163,30 @@ namespace Bitboards {
     // Returns a bitboard with all attacks of the given side.
     template<Color Side>
     Bitboard allAttacks(const Board &board, Bitboard occupied);
+}
+
+INLINE constexpr Bitboard Bitboards::sliderAttacks(PieceType slider, Square square, Bitboard occupied) {
+    // @formatter:off
+    switch (slider) {
+        case PieceType::Bishop: return bishopAttacks(square, occupied);
+        case PieceType::Rook:   return rookAttacks(square, occupied);
+        case PieceType::Queen:  return queenAttacks(square, occupied);
+        default:                assert(false); return 0ULL;
+    }
+    // @formatter:on
+}
+
+template<Color Side>
+INLINE constexpr Bitboard Bitboards::pieceAttacks(PieceType type, Square square, Bitboard occupied) {
+    // @formatter:off
+    switch (type) {
+        case PieceType::Pawn:   return pawnAttacks<Side>(square);
+        case PieceType::Knight: return knightAttacks(square);
+        case PieceType::Bishop: return bishopAttacks(square, occupied);
+        case PieceType::Rook:   return rookAttacks(square, occupied);
+        case PieceType::Queen:  return queenAttacks(square, occupied);
+        case PieceType::King:   return kingAttacks(square);
+        default:                assert(false); return 0ULL;
+    }
+    // @formatter:on
 }

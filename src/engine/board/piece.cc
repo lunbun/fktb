@@ -8,14 +8,14 @@
 std::string PieceTypeNamespace::debugName(PieceType pieceType) {
     // @formatter:off
     switch (pieceType) {
-        case PieceType::Pawn: return "Pawn";
+        case PieceType::Pawn:   return "Pawn";
         case PieceType::Knight: return "Knight";
         case PieceType::Bishop: return "Bishop";
-        case PieceType::Rook: return "Rook";
-        case PieceType::Queen: return "Queen";
-        case PieceType::King: return "King";
-        case PieceType::Empty: return "Empty";
-        default: return "Unknown";
+        case PieceType::Rook:   return "Rook";
+        case PieceType::Queen:  return "Queen";
+        case PieceType::King:   return "King";
+        case PieceType::Empty:  return "Empty";
+        default:                return "Unknown";
     }
     // @formatter:on
 }

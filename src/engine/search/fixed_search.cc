@@ -8,6 +8,7 @@
 #include "engine/move/move.h"
 #include "engine/move/move_list.h"
 #include "engine/move/movegen.h"
+#include "engine/move/legality_check.h"
 #include "engine/eval/evaluation.h"
 
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HistoryTable &history,
@@ -176,7 +177,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     Board &board = this->board_;
 
-    // Null move pruning
+    // Stage 1: Null move pruning
     // TODO: Make this less risky (e.g. zugzwang detection?)
     if (depth >= 3 && !board.isInCheck<Turn>()) {
         MakeMoveInfo info = board.makeNullMove();
@@ -195,8 +196,15 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     int32_t bestScore = -INT32_MAX;
 
+    // Stage 2: Hash move
+    //
     // Try the hash move first, if it exists. We can save all move generation entirely if the hash move causes a beta-cutoff.
-    if (hashMove.isValid()) {
+    //
+    // We also have to check the legality of the hash move in case of rare hash key collisions (see
+    // https://www.chessprogramming.org/Transposition_Table#KeyCollisions).
+    LegalityChecker<Turn> legalityChecker(board);
+
+    if (hashMove.isValid() && legalityChecker.isLegal(hashMove)) {
         MakeMoveInfo moveInfo = board.makeMove<false>(hashMove);
 
         int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
@@ -215,7 +223,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
     }
 
-    // Move generation and scoring
+    // Stage 3: Search
     AlignedMoveEntry moveBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
