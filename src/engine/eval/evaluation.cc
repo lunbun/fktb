@@ -107,15 +107,20 @@ struct KingAttack {
 };
 
 // The king zone is the important squares that must be protected for the king to be safe.
-//
-// It is the squares the king can reach, extended towards the enemy side one square.
 template<Color Side>
-INLINE Bitboard calculateKingZone(Square king) {
+INLINE Bitboard calculateKingZone(Square king, Bitboard occupied) {
     // Squares the king can reach.
-    Bitboard kingZone = Bitboards::kingAttacks(king) | (1ULL << king);
+    Bitboard kingZone = Bitboards::kingAttacks(king);
 
-    // Extend the king zone towards the enemy side.
+    // Extend the king zone two ranks towards the enemy side.
     kingZone |= kingZone.shiftForward<Side>(1);
+    kingZone |= kingZone.shiftForward<Side>(1);
+
+    // Only consider squares that would put the king in check.
+    kingZone &= Bitboards::queenAttacks(king, occupied);
+
+    // Include the king square.
+    kingZone |= (1ULL << king);
 
     return kingZone;
 }
@@ -137,6 +142,34 @@ INLINE void maybeAddKingZoneAttacksToKingAttack(KingAttack &attack, Bitboard att
     }
 }
 
+template<Color Side>
+INLINE void addAllKnightAttacksToKingAttack(KingAttack &attack, const Board &board) {
+    for (Square knight : board.bitboard(Piece::knight(Side))) {
+        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::knightAttacks(knight), PieceMaterial::Knight);
+    }
+}
+
+template<Color Side, PieceType Slider, Bitboard (*GenerateAttacks)(Square, Bitboard)>
+INLINE void addAllSliderAttacksToKingAttack(KingAttack &attack, Bitboard queens, Bitboard occupied, const Board &board) {
+    Bitboard slidersOfType = board.bitboard({ Side, Slider });
+
+    // Queens are both rooks and bishops.
+    Bitboard allSlidersOfType = slidersOfType | queens;
+
+    // Remove sliders of the same type from the occupied bitboard, so that when we generate attacks, other sliders of the same
+    // type can x-ray through fellow sliders.
+    Bitboard occupiedXRay = occupied ^ allSlidersOfType;
+
+    // TODO: If a slider is creating a battery towards a king zone with a fellow slider of the same type, then the attack is more
+    //  dangerous.
+    for (Square slider : slidersOfType) {
+        maybeAddKingZoneAttacksToKingAttack(attack, GenerateAttacks(slider, occupiedXRay), PieceMaterial::material(Slider));
+    }
+    for (Square queen : queens) {
+        maybeAddKingZoneAttacksToKingAttack(attack, GenerateAttacks(queen, occupiedXRay), PieceMaterial::Queen);
+    }
+}
+
 // Evaluates the enemy's attack on our king. Returns a negative value in centipawns if the enemy is attacking our king. The more
 // dangerous the attack is, the larger the negative value will be.
 template<Color Side>
@@ -145,23 +178,17 @@ INLINE int32_t evaluateKingAttack(const Board &board) {
 
     Bitboard occupied = board.occupied();
 
-    KingAttack attack(calculateKingZone<Side>(board.king(Side)));
+    Bitboard kingZone = calculateKingZone<Side>(board.king(Side), occupied);
+    KingAttack attack(kingZone);
+
+    // TODO: We might be able to skip the pawn shield evaluation if we instead penalize larger king zones.
 
     // Add the king zone attacks from all enemy pieces.
-    // TODO: X-ray attacks.
     // TODO: If a friendly piece is defending the attacked square, then the attack is not as dangerous.
-    for (Square knight : board.bitboard(Piece::knight(Enemy))) {
-        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::knightAttacks(knight), PieceMaterial::Knight);
-    }
-    for (Square bishop : board.bitboard(Piece::bishop(Enemy))) {
-        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::bishopAttacks(bishop, occupied), PieceMaterial::Bishop);
-    }
-    for (Square rook : board.bitboard(Piece::rook(Enemy))) {
-        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::rookAttacks(rook, occupied), PieceMaterial::Rook);
-    }
-    for (Square queen : board.bitboard(Piece::queen(Enemy))) {
-        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::queenAttacks(queen, occupied), PieceMaterial::Queen);
-    }
+    Bitboard queens = board.bitboard(Piece::queen(Enemy));
+    addAllKnightAttacksToKingAttack<Enemy>(attack, board);
+    addAllSliderAttacksToKingAttack<Enemy, PieceType::Bishop, Bitboards::bishopAttacks>(attack, queens, occupied, board);
+    addAllSliderAttacksToKingAttack<Enemy, PieceType::Rook, Bitboards::rookAttacks>(attack, queens, occupied, board);
 
     // One piece cannot checkmate on its own, so there is no attack if there is one or fewer attackers.
     if (attack.totalAttackerCount <= 1) {
@@ -169,7 +196,7 @@ INLINE int32_t evaluateKingAttack(const Board &board) {
     }
 
     int32_t score = 0;
-    for (Square kingZoneSquare : attack.kingZone) {
+    for (Square kingZoneSquare : kingZone) {
         const KingAttackSquareData &data = attack.kingZoneAttacks[kingZoneSquare];
 
         // The more pieces lined up on a square, the more dangerous it is. If the pieces are attacking separate squares, then it
