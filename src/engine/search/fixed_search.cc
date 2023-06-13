@@ -183,8 +183,9 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
     Board &board = this->board_;
 
     // Stage 1: Null move pruning
+    bool isInCheck = board.isInCheck<Turn>();
     // TODO: Make this less risky (e.g. zugzwang detection?)
-    if (depth >= 3 && !board.isInCheck<Turn>()) {
+    if (depth >= 3 && !isInCheck) {
         MakeMoveInfo info = board.makeNullMove();
 
         // TODO: Is it safe to pass -beta + 1 as the beta parameter here?
@@ -303,12 +304,22 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         MovePriorityQueue moves(movesStart, movesEnd);
 
-        bool isInCheck = board.isInCheck<Turn>();
         if (moves.empty() && !hasTacticalMoves) {
             if (isInCheck) { // Checkmate
                 return Score::mateIn(this->depth_ - depth);
             } else { // Stalemate
                 return 0;
+            }
+        }
+
+        // Futility pruning
+        if (depth == 1 && !isInCheck) {
+            constexpr int32_t FutilityMargin = 300;
+
+            int32_t evaluation = Evaluation::evaluate<Turn>(board);
+
+            if (evaluation + FutilityMargin <= alpha) {
+                return alpha;
             }
         }
 
