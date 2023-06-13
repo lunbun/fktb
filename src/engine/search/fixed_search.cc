@@ -23,7 +23,7 @@ void FixedDepthSearcher::halt() {
 SearchLine FixedDepthSearcher::search() {
     RootMoveList moves = MoveGeneration::generateLegalRoot(this->board_);
 
-    MoveOrdering::score<MoveOrdering::Type::History>(moves, this->board_, &this->history_);
+    MoveOrdering::score<MoveOrdering::Type::All>(moves, this->board_, &this->history_);
     moves.sort();
     moves.loadHashMove(this->board_, this->table_);
 
@@ -139,13 +139,13 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
     alpha = std::max(alpha, standPat);
 
     // Move generation and scoring
-    AlignedMoveEntry moveBuffer[MaxCaptureCount];
+    AlignedMoveEntry moveBuffer[MaxTacticalCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
     MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Tactical>(board, movesStart);
 
     MovePriorityQueue moves(movesStart, movesEnd);
-    MoveOrdering::score<Turn, MoveOrdering::Type::NoHistory>(moves, board, nullptr);
+    MoveOrdering::score<Turn, MoveOrdering::Type::Tactical>(moves, board, nullptr);
 
     // Capture search
     while (!moves.empty()) {
@@ -218,49 +218,93 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
 
         if (score >= beta) {
-            this->history_.maybeAdd(Turn, board, hashMove, depth);
+            if (hashMove.isQuiet()) {
+                this->history_.add(Turn, board, hashMove, depth);
+            }
+
             return bestScore;
         }
     }
 
-    // Stage 3: Search
+    // Stage 3: Tactical move search
     AlignedMoveEntry moveBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
-    MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Legal>(board, movesStart);
+    bool hasTacticalMoves;
 
-    MovePriorityQueue moves(movesStart, movesEnd);
+    {
+        MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Tactical>(board, movesStart);
 
-    if (moves.empty()) {
-        if (board.isInCheck<Turn>()) { // Checkmate
-            return Score::mateIn(this->depth_ - depth);
-        } else { // Stalemate
-            return 0;
+        MovePriorityQueue moves(movesStart, movesEnd);
+
+        hasTacticalMoves = !moves.empty();
+
+        // We already tried the hash move, so remove it from the list of moves to search
+        if (hashMove.isTactical()) {
+            moves.remove(hashMove);
+        }
+
+        MoveOrdering::score<Turn, MoveOrdering::Type::Tactical>(moves, board, nullptr);
+
+        while (!moves.empty()) {
+            Move move = moves.dequeue();
+            MakeMoveInfo moveInfo = board.makeMove<false>(move);
+
+            int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+
+            board.unmakeMove<false>(move, moveInfo);
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = move;
+                alpha = std::max(alpha, score);
+            }
+
+            if (score >= beta) {
+                return bestScore;
+            }
         }
     }
 
-    // We already tried the hash move, so remove it from the list of moves to search
-    moves.remove(hashMove);
+    // Stage 4: Quiet move search
+    {
+        MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Quiet>(board, movesStart);
 
-    MoveOrdering::score<Turn, MoveOrdering::Type::History>(moves, board, &this->history_);
+        MovePriorityQueue moves(movesStart, movesEnd);
 
-    while (!moves.empty()) {
-        Move move = moves.dequeue();
-        MakeMoveInfo moveInfo = board.makeMove<false>(move);
-
-        int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
-
-        board.unmakeMove<false>(move, moveInfo);
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestMove = move;
-            alpha = std::max(alpha, score);
+        if (moves.empty() && !hasTacticalMoves) {
+            if (board.isInCheck<Turn>()) { // Checkmate
+                return Score::mateIn(this->depth_ - depth);
+            } else { // Stalemate
+                return 0;
+            }
         }
 
-        if (score >= beta) {
-            this->history_.maybeAdd(Turn, board, move, depth);
-            return bestScore;
+        // We already tried the hash move, so remove it from the list of moves to search
+        if (hashMove.isQuiet()) {
+            moves.remove(hashMove);
+        }
+
+        MoveOrdering::score<Turn, MoveOrdering::Type::Quiet>(moves, board, &this->history_);
+
+        while (!moves.empty()) {
+            Move move = moves.dequeue();
+            MakeMoveInfo moveInfo = board.makeMove<false>(move);
+
+            int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+
+            board.unmakeMove<false>(move, moveInfo);
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = move;
+                alpha = std::max(alpha, score);
+            }
+
+            if (score >= beta) {
+                this->history_.add(Turn, board, move, depth);
+                return bestScore;
+            }
         }
     }
 

@@ -16,8 +16,8 @@ uint16_t TaperedEval::calculateContinuousPhase(const Board &board) {
     // The total weight of all the starting pieces.
     constexpr uint16_t MaxWeight = (4 * KnightWeight) + (4 * BishopWeight) + (4 * RookWeight) + (2 * QueenWeight);
 
-    // The total weight of all the pieces lost before we stop considering the game to be in the middle game.
-    constexpr uint16_t MiddleGameWeight = (4 * KnightWeight);
+    // The total weight of all the pieces lost before we stop considering the game to be in the opening.
+    constexpr uint16_t OpeningGameWeight = (4 * KnightWeight);
 
     // The total weight of the all the pieces lost before we start considering the game to be in the end game.
     constexpr uint16_t EndGameWeight = (4 * KnightWeight) + (3 * BishopWeight) + (2 * RookWeight) + (2 * QueenWeight);
@@ -32,8 +32,8 @@ uint16_t TaperedEval::calculateContinuousPhase(const Board &board) {
     lostPiecesWeight -= RookWeight * board.composite(PieceType::Rook).count();
     lostPiecesWeight -= QueenWeight * board.composite(PieceType::Queen).count();
 
-    // lostPiecesWeight is mapped from the range [MiddleGameWeight, EndGameWeight] to [0, 256].
-    lostPiecesWeight = std::clamp(lostPiecesWeight, MiddleGameWeight, EndGameWeight);
+    // lostPiecesWeight is mapped from the range [OpeningGameWeight, EndGameWeight] to [0, 256].
+    lostPiecesWeight = std::clamp(lostPiecesWeight, OpeningGameWeight, EndGameWeight);
 
-    return ((lostPiecesWeight - MiddleGameWeight) * 256) / (EndGameWeight - MiddleGameWeight);
+    return ((lostPiecesWeight - OpeningGameWeight) * 256) / (EndGameWeight - OpeningGameWeight);
 }

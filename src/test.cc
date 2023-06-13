@@ -59,9 +59,9 @@ void Tests::pseudoLegalMoveGenTest(const std::string &fen) {
 
     MovePriorityQueue moves(movesStart, movesEnd);
     if (board.turn() == Color::White) {
-        MoveOrdering::score<Color::White, MoveOrdering::Type::NoHistory>(moves, board, nullptr);
+        MoveOrdering::score<Color::White, MoveOrdering::Type::AllNoHistory>(moves, board, nullptr);
     } else {
-        MoveOrdering::score<Color::Black, MoveOrdering::Type::NoHistory>(moves, board, nullptr);
+        MoveOrdering::score<Color::Black, MoveOrdering::Type::AllNoHistory>(moves, board, nullptr);
     }
 
     while (!moves.empty()) {
@@ -75,7 +75,7 @@ void Tests::legalMoveGenTest(const std::string &fen) {
 
     RootMoveList moves = MoveGeneration::generateLegalRoot(board);
 
-    MoveOrdering::score<MoveOrdering::Type::NoHistory>(moves, board, nullptr);
+    MoveOrdering::score<MoveOrdering::Type::AllNoHistory>(moves, board, nullptr);
     moves.sort();
 
     while (!moves.empty()) {
@@ -92,7 +92,7 @@ void Tests::moveOrderingTest(const std::string &fen) {
 
     RootMoveList movesList = MoveGeneration::generateLegalRoot(board);
 
-    MoveOrdering::score<MoveOrdering::Type::NoHistory>(movesList, board, nullptr);
+    MoveOrdering::score<MoveOrdering::Type::AllNoHistory>(movesList, board, nullptr);
     movesList.sort();
 
     const std::vector<MoveEntry> &moves = movesList.moves();

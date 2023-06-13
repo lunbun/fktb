@@ -149,7 +149,7 @@ INLINE void addAllKnightAttacksToKingAttack(KingAttack &attack, const Board &boa
     }
 }
 
-template<Color Side, PieceType Slider, Bitboard (*GenerateAttacks)(Square, Bitboard)>
+template<Color Side, PieceType Slider>
 INLINE void addAllSliderAttacksToKingAttack(KingAttack &attack, Bitboard queens, Bitboard occupied, const Board &board) {
     Bitboard slidersOfType = board.bitboard({ Side, Slider });
 
@@ -163,10 +163,11 @@ INLINE void addAllSliderAttacksToKingAttack(KingAttack &attack, Bitboard queens,
     // TODO: If a slider is creating a battery towards a king zone with a fellow slider of the same type, then the attack is more
     //  dangerous.
     for (Square slider : slidersOfType) {
-        maybeAddKingZoneAttacksToKingAttack(attack, GenerateAttacks(slider, occupiedXRay), PieceMaterial::material(Slider));
+        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::sliderAttacks(Slider, slider, occupiedXRay),
+            PieceMaterial::value(Slider));
     }
     for (Square queen : queens) {
-        maybeAddKingZoneAttacksToKingAttack(attack, GenerateAttacks(queen, occupiedXRay), PieceMaterial::Queen);
+        maybeAddKingZoneAttacksToKingAttack(attack, Bitboards::sliderAttacks(Slider, queen, occupiedXRay), PieceMaterial::Queen);
     }
 }
 
@@ -187,8 +188,8 @@ INLINE int32_t evaluateKingAttack(const Board &board) {
     // TODO: If a friendly piece is defending the attacked square, then the attack is not as dangerous.
     Bitboard queens = board.bitboard(Piece::queen(Enemy));
     addAllKnightAttacksToKingAttack<Enemy>(attack, board);
-    addAllSliderAttacksToKingAttack<Enemy, PieceType::Bishop, Bitboards::bishopAttacks>(attack, queens, occupied, board);
-    addAllSliderAttacksToKingAttack<Enemy, PieceType::Rook, Bitboards::rookAttacks>(attack, queens, occupied, board);
+    addAllSliderAttacksToKingAttack<Enemy, PieceType::Bishop>(attack, queens, occupied, board);
+    addAllSliderAttacksToKingAttack<Enemy, PieceType::Rook>(attack, queens, occupied, board);
 
     // One piece cannot checkmate on its own, so there is no attack if there is one or fewer attackers.
     if (attack.totalAttackerCount <= 1) {
@@ -242,7 +243,7 @@ INLINE int32_t evaluateForSide(const Board &board) {
     // Piece square tables
     score += board.pieceSquareEval(Phase, Side);
 
-    if constexpr (Phase == GamePhase::Middle) {
+    if constexpr (Phase == GamePhase::Opening) {
         // King safety
         score += evaluateKingSafety<Side>(board);
     }
@@ -256,21 +257,21 @@ int32_t evaluate(const Board &board) {
     return evaluateForSide<Phase, Side>(board) - evaluateForSide<Phase, ~Side>(board);
 }
 
-// Evaluates the board for the given side, subtracting the evaluation for the other side. Interpolates between the middle and end
+// Evaluates the board for the given side, subtracting the evaluation for the other side. Interpolates between the opening and end
 // game phases.
 template<Color Side>
 int32_t Evaluation::evaluate(const Board &board) {
     uint16_t phase = TaperedEval::calculateContinuousPhase(board);
 
-    if (phase == GamePhase::Middle) { // Strictly middle game
-        return evaluate<GamePhase::Middle, Side>(board);
+    if (phase == GamePhase::Opening) { // Strictly opening
+        return evaluate<GamePhase::Opening, Side>(board);
     } else if (phase == GamePhase::End) { // Strictly end game
         return evaluate<GamePhase::End, Side>(board);
-    } else { // Interpolate between middle and end game
-        int32_t middleScore = evaluate<GamePhase::Middle, Side>(board);
+    } else { // Interpolate between opening and end game
+        int32_t openingScore = evaluate<GamePhase::Opening, Side>(board);
         int32_t endScore = evaluate<GamePhase::End, Side>(board);
 
-        return TaperedEval::interpolate(middleScore, endScore, phase);
+        return TaperedEval::interpolate(openingScore, endScore, phase);
     }
 }
 

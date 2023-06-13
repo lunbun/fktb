@@ -16,6 +16,7 @@ class Board;
 // @formatter:off
 namespace MoveFlagNamespace {
     enum MoveFlag : uint8_t {
+        TacticalMask        = 0b1100,
         Quiet               = 0b0000,
         DoublePawnPush      = 0b0001,
 
@@ -62,6 +63,8 @@ public:
     [[nodiscard]] INLINE constexpr MoveFlag flags() const { return static_cast<MoveFlag>((this->bits_ >> 12) & 0x0F); }
 
     [[nodiscard]] INLINE constexpr bool isValid() const { return this->from() != this->to(); }
+    [[nodiscard]] INLINE constexpr bool isQuiet() const { return !this->isTactical(); }
+    [[nodiscard]] INLINE constexpr bool isTactical() const { return this->flags() & MoveFlag::TacticalMask; }
     [[nodiscard]] INLINE constexpr bool isDoublePawnPush() const { return this->flags() == MoveFlag::DoublePawnPush; }
     [[nodiscard]] INLINE constexpr bool isCastle() const {
         // Some promotion flags also have the castle bits, so we have to explicitly check that it's not a promotion.

@@ -248,7 +248,7 @@ void IterativeSearcher::start(const Board &board) {
             // First thread is our "primary" thread, so it should not randomize anything and should use the hash move.
             rootMoveOrder = rootMoves;
 
-            MoveOrdering::score<MoveOrdering::Type::NoHistory>(rootMoveOrder, board, nullptr);
+            MoveOrdering::score<MoveOrdering::Type::AllNoHistory>(rootMoveOrder, boardCopy, nullptr);
             rootMoveOrder.sort();
 
             task->depth = 1;
@@ -277,7 +277,7 @@ void IterativeSearcher::start(const Board &board) {
                 std::shuffle(rootMoveOrder.moves().begin(), rootMoveOrder.moves().end(), generator);
             } else {
                 // Other threads have similar move order to the primary thread, but with some randomization
-                MoveOrdering::score<MoveOrdering::Type::NoHistory>(rootMoveOrder, board, nullptr);
+                MoveOrdering::score<MoveOrdering::Type::AllNoHistory>(rootMoveOrder, boardCopy, nullptr);
 
                 // Add a small random value to the score of each move
                 int32_t range = (25 * static_cast<int32_t>(i));

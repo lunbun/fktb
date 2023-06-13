@@ -144,6 +144,7 @@ namespace Bitboards {
     Bitboard kingAttacks(Square square);
 
     INLINE constexpr Bitboard sliderAttacks(PieceType slider, Square square, Bitboard occupied);
+    INLINE constexpr Bitboard nonPawnAttacks(PieceType type, Square square, Bitboard occupied);
     template<Color Side>
     INLINE constexpr Bitboard pieceAttacks(PieceType type, Square square, Bitboard occupied);
 
@@ -171,6 +172,19 @@ INLINE constexpr Bitboard Bitboards::sliderAttacks(PieceType slider, Square squa
         case PieceType::Bishop: return bishopAttacks(square, occupied);
         case PieceType::Rook:   return rookAttacks(square, occupied);
         case PieceType::Queen:  return queenAttacks(square, occupied);
+        default:                assert(false); return 0ULL;
+    }
+    // @formatter:on
+}
+
+INLINE constexpr Bitboard Bitboards::nonPawnAttacks(PieceType type, Square square, Bitboard occupied) {
+    // @formatter:off
+    switch (type) {
+        case PieceType::Knight: return knightAttacks(square);
+        case PieceType::Bishop: return bishopAttacks(square, occupied);
+        case PieceType::Rook:   return rookAttacks(square, occupied);
+        case PieceType::Queen:  return queenAttacks(square, occupied);
+        case PieceType::King:   return kingAttacks(square);
         default:                assert(false); return 0ULL;
     }
     // @formatter:on

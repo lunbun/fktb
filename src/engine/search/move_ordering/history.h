@@ -14,8 +14,8 @@ class HistoryTable {
 public:
     INLINE constexpr HistoryTable();
 
-    // Increments the history table if the move is not a capture. Call this on beta-cutoffs.
-    INLINE void maybeAdd(Color color, const Board &board, Move move, uint16_t depth);
+    // Increments the history table. Call this on beta-cutoffs of quiet moves.
+    INLINE void add(Color color, const Board &board, Move move, uint16_t depth);
 
     // Returns the history score for the given move. The returned score is normalized based off of the total sum of all history
     // scores so that at higher depths, the history scores aren't insanely high compared to at lower depths.
@@ -31,14 +31,12 @@ private:
 // Initialize the totals to start at 1 to avoid division by zero. This won't really affect the results.
 INLINE constexpr HistoryTable::HistoryTable() : total_(1, 1), table_() { }
 
-// Increments the history table if the move is not a capture. Call this on beta-cutoffs.
-INLINE void HistoryTable::maybeAdd(Color color, const Board &board, Move move, uint16_t depth) {
-    if (!move.isCapture()) {
-        uint16_t score = depth * depth;
+// Increments the history table. Call this on beta-cutoffs of quiet moves.
+INLINE void HistoryTable::add(Color color, const Board &board, Move move, uint16_t depth) {
+    uint16_t score = depth * depth;
 
-        this->total_[color] += score;
-        this->table_[color][board.pieceAt(move.from()).type()][move.to()] += score;
-    }
+    this->total_[color] += score;
+    this->table_[color][board.pieceAt(move.from()).type()][move.to()] += score;
 }
 
 // Returns the history score for the given move. The returned score is normalized based off of the total sum of all history scores

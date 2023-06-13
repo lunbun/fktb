@@ -46,6 +46,12 @@ namespace Intrinsics {
         return _blsr_u64(x);
     }
 
+    // Extract lowest set bit: returns the least significant bit.
+    // Equivalent to x & (-x).
+    INLINE uint64_t blsi(uint64_t x) {
+        return _blsi_u64(x);
+    }
+
     // Parallel bits deposit: deposits bits from x into the mask.
     INLINE uint64_t pdep(uint64_t x, uint64_t mask) {
         return _pdep_u64(x, mask);

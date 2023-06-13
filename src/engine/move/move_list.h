@@ -11,7 +11,7 @@
 class TranspositionTable;
 
 constexpr uint32_t MaxMoveCount = 128;
-constexpr uint32_t MaxCaptureCount = 32;
+constexpr uint32_t MaxTacticalCount = 32;
 
 // Using uint64_t[] instead of MoveEntry[] allows the array to be uninitialized. It does mean though that we have to
 // reinterpret_cast the array to MoveEntry * when we want to use it.

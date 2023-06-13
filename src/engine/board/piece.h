@@ -60,12 +60,17 @@ namespace PieceMaterial {
     constexpr int32_t Bishop        = 330;
     constexpr int32_t Rook          = 500;
     constexpr int32_t Queen         = 900;
-    constexpr int32_t King          = 0;
-    constexpr PieceTypeMap<int32_t> Values = { Pawn, Knight, Bishop, Rook, Queen, King };
+    constexpr std::array<int32_t, 5> Values = { Pawn, Knight, Bishop, Rook, Queen };
 
     constexpr int32_t BishopPair    = 50;
 
-    INLINE constexpr int32_t material(PieceType pieceType) { return PieceMaterial::Values[pieceType]; }
+    [[nodiscard]] INLINE constexpr int32_t value(PieceType type);
+}
+
+INLINE constexpr int32_t PieceMaterial::value(PieceType type) {
+    assert(type != PieceType::King);
+    assert(type != PieceType::Empty);
+    return PieceMaterial::Values[type];
 }
 // @formatter:on
 
@@ -91,7 +96,7 @@ public:
     [[nodiscard]] INLINE constexpr PieceType type() const { return static_cast<PieceType>(this->bits_ & 7); }
     [[nodiscard]] INLINE constexpr bool isEmpty() const { return this->type() == PieceType::Empty; }
 
-    [[nodiscard]] INLINE constexpr int32_t material() const { return PieceMaterial::material(this->type()); }
+    [[nodiscard]] INLINE constexpr int32_t material() const { return PieceMaterial::value(this->type()); }
 
     [[nodiscard]] INLINE constexpr bool operator==(Piece other) const { return this->bits_ == other.bits_; }
 

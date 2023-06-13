@@ -37,7 +37,7 @@ INLINE bool LegalityChecker<Side>::isPseudoLegalQuiet(Move move, Piece piece) co
         // Ensure there is no piece on the to square.
         return this->empty_.get(to);
     } else {
-        Bitboard attacks = Bitboards::pieceAttacks<Side>(piece.type(), from, this->occupied_);
+        Bitboard attacks = Bitboards::nonPawnAttacks(piece.type(), from, this->occupied_);
 
         // Ensure that the piece can move to the square, and that there is no piece on that square.
         return attacks.get(to) && this->empty_.get(to);

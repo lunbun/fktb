@@ -104,8 +104,7 @@ INLINE void Board::addKing(Color color, Square square) {
     assert(!this->kings_[color].isValid());
     this->kings_[color] = square;
 
-    this->material_[color] += PieceMaterial::King;
-    this->pieceSquareEval_[GamePhase::Middle][color] += PieceSquareTables::evaluate(GamePhase::Middle, king, square);
+    this->pieceSquareEval_[GamePhase::Opening][color] += PieceSquareTables::evaluate(GamePhase::Opening, king, square);
     this->pieceSquareEval_[GamePhase::End][color] += PieceSquareTables::evaluate(GamePhase::End, king, square);
 
     if constexpr (UpdateHash) {
@@ -122,7 +121,7 @@ INLINE void Board::addPiece(Piece piece, Square square) {
     this->bitboard(piece).set(square);
 
     this->material_[piece.color()] += piece.material();
-    this->pieceSquareEval_[GamePhase::Middle][piece.color()] += PieceSquareTables::evaluate(GamePhase::Middle, piece, square);
+    this->pieceSquareEval_[GamePhase::Opening][piece.color()] += PieceSquareTables::evaluate(GamePhase::Opening, piece, square);
     this->pieceSquareEval_[GamePhase::End][piece.color()] += PieceSquareTables::evaluate(GamePhase::End, piece, square);
 
     if constexpr (UpdateHash) {
@@ -139,7 +138,7 @@ INLINE void Board::removePiece(Piece piece, Square square) {
     this->bitboard(piece).clear(square);
 
     this->material_[piece.color()] -= piece.material();
-    this->pieceSquareEval_[GamePhase::Middle][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Middle, piece, square);
+    this->pieceSquareEval_[GamePhase::Opening][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Opening, piece, square);
     this->pieceSquareEval_[GamePhase::End][piece.color()] -= PieceSquareTables::evaluate(GamePhase::End, piece, square);
 
     if constexpr (UpdateHash) {
@@ -199,8 +198,8 @@ INLINE void Board::movePiece(Piece piece, Square from, Square to) {
     }
 
     // Update piece square evaluation
-    this->pieceSquareEval_[GamePhase::Middle][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Middle, piece, from);
-    this->pieceSquareEval_[GamePhase::Middle][piece.color()] += PieceSquareTables::evaluate(GamePhase::Middle, piece, to);
+    this->pieceSquareEval_[GamePhase::Opening][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Opening, piece, from);
+    this->pieceSquareEval_[GamePhase::Opening][piece.color()] += PieceSquareTables::evaluate(GamePhase::Opening, piece, to);
     this->pieceSquareEval_[GamePhase::End][piece.color()] -= PieceSquareTables::evaluate(GamePhase::End, piece, from);
     this->pieceSquareEval_[GamePhase::End][piece.color()] += PieceSquareTables::evaluate(GamePhase::End, piece, to);
 

@@ -346,8 +346,8 @@ Bitboard Bitboards::pawnAttacks(Square square) {
     return pawnAttackTable[Side][square];
 }
 
-template Bitboard Bitboards::pawnAttacks<Color::White>(Square square);
-template Bitboard Bitboards::pawnAttacks<Color::Black>(Square square);
+template Bitboard Bitboards::pawnAttacks<Color::White>(Square);
+template Bitboard Bitboards::pawnAttacks<Color::Black>(Square);
 
 Bitboard Bitboards::knightAttacks(Square square) {
     return knightAttackTable[square];
@@ -408,8 +408,8 @@ Bitboard Bitboards::allPawnAttacks(Bitboard pawns) {
     }
 }
 
-template Bitboard Bitboards::allPawnAttacks<Color::White>(Bitboard pawns);
-template Bitboard Bitboards::allPawnAttacks<Color::Black>(Bitboard pawns);
+template Bitboard Bitboards::allPawnAttacks<Color::White>(Bitboard);
+template Bitboard Bitboards::allPawnAttacks<Color::Black>(Bitboard);
 
 Bitboard Bitboards::allKnightAttacks(Bitboard knights) {
     Bitboard attacks;
@@ -453,5 +453,5 @@ Bitboard Bitboards::allAttacks(const Board &board, Bitboard occupied) {
         | kingAttacks(board.king(Side));
 }
 
-template Bitboard Bitboards::allAttacks<Color::White>(const Board &board, Bitboard occupied);
-template Bitboard Bitboards::allAttacks<Color::Black>(const Board &board, Bitboard occupied);
+template Bitboard Bitboards::allAttacks<Color::White>(const Board &, Bitboard);
+template Bitboard Bitboards::allAttacks<Color::Black>(const Board &, Bitboard);
