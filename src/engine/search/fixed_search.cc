@@ -56,8 +56,8 @@ SearchLine FixedDepthSearcher::search(RootMoveList moves) {
     while (move.isValid()) {
         bestLine.push_back(move);
 
-        // No need to update the turn since this is a copy of the board that is only used for finding the best line
-        board.makeMove<false>(move);
+        // We are only using the board's hash, so we don't need to update anything else
+        board.makeMove<MakeMoveType::HashOnly>(move);
 
         // Find the next best move in the line
         depth--;
@@ -104,7 +104,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
-        MakeMoveInfo info = board.makeMove<false>(move);
+        MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
         int32_t score = -search<~Turn>(depth - 1, -INT32_MAX, -alpha);
 
@@ -113,7 +113,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
             alpha = score;
         }
 
-        board.unmakeMove<false>(move, info);
+        board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
     }
 
     // Transposition table store
@@ -155,12 +155,11 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
     // Capture search
     while (!moves.empty()) {
         Move move = moves.dequeue();
-        // No need to update the turn since we do that manually with templates
-        MakeMoveInfo info = board.makeMove<false>(move);
+        MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
         int32_t score = -this->searchQuiesce<~Turn>(-beta, -alpha);
 
-        board.unmakeMove<false>(move, info);
+        board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
 
         if (score >= beta) {
             return beta;
@@ -211,11 +210,11 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
     LegalityChecker<Turn> legalityChecker(board);
 
     if (hashMove.isValid() && legalityChecker.isLegal(hashMove)) {
-        MakeMoveInfo info = board.makeMove<false>(hashMove);
+        MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(hashMove);
 
         int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
 
-        board.unmakeMove<false>(hashMove, info);
+        board.unmakeMove<MakeMoveType::AllNoTurn>(hashMove, info);
 
         if (score > bestScore) {
             bestScore = score;
@@ -256,11 +255,11 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         // Search all tactical moves
         while (!moves.empty()) {
             Move move = moves.dequeue();
-            MakeMoveInfo info = board.makeMove<false>(move);
+            MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
             int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
 
-            board.unmakeMove<false>(move, info);
+            board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
 
             if (score > bestScore) {
                 bestScore = score;
@@ -280,11 +279,11 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
             continue;
         }
 
-        MakeMoveInfo info = board.makeMove<false>(killer);
+        MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(killer);
 
         int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
 
-        board.unmakeMove<false>(killer, info);
+        board.unmakeMove<MakeMoveType::AllNoTurn>(killer, info);
 
         if (score > bestScore) {
             bestScore = score;
@@ -340,7 +339,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         while (!moves.empty()) {
             Move move = moves.dequeue();
-            MakeMoveInfo info = board.makeMove<false>(move);
+            MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
             // TODO: Do not reduce moves that give check
             uint16_t depthReduction = 0;
@@ -376,7 +375,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
                 }
             }
 
-            board.unmakeMove<false>(move, info);
+            board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
 
             if (score >= beta) {
                 this->heuristics_.history.add(Turn, board, move, depth);

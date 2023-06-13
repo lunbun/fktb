@@ -16,6 +16,47 @@
 #include "engine/move/move.h"
 #include "engine/eval/game_phase.h"
 
+
+// @formatter:off
+
+// Gives special control over what to update when making a move. Some calls to makeMove may not need all information to be
+// updated, so this can be used to avoid unnecessary work.
+//
+// Note: The piece array (Board::pieces_) is always updated regardless of the flags, since if it is not, the internal board state
+// can become corrupted.
+namespace MakeMoveFlags {
+    constexpr uint32_t Turn         = 0x01;             // Update the turn (will still update the hash's turn even if this is not
+                                                        // passed)?
+    constexpr uint32_t Gameplay     = 0x02;             // Update gameplay information (castling rights, en passant square, etc.)?
+    constexpr uint32_t Hash         = 0x04 | Gameplay;  // Update the Zobrist hash?
+                                                        // Note: Hash requires the Gameplay flag, because otherwise, the hash will
+                                                        // not synchronize with changes in gameplay information.
+    constexpr uint32_t Evaluation   = 0x08;             // Update the evaluation (material and piece-square tables)?
+    constexpr uint32_t Bitboards    = 0x10;             // Update the bitboards?
+
+    constexpr uint32_t Unmake       = 0x20;             // Flag used internally to indicate a move is being unmade. Do not pass this flag
+                                                        // to makeMove/unmakeMove.
+}
+
+// Only these sets of flags will link properly with the makeMove/unmakeMove methods.
+namespace MakeMoveType {
+    // Makes a move and updates all information.
+    constexpr uint32_t All                  = MakeMoveFlags::Turn | MakeMoveFlags::Gameplay | MakeMoveFlags::Hash |
+                                              MakeMoveFlags::Evaluation | MakeMoveFlags::Bitboards;
+
+    // Makes a move and updates all information except the turn.
+    constexpr uint32_t AllNoTurn            = MakeMoveFlags::Gameplay | MakeMoveFlags::Hash | MakeMoveFlags::Evaluation |
+                                              MakeMoveFlags::Bitboards;
+
+    // Makes a move and updates only the hash.
+    constexpr uint32_t HashOnly             = MakeMoveFlags::Hash;
+
+    // Makes a move and updates only the bitboards.
+    constexpr uint32_t BitboardsOnly        = MakeMoveFlags::Bitboards;
+}
+
+// @formatter:on
+
 struct MakeMoveInfo {
     uint64_t oldHash;
     CastlingRights oldCastlingRights;
@@ -24,6 +65,8 @@ struct MakeMoveInfo {
 
     MakeMoveInfo() = delete;
 };
+
+
 
 class Board {
 public:
@@ -82,21 +125,20 @@ public:
     template<Color Side>
     [[nodiscard]] bool isInCheck() const;
 
-    template<bool UpdateHash>
+    template<uint32_t Flags>
     void addKing(Color color, Square square);
-    template<bool UpdateHash>
+    template<uint32_t Flags>
     void addPiece(Piece piece, Square square);
-    template<bool UpdateHash>
+    template<uint32_t Flags>
     void removePiece(Piece piece, Square square);
 
-    // Makes/unmakes a move with/without updating the turn (if no turn update, the hash's turn will still update, but not the
-    // turn_ field).
-    template<bool UpdateTurn>
+    // Makes/unmakes a move.
+    template<uint32_t Flags>
     MakeMoveInfo makeMove(Move move);
-    template<bool UpdateTurn>
+    template<uint32_t Flags>
     void unmakeMove(Move move, MakeMoveInfo info);
 
-    // Makes/unmakes a null move WITHOUT updating turn_ (updates the hash's turn, but not the turn_ field itself).
+    // Makes/unmakes a null move without updating the turn.
     MakeMoveInfo makeNullMove();
     void unmakeNullMove(MakeMoveInfo info);
 
@@ -113,33 +155,31 @@ private:
     ColorMap<std::array<Bitboard, 5>> bitboards_;
 
     // Updates the hash and castling rights.
+    template<uint32_t Flags>
     void castlingRights(CastlingRights newCastlingRights);
 
     // Removes the relevant castling rights if the given square is a rook square.
+    template<uint32_t Flags>
     void maybeRevokeCastlingRightsForRookSquare(Square square);
 
     // Updates the hash and en passant square.
+    template<uint32_t Flags>
     void enPassantSquare(Square newEnPassantSquare);
 
-    // Moves a piece from one square to another.
-    template<bool UpdateHash>
-    void movePiece(Piece piece, Square from, Square to);
+    // Moves/unmoves a piece from one square to another. Returns the piece that was moved.
+    template<uint32_t Flags>
+    Piece movePiece(Square from, Square to);
 
-    // Moves/unmoves a piece from one square to another. Will not update hash if it is an unmake. Returns the moved
-    // piece.
-    template<bool IsMake>
-    Piece moveOrUnmovePiece(Square from, Square to);
-
-    // Makes/unmakes a castling move. Will not update hash or castling rights if it is an unmake.
-    template<bool IsMake>
+    // Makes/unmakes a castling move.
+    template<uint32_t Flags>
     void makeCastlingMove(Move move);
 
-    // Makes/unmakes a promotion move. Will not update hash if it is an unmake.
-    template<bool IsMake>
+    // Makes/unmakes a promotion move.
+    template<uint32_t Flags>
     void makePromotionMove(Move move);
 
-    // Makes/unmakes a quiet move. Will not update hash or castling rights if it is an unmake.
-    template<bool IsMake>
+    // Makes/unmakes a quiet move.
+    template<uint32_t Flags>
     void makeQuietMove(Move move);
 };
 

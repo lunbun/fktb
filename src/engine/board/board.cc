@@ -41,9 +41,9 @@ Board Board::fromFen(const std::string &fen) {
 
         Piece piece = entry.piece;
         if (piece.type() == PieceType::King) {
-            board.addKing<true>(piece.color(), entry.square);
+            board.addKing<MakeMoveType::All>(piece.color(), entry.square);
         } else {
-            board.addPiece<true>(piece, entry.square);
+            board.addPiece<MakeMoveType::All>(piece, entry.square);
         }
     }
 
@@ -94,67 +94,85 @@ template bool Board::isInCheck<Color::Black>() const;
 
 
 
-template<bool UpdateHash>
+template<uint32_t Flags>
 INLINE void Board::addKing(Color color, Square square) {
     Piece king = Piece::king(color);
-
-    assert(this->pieceAt(square).isEmpty());
-    this->pieces_[square] = king;
 
     assert(!this->kings_[color].isValid());
     this->kings_[color] = square;
 
-    this->pieceSquareEval_[GamePhase::Opening][color] += PieceSquareTables::evaluate(GamePhase::Opening, king, square);
-    this->pieceSquareEval_[GamePhase::End][color] += PieceSquareTables::evaluate(GamePhase::End, king, square);
+    assert(this->pieceAt(square).isEmpty());
+    this->pieces_[square] = king;
 
-    if constexpr (UpdateHash) {
+    if constexpr (Flags & MakeMoveFlags::Evaluation) {
+        this->pieceSquareEval_[GamePhase::Opening][color] += PieceSquareTables::evaluate(GamePhase::Opening, king, square);
+        this->pieceSquareEval_[GamePhase::End][color] += PieceSquareTables::evaluate(GamePhase::End, king, square);
+    }
+
+    if constexpr (Flags & MakeMoveFlags::Hash) {
         this->hash_ ^= Zobrist::piece(Piece::king(color), square);
     }
 }
 
-template<bool UpdateHash>
+template<uint32_t Flags>
 INLINE void Board::addPiece(Piece piece, Square square) {
     assert(this->pieceAt(square).isEmpty());
     this->pieces_[square] = piece;
 
-    assert(!this->bitboard(piece).get(square));
-    this->bitboard(piece).set(square);
+    if constexpr (Flags & MakeMoveFlags::Bitboards) {
+        assert(!this->bitboard(piece).get(square));
+        this->bitboard(piece).set(square);
+    }
 
-    this->material_[piece.color()] += piece.material();
-    this->pieceSquareEval_[GamePhase::Opening][piece.color()] += PieceSquareTables::evaluate(GamePhase::Opening, piece, square);
-    this->pieceSquareEval_[GamePhase::End][piece.color()] += PieceSquareTables::evaluate(GamePhase::End, piece, square);
+    if constexpr (Flags & MakeMoveFlags::Evaluation) {
+        this->material_[piece.color()] += piece.material();
+        this->pieceSquareEval_[GamePhase::Opening][piece.color()] += PieceSquareTables::evaluate(GamePhase::Opening, piece,
+            square);
+        this->pieceSquareEval_[GamePhase::End][piece.color()] += PieceSquareTables::evaluate(GamePhase::End, piece, square);
+    }
 
-    if constexpr (UpdateHash) {
+    if constexpr (Flags & MakeMoveFlags::Hash) {
         this->hash_ ^= Zobrist::piece(piece, square);
     }
 }
 
-template<bool UpdateHash>
+template<uint32_t Flags>
 INLINE void Board::removePiece(Piece piece, Square square) {
     assert(this->pieceAt(square) == piece);
     this->pieces_[square] = Piece::empty();
 
-    assert(this->bitboard(piece).get(square));
-    this->bitboard(piece).clear(square);
+    if constexpr (Flags & MakeMoveFlags::Bitboards) {
+        assert(this->bitboard(piece).get(square));
+        this->bitboard(piece).clear(square);
+    }
 
-    this->material_[piece.color()] -= piece.material();
-    this->pieceSquareEval_[GamePhase::Opening][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Opening, piece, square);
-    this->pieceSquareEval_[GamePhase::End][piece.color()] -= PieceSquareTables::evaluate(GamePhase::End, piece, square);
+    if constexpr (Flags & MakeMoveFlags::Evaluation) {
+        this->material_[piece.color()] -= piece.material();
+        this->pieceSquareEval_[GamePhase::Opening][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Opening, piece,
+            square);
+        this->pieceSquareEval_[GamePhase::End][piece.color()] -= PieceSquareTables::evaluate(GamePhase::End, piece, square);
+    }
 
-    if constexpr (UpdateHash) {
+    if constexpr (Flags & MakeMoveFlags::Hash) {
         this->hash_ ^= Zobrist::piece(piece, square);
     }
 }
 
 // Updates the hash and castling rights.
+template<uint32_t Flags>
 INLINE void Board::castlingRights(CastlingRights newCastlingRights) {
-    this->hash_ ^= Zobrist::castlingRights(this->castlingRights_);
-    this->hash_ ^= Zobrist::castlingRights(newCastlingRights);
+    if constexpr (Flags & MakeMoveFlags::Hash) {
+        this->hash_ ^= Zobrist::castlingRights(this->castlingRights_);
+        this->hash_ ^= Zobrist::castlingRights(newCastlingRights);
+    }
 
-    this->castlingRights_ = newCastlingRights;
+    if constexpr (Flags & MakeMoveFlags::Gameplay) {
+        this->castlingRights_ = newCastlingRights;
+    }
 }
 
 // Removes the relevant castling rights if the given square is a rook square.
+template<uint32_t Flags>
 INLINE void Board::maybeRevokeCastlingRightsForRookSquare(Square square) {
     constexpr Bitboard CastlingRookSquares = Bitboards::A1 | Bitboards::H1 | Bitboards::A8 | Bitboards::H8;
 
@@ -164,20 +182,32 @@ INLINE void Board::maybeRevokeCastlingRightsForRookSquare(Square square) {
     }
 
     CastlingRights revokedRights = CastlingRights::fromRookSquare(square);
-    this->castlingRights(this->castlingRights_.without(revokedRights));
+    this->castlingRights<Flags>(this->castlingRights_.without(revokedRights));
 }
 
 // Updates the hash and en passant square.
+template<uint32_t Flags>
 INLINE void Board::enPassantSquare(Square newEnPassantSquare) {
-    this->hash_ ^= Zobrist::enPassantSquare(this->enPassantSquare_);
-    this->hash_ ^= Zobrist::enPassantSquare(newEnPassantSquare);
+    if constexpr (Flags & MakeMoveFlags::Hash) {
+        this->hash_ ^= Zobrist::enPassantSquare(this->enPassantSquare_);
+        this->hash_ ^= Zobrist::enPassantSquare(newEnPassantSquare);
+    }
 
-    this->enPassantSquare_ = newEnPassantSquare;
+    if constexpr (Flags & MakeMoveFlags::Gameplay) {
+        this->enPassantSquare_ = newEnPassantSquare;
+    }
 }
 
-// Moves a piece from one square to another.
-template<bool UpdateHash>
-INLINE void Board::movePiece(Piece piece, Square from, Square to) {
+// Moves/unmoves a piece from one square to another. Returns the piece that was moved.
+template<uint32_t Flags>
+INLINE Piece Board::movePiece(Square from, Square to) {
+    if constexpr (Flags & MakeMoveFlags::Unmake) {
+        // Swap the from and to squares if we're unmoving the piece
+        std::swap(from, to);
+    }
+
+    Piece piece = this->pieceAt(from);
+
     assert(!piece.isEmpty());
     assert(from != to);
 
@@ -190,92 +220,80 @@ INLINE void Board::movePiece(Piece piece, Square from, Square to) {
         assert(this->kings_[piece.color()] == from);
         this->kings_[piece.color()] = to;
     } else { // Other piece move
-        Bitboard &bitboard = this->bitboard(piece);
-        assert(bitboard.get(from));
-        assert(!bitboard.get(to));
-        bitboard.clear(from);
-        bitboard.set(to);
+        if constexpr (Flags & MakeMoveFlags::Bitboards) {
+            Bitboard &bitboard = this->bitboard(piece);
+            assert(bitboard.get(from));
+            assert(!bitboard.get(to));
+            bitboard.clear(from);
+            bitboard.set(to);
+        }
     }
 
     // Update piece square evaluation
-    this->pieceSquareEval_[GamePhase::Opening][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Opening, piece, from);
-    this->pieceSquareEval_[GamePhase::Opening][piece.color()] += PieceSquareTables::evaluate(GamePhase::Opening, piece, to);
-    this->pieceSquareEval_[GamePhase::End][piece.color()] -= PieceSquareTables::evaluate(GamePhase::End, piece, from);
-    this->pieceSquareEval_[GamePhase::End][piece.color()] += PieceSquareTables::evaluate(GamePhase::End, piece, to);
+    if constexpr (Flags & MakeMoveFlags::Evaluation) {
+        this->pieceSquareEval_[GamePhase::Opening][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Opening, piece, from);
+        this->pieceSquareEval_[GamePhase::Opening][piece.color()] += PieceSquareTables::evaluate(GamePhase::Opening, piece, to);
+        this->pieceSquareEval_[GamePhase::End][piece.color()] -= PieceSquareTables::evaluate(GamePhase::End, piece, from);
+        this->pieceSquareEval_[GamePhase::End][piece.color()] += PieceSquareTables::evaluate(GamePhase::End, piece, to);
+    }
 
-    if constexpr (UpdateHash) {
+    if constexpr (Flags & MakeMoveFlags::Hash) {
         this->hash_ ^= Zobrist::piece(piece, from);
         this->hash_ ^= Zobrist::piece(piece, to);
     }
+
+    return piece;
 }
 
-// Moves/unmoves a piece from one square to another. Will not update hash if it is an unmake. Returns the moved piece.
-template<bool IsMake>
-INLINE Piece Board::moveOrUnmovePiece(Square from, Square to) {
-    if constexpr (IsMake) {
-        Piece piece = this->pieceAt(from);
-        this->movePiece<true>(piece, from, to);
-        return piece;
-    } else {
-        Piece piece = this->pieceAt(to);
-
-        // Disabled linting on the next line because it is flagged for "argument selection defects," where it thinks
-        // that we erroneously swapped the from and to squares. This is actually correct though since we are unmaking
-        // the move.
-        this->movePiece<false>(piece, to, from); // NOLINT
-
-        return piece;
-    }
-}
-
-// Makes/unmakes a castling move. Will not update hash or castling rights if it is an unmake.
-template<bool IsMake>
+// Makes/unmakes a castling move.
+template<uint32_t Flags>
 INLINE void Board::makeCastlingMove(Move move) {
     // Move the king
-    Piece king = this->moveOrUnmovePiece<IsMake>(move.from(), move.to());
+    Piece king = this->movePiece<Flags>(move.from(), move.to());
 
     // Move the rook
     Square rookFrom = CastlingRook::from(king.color(), move.castlingSide());
     Square rookTo = CastlingRook::to(king.color(), move.castlingSide());
-    this->moveOrUnmovePiece<IsMake>(rookFrom, rookTo);
+    this->movePiece<Flags>(rookFrom, rookTo);
 
     // Update castling rights
-    if constexpr (IsMake) {
-        this->castlingRights(this->castlingRights_.without(king.color()));
+    if constexpr (!(Flags & MakeMoveFlags::Unmake) && (Flags & MakeMoveFlags::Gameplay)) {
+        this->castlingRights<Flags>(this->castlingRights_.without(king.color()));
     }
 }
 
-// Makes/unmakes a promotion move. Will not update hash if it is an unmake.
-template<bool IsMake>
+// Makes/unmakes a promotion move.
+template<uint32_t Flags>
 INLINE void Board::makePromotionMove(Move move) {
-    if constexpr (IsMake) {
-        Piece pawn = this->pieceAt(move.from());
-
-        // Remove the old pawn
-        this->removePiece<true>(pawn, move.from());
-
-        // Add the new piece
-        Piece promotion(pawn.color(), move.promotion());
-        this->addPiece<true>(promotion, move.to());
-    } else {
+    if constexpr (Flags & MakeMoveFlags::Unmake) { // Unmake
         Piece promotion = this->pieceAt(move.to());
 
         // Remove the promoted piece
-        this->removePiece<false>(promotion, move.to());
+        this->removePiece<Flags>(promotion, move.to());
 
         // Add the pawn
-        this->addPiece<false>(Piece::pawn(promotion.color()), move.from());
+        this->addPiece<Flags>(Piece::pawn(promotion.color()), move.from());
+    } else { // Make
+        Piece pawn = this->pieceAt(move.from());
+
+        // Remove the old pawn
+        this->removePiece<Flags>(pawn, move.from());
+
+        // Add the new piece
+        Piece promotion(pawn.color(), move.promotion());
+        this->addPiece<Flags>(promotion, move.to());
     }
 }
 
-// Makes/unmakes a quiet move. Will not update hash or castling rights if it is an unmake.
-template<bool IsMake>
+// Makes/unmakes a quiet move.
+template<uint32_t Flags>
 INLINE void Board::makeQuietMove(Move move) {
     // Move/unmove the piece
-    Piece piece = this->moveOrUnmovePiece<IsMake>(move.from(), move.to());
+    Piece piece = this->movePiece<Flags>(move.from(), move.to());
 
-    // Update castling rights or en passant square if necessary
-    if constexpr (IsMake) {
+    // Update gameplay information if necessary (don't need to update if unmaking since unmaking will just pull the old values
+    // from the MakeMoveInfo)
+    if constexpr (!(Flags & MakeMoveFlags::Unmake) && (Flags & MakeMoveFlags::Gameplay)) {
         switch (piece.type()) {
             case PieceType::Pawn: {
                 // Update en passant square if double pawn push
@@ -283,20 +301,20 @@ INLINE void Board::makeQuietMove(Move move) {
                     // TODO: There's probably a better way of getting the en passant square, but for now, just average the from
                     //  and to squares
                     Square enPassantSquare(move.to().file(), (move.to().rank() + move.from().rank()) / 2);
-                    this->enPassantSquare(enPassantSquare);
+                    this->enPassantSquare<Flags>(enPassantSquare);
                 }
                 break;
             }
 
             case PieceType::Rook: {
                 // Update castling rights if necessary
-                this->maybeRevokeCastlingRightsForRookSquare(move.from());
+                this->maybeRevokeCastlingRightsForRookSquare<Flags>(move.from());
                 break;
             }
 
             case PieceType::King: {
                 // Update castling rights
-                this->castlingRights(this->castlingRights_.without(piece.color()));
+                this->castlingRights<Flags>(this->castlingRights_.without(piece.color()));
                 break;
             }
 
@@ -305,14 +323,23 @@ INLINE void Board::makeQuietMove(Move move) {
     }
 }
 
-template<bool UpdateTurn>
+template<uint32_t Flags>
 MakeMoveInfo Board::makeMove(Move move) {
-    uint64_t oldHash = this->hash_;
-    CastlingRights oldCastlingRights = this->castlingRights_;
-    Square oldEnPassantSquare = this->enPassantSquare_;
+    // Save old state to MakeMoveInfo, so we can unmake the move later
+    uint64_t oldHash;
+    if constexpr (Flags & MakeMoveFlags::Hash) {
+        oldHash = this->hash();
+    }
+
+    CastlingRights oldCastlingRights;
+    Square oldEnPassantSquare;
+    if constexpr (Flags & MakeMoveFlags::Gameplay) {
+        oldCastlingRights = this->castlingRights();
+        oldEnPassantSquare = this->enPassantSquare();
+    }
 
     // Reset en passant square (if the move is a double pawn push, will be set to correct value later during makeQuietMove)
-    this->enPassantSquare(Square::Invalid);
+    this->enPassantSquare<Flags>(Square::Invalid);
 
     // Captures
     Piece captured = Piece::empty();
@@ -323,76 +350,87 @@ MakeMoveInfo Board::makeMove(Move move) {
         // (avoids unnecessary memory reads)
         captured = this->pieceAt(capturedSquare);
         assert(captured.type() != PieceType::King);
-        this->removePiece<true>(captured, capturedSquare);
+        this->removePiece<Flags>(captured, capturedSquare);
 
         // If a rook is captured, update castling rights if necessary
         if (captured.type() == PieceType::Rook) {
-            this->maybeRevokeCastlingRightsForRookSquare(capturedSquare);
+            this->maybeRevokeCastlingRightsForRookSquare<Flags>(capturedSquare);
         }
     }
 
     // Make the move
     if (move.isCastle()) { // Castling
-        this->makeCastlingMove<true>(move);
+        this->makeCastlingMove<Flags>(move);
     } else if (move.isPromotion()) { // Promotions
-        this->makePromotionMove<true>(move);
+        this->makePromotionMove<Flags>(move);
     } else { // Quiet moves
-        this->makeQuietMove<true>(move);
+        this->makeQuietMove<Flags>(move);
     }
 
     // Switch the turn
-    this->hash_ ^= Zobrist::blackToMove();
-    if constexpr (UpdateTurn) {
+    if constexpr (Flags & MakeMoveFlags::Hash) {
+        this->hash_ ^= Zobrist::blackToMove();
+    }
+    if constexpr (Flags & MakeMoveFlags::Turn) {
         this->turn_ = ~this->turn_;
     }
 
     return { oldHash, oldCastlingRights, oldEnPassantSquare, captured };
 }
 
-template<bool UpdateTurn>
+template<uint32_t Flags>
 void Board::unmakeMove(Move move, MakeMoveInfo info) {
+    constexpr uint32_t UnmakeFlags = Flags | MakeMoveFlags::Unmake;
+
     // We don't need to do any hash, castling rights, or en passant square updates here since we just restore the old hash and
     // castling rights from MakeMoveInfo
 
     if (move.isCastle()) { // Castling
-        this->makeCastlingMove<false>(move);
+        this->makeCastlingMove<UnmakeFlags>(move);
     } else if (move.isPromotion()) { // Promotions
-        this->makePromotionMove<false>(move);
+        this->makePromotionMove<UnmakeFlags>(move);
     } else { // Normal moves
-        this->makeQuietMove<false>(move);
+        this->makeQuietMove<UnmakeFlags>(move);
     }
 
     if (move.isCapture()) { // Captures
         // Add the captured piece back
-        this->addPiece<false>(info.captured, move.capturedSquare());
+        this->addPiece<UnmakeFlags>(info.captured, move.capturedSquare());
     }
 
-    // Restore the old hash, castling rights, and en passant square
-    this->hash_ = info.oldHash;
-    this->castlingRights_ = info.oldCastlingRights;
-    this->enPassantSquare_ = info.oldEnPassantSquare;
+    // Restore the old hash
+    if constexpr (Flags & MakeMoveFlags::Hash) {
+        this->hash_ = info.oldHash;
+    }
 
-    // Switch the turn if necessary
-    if constexpr (UpdateTurn) {
+    // Restore the old gameplay info
+    if constexpr (Flags & MakeMoveFlags::Gameplay) {
+        this->castlingRights_ = info.oldCastlingRights;
+        this->enPassantSquare_ = info.oldEnPassantSquare;
+    }
+    if constexpr (Flags & MakeMoveFlags::Turn) {
         this->turn_ = ~this->turn_;
     }
 }
 
-template MakeMoveInfo Board::makeMove<false>(Move);
-template MakeMoveInfo Board::makeMove<true>(Move);
-template void Board::unmakeMove<false>(Move, MakeMoveInfo);
-template void Board::unmakeMove<true>(Move, MakeMoveInfo);
+template MakeMoveInfo Board::makeMove<MakeMoveType::All>(Move);
+template MakeMoveInfo Board::makeMove<MakeMoveType::AllNoTurn>(Move);
+template MakeMoveInfo Board::makeMove<MakeMoveType::HashOnly>(Move);
+template MakeMoveInfo Board::makeMove<MakeMoveType::BitboardsOnly>(Move);
+template void Board::unmakeMove<MakeMoveType::All>(Move, MakeMoveInfo);
+template void Board::unmakeMove<MakeMoveType::AllNoTurn>(Move, MakeMoveInfo);
+template void Board::unmakeMove<MakeMoveType::HashOnly>(Move, MakeMoveInfo);
+template void Board::unmakeMove<MakeMoveType::BitboardsOnly>(Move, MakeMoveInfo);
 
 
-
-// Makes/unmakes a null move WITHOUT updating turn_ (updates the hash's turn, but not the turn_ field itself).
+// Makes/unmakes a null move.
 MakeMoveInfo Board::makeNullMove() {
     uint64_t oldHash = this->hash_;
     CastlingRights oldCastlingRights = this->castlingRights_;
     Square oldEnPassantSquare = this->enPassantSquare_;
 
     // Reset en passant square
-    this->enPassantSquare(Square::Invalid);
+    this->enPassantSquare<MakeMoveType::All>(Square::Invalid);
 
     // Switch the turn
     this->hash_ ^= Zobrist::blackToMove();
@@ -401,7 +439,7 @@ MakeMoveInfo Board::makeNullMove() {
 }
 
 void Board::unmakeNullMove(MakeMoveInfo info) {
-    // Restore the old hash, castling rights, and en passant square
+    // Restore the old hash and gameplay info
     this->hash_ = info.oldHash;
     this->castlingRights_ = info.oldCastlingRights;
     this->enPassantSquare_ = info.oldEnPassantSquare;

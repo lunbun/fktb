@@ -142,7 +142,8 @@ int32_t See::evaluate(Square square, const Board &board) {
 
 template<Color Side>
 int32_t See::evaluate(Move move, Board &board) {
-    MakeMoveInfo info = board.makeMove<false>(move);
+    // We are only using the piece array and bitboards, so we can use MakeMoveType::BitboardsOnly
+    MakeMoveInfo info = board.makeMove<MakeMoveType::BitboardsOnly>(move);
 
     int32_t score = 0;
 
@@ -152,7 +153,7 @@ int32_t See::evaluate(Move move, Board &board) {
 
     score += evaluate<Side>(move.to(), board);
 
-    board.unmakeMove<false>(move, info);
+    board.unmakeMove<MakeMoveType::BitboardsOnly>(move, info);
 
     return score;
 }

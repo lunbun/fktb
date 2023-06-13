@@ -259,11 +259,12 @@ bool LegalityChecker<Side>::isLegal(Move move) const {
     if (move.isCastle()) {
         return this->isLegalCastle(move);
     } else {
-        MakeMoveInfo info = board.makeMove<false>(move);
+        // Board::isInCheck() only uses bitboards, so we can use MakeMoveType::BitboardsOnly.
+        MakeMoveInfo info = board.makeMove<MakeMoveType::BitboardsOnly>(move);
 
         bool isLegal = !board.isInCheck<Side>();
 
-        board.unmakeMove<false>(move, info);
+        board.unmakeMove<MakeMoveType::BitboardsOnly>(move, info);
 
         return isLegal;
     }

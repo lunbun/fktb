@@ -100,7 +100,7 @@ void Tests::moveOrderingTest(const std::string &fen, const std::vector<std::stri
     // Make the moves
     for (const std::string &moveStr : movesSequence) {
         Move move = Move::fromUci(moveStr, board);
-        board.makeMove<true>(move);
+        board.makeMove<MakeMoveType::All>(move);
     }
 
     RootMoveList movesList = MoveGeneration::generateLegalRoot(board);
@@ -203,9 +203,9 @@ void Tests::unmakeMoveTest(const std::string &fen) {
         std::string beforeFen = board.toFen();
         Board beforeBoard = board.copy();
 
-        MakeMoveInfo info = board.makeMove<true>(move);
+        MakeMoveInfo info = board.makeMove<MakeMoveType::All>(move);
 
-        board.unmakeMove<true>(move, info);
+        board.unmakeMove<MakeMoveType::All>(move, info);
 
         if (beforeFen != board.toFen()) {
             throw std::runtime_error("Fen does not match after unmake move. Fen: " + beforeFen);
@@ -259,13 +259,13 @@ uint32_t hashTestSearch(Board &board, uint16_t depth) {
     while (!moves.empty()) {
         Move move = moves.dequeue();
 
-        MakeMoveInfo info = board.makeMove<true>(move);
+        MakeMoveInfo info = board.makeMove<MakeMoveType::All>(move);
 
         verifyHash(board);
 
         nodeCount += hashTestSearch<~Side>(board, depth - 1);
 
-        board.unmakeMove<true>(move, info);
+        board.unmakeMove<MakeMoveType::All>(move, info);
 
         verifyHash(board);
     }
@@ -398,11 +398,11 @@ uint64_t perftSearch(Board &board, uint16_t depth) {
     while (movesEnd != movesStart) {
         Move move = (--movesEnd)->move;
 
-        MakeMoveInfo info = board.makeMove<false>(move);
+        MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
         nodeCount += perftSearch<~Side>(board, depth - 1);
 
-        board.unmakeMove<false>(move, info);
+        board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
     }
 
     return nodeCount;

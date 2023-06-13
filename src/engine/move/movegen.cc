@@ -206,11 +206,12 @@ INLINE void MoveGenerator<Side, Flags>::maybeSerializeEnPassant(Square from, Squ
         // in check.
         Board &board = this->board_;
 
-        MakeMoveInfo info = board.makeMove<false>(move);
+        // Board::isInCheck() only uses bitboards, so we can use MakeMoveType::BitboardsOnly.
+        MakeMoveInfo info = board.makeMove<MakeMoveType::BitboardsOnly>(move);
 
         isLegal = !board.isInCheck<Side>();
 
-        board.unmakeMove<false>(move, info);
+        board.unmakeMove<MakeMoveType::BitboardsOnly>(move, info);
     }
 
     if (isLegal) {
@@ -502,14 +503,16 @@ INLINE MoveEntry *filterLegal(Board &board, MoveEntry *start, MoveEntry *end) {
     // TODO: This is a very inefficient method. Implement a more efficient method.
     for (MoveEntry *entry = start; entry != end; entry++) {
         Move move = entry->move;
-        MakeMoveInfo info = board.makeMove<false>(move);
+
+        // Board::isInCheck() only uses bitboards, so we can use MakeMoveType::BitboardsOnly.
+        MakeMoveInfo info = board.makeMove<MakeMoveType::BitboardsOnly>(move);
 
         // TODO: Do not allow castling through check (or in check)
         if (!board.isInCheck<Side>()) {
             *(result++) = *entry;
         }
 
-        board.unmakeMove<false>(move, info);
+        board.unmakeMove<MakeMoveType::BitboardsOnly>(move, info);
     }
 
     return result;

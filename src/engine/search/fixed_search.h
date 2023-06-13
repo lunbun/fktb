@@ -42,7 +42,7 @@ public:
     [[nodiscard]] SearchLine search();
 
     // Allows control over the move ordering of the root node.
-    // Note: if you want to use the hash move, you must add it to the move list yourself.
+    // Note: If you want to use the hash move, you must add it to the move list yourself.
     [[nodiscard]] SearchLine search(RootMoveList moves);
 
     // Tells the searcher to stop searching as soon as possible. This is not guaranteed to stop the search immediately,
