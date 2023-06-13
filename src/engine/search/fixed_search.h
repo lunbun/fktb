@@ -37,7 +37,7 @@ struct SearchLine {
 
 class FixedDepthSearcher {
 public:
-    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HistoryTable &history, SearchStatistics &stats);
+    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HeuristicTables &heuristics, SearchStatistics &stats);
 
     [[nodiscard]] SearchLine search();
 
@@ -59,7 +59,7 @@ private:
     Board board_;
     uint16_t depth_;
     TranspositionTable &table_;
-    HistoryTable &history_;
+    HeuristicTables &heuristics_;
     SearchStatistics &stats_;
 
     template<Color Turn>

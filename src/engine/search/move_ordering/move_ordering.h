@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <memory>
 
-#include "history.h"
+#include "heuristics.h"
 #include "engine/inline.h"
 #include "engine/move/move.h"
 #include "engine/move/move_list.h"

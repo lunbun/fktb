@@ -127,9 +127,9 @@ std::chrono::milliseconds Tests::fixedDepthTest(const std::string &fen, uint16_t
     Board board = Board::fromFen(fen);
 
     TranspositionTable table(2097152);
-    HistoryTable history;
+    HeuristicTables heuristics;
     SearchStatistics stats;
-    FixedDepthSearcher searcher(board, depth, table, history, stats);
+    FixedDepthSearcher searcher(board, depth, table, heuristics, stats);
     SearchLine bestLine = searcher.search();
 
     std::cout << "Best move: " << bestLine.moves[0].debugName(board) << std::endl;

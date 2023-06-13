@@ -32,12 +32,12 @@ struct SearchTask {
     std::optional<RootMoveList> rootMoveOrder = std::nullopt;
     bool canUseHashMove = false;
     TranspositionTable &table;
-    HistoryTable history;
+    HeuristicTables heuristics;
     SearchStatistics &stats;
     std::unique_ptr<FixedDepthSearcher> iteration = nullptr;
 
     SearchTask(const Board &board, TranspositionTable &table, SearchStatistics &stats) : board(board.copy()), table(table),
-                                                                                         history(), stats(stats) { }
+                                                                                         heuristics(), stats(stats) { }
 };
 
 
@@ -157,7 +157,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
         }
 
         // Create a new searcher
-        task.iteration = std::make_unique<FixedDepthSearcher>(task.board, task.depth, task.table, task.history, task.stats);
+        task.iteration = std::make_unique<FixedDepthSearcher>(task.board, task.depth, task.table, task.heuristics, task.stats);
 
         iteration = task.iteration.get();
     }

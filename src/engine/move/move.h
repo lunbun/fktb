@@ -92,6 +92,7 @@ public:
     [[nodiscard]] INLINE constexpr PieceType promotion() const;
 
     [[nodiscard]] INLINE constexpr bool operator==(Move other) const { return this->bits_ == other.bits_; }
+    [[nodiscard]] INLINE constexpr bool operator!=(Move other) const { return this->bits_ != other.bits_; }
 
     [[nodiscard]] std::string uci() const;
     [[nodiscard]] std::string debugName(const Board &board) const;

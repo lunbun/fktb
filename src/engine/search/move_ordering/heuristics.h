@@ -12,7 +12,7 @@
 
 class HistoryTable {
 public:
-    INLINE constexpr HistoryTable();
+    HistoryTable();
 
     // Increments the history table. Call this on beta-cutoffs of quiet moves.
     INLINE void add(Color color, const Board &board, Move move, uint16_t depth);
@@ -25,11 +25,6 @@ private:
     ColorMap<uint32_t> total_; // Sum of all history scores for each color.
     ColorMap<PieceTypeMap<SquareMap<uint32_t>>> table_;
 };
-
-
-
-// Initialize the totals to start at 1 to avoid division by zero. This won't really affect the results.
-INLINE constexpr HistoryTable::HistoryTable() : total_(1, 1), table_() { }
 
 // Increments the history table. Call this on beta-cutoffs of quiet moves.
 INLINE void HistoryTable::add(Color color, const Board &board, Move move, uint16_t depth) {
@@ -47,3 +42,44 @@ INLINE void HistoryTable::add(Color color, const Board &board, Move move, uint16
     score /= this->total_[color];
     return static_cast<int32_t>(score);
 }
+
+
+
+class KillerTable {
+public:
+    KillerTable();
+    ~KillerTable();
+
+    // Resizes the killer table to the given size. This should be called at the start of each search, when the depth changes.
+    void resize(uint16_t size);
+
+    // Adds a killer move to the table. This should be called on beta-cutoffs of quiet moves.
+    void add(uint16_t depth, Move move);
+
+    [[nodiscard]] INLINE const auto &operator[](uint16_t depth) const;
+
+private:
+    constexpr static uint32_t MaxKillerMoves = 2;
+    using Ply = std::array<Move, MaxKillerMoves>;
+
+    // The KillerTable owns the memory for the table. We are using manual memory management to have better control over how
+    // resizing works. With std::vector, when it resizes, the elements are anchored to the front of the vector and new spaces is
+    // added to the end. However, because we are using depth as the index, we want the elements to be anchored to the end of the
+    // vector, and new space to be added to the front. This will keep the depth indices consistent between resizes.
+    uint16_t size_;
+    Ply *table_;
+};
+
+const auto &KillerTable::operator[](uint16_t depth) const {
+    assert(depth < this->size_);
+    return this->table_[depth];
+}
+
+
+
+struct HeuristicTables {
+    HistoryTable history;
+    KillerTable killers;
+
+    HeuristicTables();
+};

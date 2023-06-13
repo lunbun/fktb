@@ -11,8 +11,8 @@
 #include "engine/move/legality_check.h"
 #include "engine/eval/evaluation.h"
 
-FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HistoryTable &history,
-    SearchStatistics &stats) : board_(board.copy()), depth_(depth), table_(table), history_(history), stats_(stats) { }
+FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HeuristicTables &heuristics,
+    SearchStatistics &stats) : board_(board.copy()), depth_(depth), table_(table), heuristics_(heuristics), stats_(stats) { }
 
 void FixedDepthSearcher::halt() {
     this->isHalted_ = true;
@@ -23,7 +23,7 @@ void FixedDepthSearcher::halt() {
 SearchLine FixedDepthSearcher::search() {
     RootMoveList moves = MoveGeneration::generateLegalRoot(this->board_);
 
-    MoveOrdering::score<MoveOrdering::Type::All>(moves, this->board_, &this->history_);
+    MoveOrdering::score<MoveOrdering::Type::All>(moves, this->board_, &this->heuristics_.history);
     moves.sort();
     moves.loadHashMove(this->board_, this->table_);
 
@@ -31,6 +31,10 @@ SearchLine FixedDepthSearcher::search() {
 }
 
 SearchLine FixedDepthSearcher::search(RootMoveList moves) {
+    // Resize the killer table to the depth of the search
+    this->heuristics_.killers.resize(this->depth_);
+
+    // Search the root node
     SearchRootNode node = SearchRootNode::invalid();
     if (this->board_.turn() == Color::White) {
         node = this->searchRoot<Color::White>(std::move(moves));
@@ -38,6 +42,7 @@ SearchLine FixedDepthSearcher::search(RootMoveList moves) {
         node = this->searchRoot<Color::Black>(std::move(moves));
     }
 
+    // Check if the search was halted
     if (this->isHalted_) {
         return SearchLine::invalid();
     }
@@ -99,7 +104,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
 
     while (!moves.empty()) {
         Move move = moves.dequeue();
-        MakeMoveInfo moveInfo = board.makeMove<false>(move);
+        MakeMoveInfo info = board.makeMove<false>(move);
 
         int32_t score = -search<~Turn>(depth - 1, -INT32_MAX, -alpha);
 
@@ -108,7 +113,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
             alpha = score;
         }
 
-        board.unmakeMove<false>(move, moveInfo);
+        board.unmakeMove<false>(move, info);
     }
 
     // Transposition table store
@@ -151,11 +156,11 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
     while (!moves.empty()) {
         Move move = moves.dequeue();
         // No need to update the turn since we do that manually with templates
-        MakeMoveInfo moveInfo = board.makeMove<false>(move);
+        MakeMoveInfo info = board.makeMove<false>(move);
 
         int32_t score = -this->searchQuiesce<~Turn>(-beta, -alpha);
 
-        board.unmakeMove<false>(move, moveInfo);
+        board.unmakeMove<false>(move, info);
 
         if (score >= beta) {
             return beta;
@@ -205,11 +210,11 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
     LegalityChecker<Turn> legalityChecker(board);
 
     if (hashMove.isValid() && legalityChecker.isLegal(hashMove)) {
-        MakeMoveInfo moveInfo = board.makeMove<false>(hashMove);
+        MakeMoveInfo info = board.makeMove<false>(hashMove);
 
         int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
 
-        board.unmakeMove<false>(hashMove, moveInfo);
+        board.unmakeMove<false>(hashMove, info);
 
         if (score > bestScore) {
             bestScore = score;
@@ -219,7 +224,8 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         if (score >= beta) {
             if (hashMove.isQuiet()) {
-                this->history_.add(Turn, board, hashMove, depth);
+                this->heuristics_.history.add(Turn, board, hashMove, depth);
+                this->heuristics_.killers.add(depth, hashMove);
             }
 
             return bestScore;
@@ -240,19 +246,20 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         hasTacticalMoves = !moves.empty();
 
         // We already tried the hash move, so remove it from the list of moves to search
-        if (hashMove.isTactical()) {
+        if (hashMove.isValid() && hashMove.isTactical()) {
             moves.remove(hashMove);
         }
 
         MoveOrdering::score<Turn, MoveOrdering::Type::Tactical>(moves, board, nullptr);
 
+        // Search all tactical moves
         while (!moves.empty()) {
             Move move = moves.dequeue();
-            MakeMoveInfo moveInfo = board.makeMove<false>(move);
+            MakeMoveInfo info = board.makeMove<false>(move);
 
             int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
 
-            board.unmakeMove<false>(move, moveInfo);
+            board.unmakeMove<false>(move, info);
 
             if (score > bestScore) {
                 bestScore = score;
@@ -266,7 +273,31 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
     }
 
-    // Stage 4: Quiet move search
+    // Stage 4: Killer moves
+    for (Move killer : this->heuristics_.killers[depth]) {
+        if (!killer.isValid() || !legalityChecker.isLegal(killer)) {
+            continue;
+        }
+
+        MakeMoveInfo info = board.makeMove<false>(killer);
+
+        int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+
+        board.unmakeMove<false>(killer, info);
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = killer;
+            alpha = std::max(alpha, score);
+        }
+
+        if (score >= beta) {
+            this->heuristics_.history.add(Turn, board, killer, depth);
+            return bestScore;
+        }
+    }
+
+    // Stage 5: Quiet move search
     {
         MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Quiet>(board, movesStart);
 
@@ -280,20 +311,26 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
             }
         }
 
-        // We already tried the hash move, so remove it from the list of moves to search
-        if (hashMove.isQuiet()) {
+        // We already searched the hash move and killer moves, so remove them from the list of moves to search
+        if (hashMove.isValid() && hashMove.isQuiet()) {
             moves.remove(hashMove);
         }
+        for (Move killer : this->heuristics_.killers[depth]) {
+            if (killer.isValid()) {
+                moves.remove(killer);
+            }
+        }
 
-        MoveOrdering::score<Turn, MoveOrdering::Type::Quiet>(moves, board, &this->history_);
+        MoveOrdering::score<Turn, MoveOrdering::Type::Quiet>(moves, board, &this->heuristics_.history);
 
+        // Search all quiet moves
         while (!moves.empty()) {
             Move move = moves.dequeue();
-            MakeMoveInfo moveInfo = board.makeMove<false>(move);
+            MakeMoveInfo info = board.makeMove<false>(move);
 
             int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
 
-            board.unmakeMove<false>(move, moveInfo);
+            board.unmakeMove<false>(move, info);
 
             if (score > bestScore) {
                 bestScore = score;
@@ -302,7 +339,8 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
             }
 
             if (score >= beta) {
-                this->history_.add(Turn, board, move, depth);
+                this->heuristics_.history.add(Turn, board, move, depth);
+                this->heuristics_.killers.add(depth, move);
                 return bestScore;
             }
         }
