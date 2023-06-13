@@ -22,25 +22,19 @@ public:
     [[nodiscard]] INLINE int32_t score(Color color, PieceType type, Square to, uint32_t scale) const;
 
 private:
-    ColorMap<uint32_t> total_; // Sum of all history scores for each color.
     ColorMap<PieceTypeMap<SquareMap<uint32_t>>> table_;
 };
 
 // Increments the history table. Call this on beta-cutoffs of quiet moves.
 INLINE void HistoryTable::add(Color color, const Board &board, Move move, uint16_t depth) {
     uint16_t score = depth * depth;
-
-    this->total_[color] += score;
     this->table_[color][board.pieceAt(move.from()).type()][move.to()] += score;
 }
 
 // Returns the history score for the given move. The returned score is normalized based off of the total sum of all history scores
 // so that at higher depths, the history scores aren't insanely high compared to at lower depths.
 [[nodiscard]] INLINE int32_t HistoryTable::score(Color color, PieceType type, Square to, uint32_t scale) const {
-    uint64_t score = this->table_[color][type][to];
-    score *= scale;
-    score /= this->total_[color];
-    return static_cast<int32_t>(score);
+    return static_cast<int32_t>(this->table_[color][type][to]);
 }
 
 

@@ -87,12 +87,25 @@ void Tests::legalMoveGenTest(const std::string &fen) {
 
 
 // Move ordering test
-void Tests::moveOrderingTest(const std::string &fen) {
+void Tests::moveOrderingTest(const std::string &fen, const std::vector<std::string> &movesSequence) {
     Board board = Board::fromFen(fen);
+
+    // Run a search to get history heuristic data
+    TranspositionTable table(2097152);
+    HeuristicTables heuristics;
+    SearchStatistics stats;
+    FixedDepthSearcher searcher(board, 9, table, heuristics, stats);
+    static_cast<void>(searcher.search());
+
+    // Make the moves
+    for (const std::string &moveStr : movesSequence) {
+        Move move = Move::fromUci(moveStr, board);
+        board.makeMove<true>(move);
+    }
 
     RootMoveList movesList = MoveGeneration::generateLegalRoot(board);
 
-    MoveOrdering::score<MoveOrdering::Type::AllNoHistory>(movesList, board, nullptr);
+    MoveOrdering::score<MoveOrdering::Type::All>(movesList, board, &heuristics.history);
     movesList.sort();
 
     const std::vector<MoveEntry> &moves = movesList.moves();

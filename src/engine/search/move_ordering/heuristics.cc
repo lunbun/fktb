@@ -3,8 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 
-// Initialize the totals to start at 1 to avoid division by zero. This won't really affect the results.
-HistoryTable::HistoryTable() : total_(1, 1), table_() { }
+HistoryTable::HistoryTable() : table_() { }
 
 
 

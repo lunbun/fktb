@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #include <chrono>
 
 namespace Tests {
@@ -10,7 +11,10 @@ namespace Tests {
     void legalMoveGenTest(const std::string &fen);
 
     // Prints out all moves and their ordering scores for a given position.
-    void moveOrderingTest(const std::string &fen);
+    //
+    // In order for the move ordering to have history heuristic data to work with, a search must be run on a position that has the
+    // desired position to analyze as a child node. This is why we need the movesSequence parameter.
+    void moveOrderingTest(const std::string &fen, const std::vector<std::string> &movesSequence);
 
     // Runs a benchmark on the fixed depth search.
     void benchmark();

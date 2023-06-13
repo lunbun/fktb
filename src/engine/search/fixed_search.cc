@@ -303,8 +303,9 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         MovePriorityQueue moves(movesStart, movesEnd);
 
+        bool isInCheck = board.isInCheck<Turn>();
         if (moves.empty() && !hasTacticalMoves) {
-            if (board.isInCheck<Turn>()) { // Checkmate
+            if (isInCheck) { // Checkmate
                 return Score::mateIn(this->depth_ - depth);
             } else { // Stalemate
                 return 0;
@@ -324,25 +325,55 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         MoveOrdering::score<Turn, MoveOrdering::Type::Quiet>(moves, board, &this->heuristics_.history);
 
         // Search all quiet moves
+        uint16_t nodeIndex = 0;
+
         while (!moves.empty()) {
             Move move = moves.dequeue();
             MakeMoveInfo info = board.makeMove<false>(move);
 
-            int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+            // TODO: Do not reduce moves that give check
+            uint16_t depthReduction = 0;
+            if (depth >= 3 && !isInCheck && nodeIndex >= 4) {
+                // Late move reduction
+                depthReduction = 1;
 
-            board.unmakeMove<false>(move, info);
+                if (nodeIndex >= 10) {
+                    depthReduction = (depth / 3);
+                }
+            }
+
+            int32_t score = -this->search<~Turn>(depth - 1 - depthReduction, -beta, -alpha);
 
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = move;
-                alpha = std::max(alpha, score);
+
+                if (score > alpha) {
+                    if (depthReduction > 0) {
+                        // If the move was above alpha, but we reduced the depth, we have to search the move again with the full
+                        // depth.
+                        score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMove = move;
+                            alpha = std::max(alpha, score);
+                        }
+                    } else {
+                        alpha = score;
+                    }
+                }
             }
+
+            board.unmakeMove<false>(move, info);
 
             if (score >= beta) {
                 this->heuristics_.history.add(Turn, board, move, depth);
                 this->heuristics_.killers.add(depth, move);
                 return bestScore;
             }
+
+            nodeIndex++;
         }
     }
 
