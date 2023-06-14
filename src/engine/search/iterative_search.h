@@ -43,7 +43,7 @@ public:
     void start(const Board &board);
     SearchResult stop();
 
-    [[nodiscard]] INLINE const SearchStatistics &stats() const { return *this->stats_; }
+    [[nodiscard]] INLINE const SearchStatistics &stats() const { return this->stats_; }
 
 private:
     class SearchThread;
@@ -53,8 +53,8 @@ private:
 
     std::vector<IterationCallback> callbacks_;
     SearchResult result_;
-    std::unique_ptr<TranspositionTable> table_;
-    std::unique_ptr<SearchStatistics> stats_;
+    TranspositionTable table_;
+    SearchStatistics stats_;
 
     void notifyCallbacks(const SearchResult &result);
     void receiveResultFromThread(const SearchResult &result);

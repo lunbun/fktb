@@ -188,8 +188,8 @@ void IterativeSearcher::SearchThread::loop() {
 
 
 
-IterativeSearcher::IterativeSearcher(uint32_t threadCount) : threads_(), mutex_(), callbacks_(),
-                                                             result_(SearchResult::invalid()), table_(nullptr) {
+IterativeSearcher::IterativeSearcher(uint32_t threadCount) : threads_(), mutex_(), callbacks_(), result_(SearchResult::invalid()),
+                                                             table_(4194304), stats_() {
     // Lazy SMP seems to be broken atm so only allow one thread
     assert(threadCount == 1);
 
@@ -229,8 +229,8 @@ void IterativeSearcher::start(const Board &board) {
     std::lock_guard<std::mutex> lock(this->mutex_);
 
     this->result_ = SearchResult::invalid();
-    this->table_ = std::make_unique<TranspositionTable>(4194304);
-    this->stats_ = std::make_unique<SearchStatistics>();
+    this->table_.clear();
+    this->stats_.reset();
 
     Board boardCopy = board.copy();
     RootMoveList rootMoves = MoveGeneration::generateLegalRoot(boardCopy);
@@ -239,7 +239,7 @@ void IterativeSearcher::start(const Board &board) {
     std::mt19937 generator(device());
 
     for (uint32_t i = 0; i < this->threads_.size(); i++) {
-        std::unique_ptr<SearchTask> task = std::make_unique<SearchTask>(board, *this->table_, *this->stats_);
+        std::unique_ptr<SearchTask> task = std::make_unique<SearchTask>(board, this->table_, this->stats_);
 
         // Create a copy of the root moves so that we can modify it
         RootMoveList rootMoveOrder = rootMoves;
@@ -305,8 +305,8 @@ SearchResult IterativeSearcher::stop() {
     SearchResult result = std::move(this->result_);
 
     this->result_ = SearchResult::invalid();
-    this->table_ = nullptr;
-    this->stats_ = nullptr;
+    this->table_.clear();
+    this->stats_.reset();
 
     return result;
 }

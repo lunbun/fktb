@@ -2,9 +2,11 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include <cstring>
 #include <random>
 #include <array>
 #include <cassert>
+#include <stdexcept>
 
 #include "engine/move/move.h"
 #include "engine/board/square.h"
@@ -75,18 +77,28 @@ uint64_t Zobrist::piece(Piece piece, Square square) {
 
 
 void TranspositionTable::Entry::store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
-    this->key_ = key;
-    this->depth_ = depth;
-    this->flag_ = flag;
-    this->bestMove_ = bestMove;
-    this->bestScore_ = bestScore;
+    this->data1_ = 0;
+    this->data1_ |= ((key >> MinimumTableSizeLog2) & UpperBitsKeyMask) << UpperBitsKeyShift;
+    this->data1_ |= (depth & DepthMask) << DepthShift;
+    this->data1_ |= (static_cast<uint64_t>(flag) & FlagMask) << FlagShift;
+
+    this->data2_ = 0;
+    this->data2_ |= (bestMove.bits() & BestMoveMask) << BestMoveShift;
+    this->data2_ |= (static_cast<uint32_t>(bestScore) & BestScoreMask) << BestScoreShift;
 }
 
 TranspositionTable::TranspositionTable(uint32_t size) {
-    bool powerOfTwo = (size != 0) && !(size & (size - 1));
-    assert(powerOfTwo && "Transposition table size must be a power of two.");
+    if (size < MinimumTableSize) {
+        throw std::invalid_argument("Transposition table size is not large enough.");
+    }
 
-    this->sizeMask_ = size - 1;
+    bool powerOfTwo = (size != 0) && !(size & (size - 1));
+    if (!powerOfTwo) {
+        throw std::invalid_argument("Transposition table size must be a power of two.");
+    }
+
+    this->size_ = size;
+    this->indexMask_ = size - 1;
 
     this->entries_ = static_cast<Entry *>(std::calloc(size, sizeof(Entry)));
 }
@@ -95,10 +107,16 @@ TranspositionTable::~TranspositionTable() {
     std::free(this->entries_);
 }
 
-TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {
-    Entry *entry = this->entries_ + (key & this->sizeMask_);
+void TranspositionTable::clear() {
+    std::memset(this->entries_, 0, (this->size_) * sizeof(Entry));
+}
 
-    if (entry->isValid() && entry->key() == key) {
+TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {
+    Entry *entry = this->entries_ + (key & this->indexMask_);
+
+    uint64_t upperBitsKey = (key >> MinimumTableSizeLog2) & UpperBitsKeyMask;
+
+    if (entry->isValid() && entry->upperBitsKey() == upperBitsKey) {
         return entry;
     } else {
         return nullptr;
@@ -106,7 +124,7 @@ TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {
 }
 
 void TranspositionTable::store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
-    Entry *entry = this->entries_ + (key & this->sizeMask_);
+    Entry *entry = this->entries_ + (key & this->indexMask_);
 
     // Only overwrite an existing entry if the new entry has a higher depth
     if (!entry->isValid() || depth > entry->depth()) {

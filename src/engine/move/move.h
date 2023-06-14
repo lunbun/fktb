@@ -53,7 +53,10 @@ public:
     // Creates a move from a UCI string.
     static Move fromUci(const std::string &uci, const Board &board);
 
+    INLINE constexpr explicit Move(uint16_t bits) : bits_(bits) { }
     INLINE constexpr Move(Square from, Square to, MoveFlag flags) : bits_((flags << 12) | (to << 6) | from) { }
+
+    [[nodiscard]] INLINE constexpr uint16_t bits() const { return this->bits_; }
 
     // Returns the square that the piece was moved from.
     [[nodiscard]] INLINE constexpr Square from() const { return this->bits_ & 0x3F; }
