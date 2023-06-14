@@ -249,7 +249,15 @@ INLINE int32_t evaluateFastForSide(const Board &board) {
 // Stage 1 of lazy evaluation for both sides, subtracting the evaluation for the other side.
 template<GamePhase Phase, Color Side>
 int32_t evaluateFast(const Board &board) {
-    return evaluateFastForSide<Phase, Side>(board) - evaluateFastForSide<Phase, ~Side>(board);
+    int32_t score = evaluateFastForSide<Phase, Side>(board) - evaluateFastForSide<Phase, ~Side>(board);
+
+    // Tempo bonus
+    if constexpr (Phase == GamePhase::Opening) {
+        constexpr int32_t TempoBonus = 20;
+        score += TempoBonus;
+    }
+
+    return score;
 }
 
 // Stage 2 of lazy evaluation (slower evaluation, only done if the fast evaluation does not cause a cutoff)
@@ -257,8 +265,8 @@ template<GamePhase Phase, Color Side>
 INLINE int32_t evaluateCompleteForSide(const Board &board) {
     int32_t score = 0;
 
+    // King safety
     if constexpr (Phase == GamePhase::Opening) {
-        // King safety
         score += evaluateKingSafety<Side>(board);
     }
 
