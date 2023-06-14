@@ -130,14 +130,14 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
 
     Board &board = this->board_;
 
-    int32_t standPat = Evaluation::evaluate<Turn>(board);
+    int32_t standPat = Evaluation::evaluate<Turn>(board, alpha, beta);
     if (standPat >= beta) {
         return beta;
     }
 
     // Delta pruning
-    int32_t delta = (PieceMaterial::Queen + 200);
-    if (standPat + delta <= alpha) {
+    constexpr int32_t Delta = 1100;
+    if (standPat + Delta < alpha) {
         return alpha;
     }
 
@@ -315,7 +315,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         if (depth == 1 && !isInCheck) {
             constexpr int32_t FutilityMargin = 300;
 
-            int32_t evaluation = Evaluation::evaluate<Turn>(board);
+            int32_t evaluation = Evaluation::evaluate<Turn>(board, alpha, beta);
 
             if (evaluation + FutilityMargin <= alpha) {
                 return alpha;

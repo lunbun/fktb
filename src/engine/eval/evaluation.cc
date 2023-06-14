@@ -229,9 +229,9 @@ INLINE int32_t evaluateKingSafety(const Board &board) {
 
 
 
-// Evaluates the board for the given side and game phase.
+// Stage 1 of lazy evaluation (fast evaluation)
 template<GamePhase Phase, Color Side>
-INLINE int32_t evaluateForSide(const Board &board) {
+INLINE int32_t evaluateFastForSide(const Board &board) {
     int32_t score = 0;
 
     // Material
@@ -243,6 +243,20 @@ INLINE int32_t evaluateForSide(const Board &board) {
     // Piece square tables
     score += board.pieceSquareEval(Phase, Side);
 
+    return score;
+}
+
+// Stage 1 of lazy evaluation for both sides, subtracting the evaluation for the other side.
+template<GamePhase Phase, Color Side>
+int32_t evaluateFast(const Board &board) {
+    return evaluateFastForSide<Phase, Side>(board) - evaluateFastForSide<Phase, ~Side>(board);
+}
+
+// Stage 2 of lazy evaluation (slower evaluation, only done if the fast evaluation does not cause a cutoff)
+template<GamePhase Phase, Color Side>
+INLINE int32_t evaluateCompleteForSide(const Board &board) {
+    int32_t score = 0;
+
     if constexpr (Phase == GamePhase::Opening) {
         // King safety
         score += evaluateKingSafety<Side>(board);
@@ -251,29 +265,59 @@ INLINE int32_t evaluateForSide(const Board &board) {
     return score;
 }
 
-// Evaluates the board for the given side and game phase, subtracting the evaluation for the other side.
+// Stage 2 of lazy evaluation for both sides, subtracting the evaluation for the other side.
 template<GamePhase Phase, Color Side>
-int32_t evaluate(const Board &board) {
-    return evaluateForSide<Phase, Side>(board) - evaluateForSide<Phase, ~Side>(board);
+int32_t evaluateComplete(const Board &board) {
+    return evaluateCompleteForSide<Phase, Side>(board) - evaluateCompleteForSide<Phase, ~Side>(board);
 }
 
 // Evaluates the board for the given side, subtracting the evaluation for the other side. Interpolates between the opening and end
 // game phases.
 template<Color Side>
-int32_t Evaluation::evaluate(const Board &board) {
+int32_t Evaluation::evaluate(const Board &board, int32_t alpha, int32_t beta) {
+    constexpr int32_t LazyEvalMargin = 150;
+
     uint16_t phase = TaperedEval::calculateContinuousPhase(board);
 
     if (phase == GamePhase::Opening) { // Strictly opening
-        return evaluate<GamePhase::Opening, Side>(board);
-    } else if (phase == GamePhase::End) { // Strictly end game
-        return evaluate<GamePhase::End, Side>(board);
-    } else { // Interpolate between opening and end game
-        int32_t openingScore = evaluate<GamePhase::Opening, Side>(board);
-        int32_t endScore = evaluate<GamePhase::End, Side>(board);
 
+        int32_t score = evaluateFast<GamePhase::Opening, Side>(board);
+
+        // Check if we can prune the evaluation.
+        if (score - LazyEvalMargin > beta || score + LazyEvalMargin < alpha) {
+            return score;
+        }
+
+        return score + evaluateComplete<GamePhase::Opening, Side>(board);
+
+    } else if (phase == GamePhase::End) { // Strictly end game
+
+        int32_t score = evaluateFast<GamePhase::End, Side>(board);
+
+        // Check if we can prune the evaluation.
+        if (score - LazyEvalMargin > beta || score + LazyEvalMargin < alpha) {
+            return score;
+        }
+
+        return score + evaluateComplete<GamePhase::End, Side>(board);
+
+    } else { // Interpolate between opening and end game
+
+        int32_t openingScore = evaluateFast<GamePhase::Opening, Side>(board);
+        int32_t endScore = evaluateFast<GamePhase::End, Side>(board);
+        int32_t score = TaperedEval::interpolate(openingScore, endScore, phase);
+
+        // Check if we can prune the evaluation.
+        if (score - LazyEvalMargin > beta || score + LazyEvalMargin < alpha) {
+            return score;
+        }
+
+        openingScore += evaluateComplete<GamePhase::Opening, Side>(board);
+        endScore += evaluateComplete<GamePhase::End, Side>(board);
         return TaperedEval::interpolate(openingScore, endScore, phase);
+
     }
 }
 
-template int32_t Evaluation::evaluate<Color::White>(const Board &board);
-template int32_t Evaluation::evaluate<Color::Black>(const Board &board);
+template int32_t Evaluation::evaluate<Color::White>(const Board &, int32_t, int32_t);
+template int32_t Evaluation::evaluate<Color::Black>(const Board &, int32_t, int32_t);
