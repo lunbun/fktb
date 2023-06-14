@@ -31,10 +31,6 @@ namespace Tests {
     // Verifies that the Zobrist hash is working correctly.
     void hashTest(const std::string &fen, uint16_t depth);
 
-    // Verifies that the transposition table is locking correctly, and that no two threads can write/read at the same
-    // time.
-    void transpositionLockTest();
-
     // Performs a perft test on a given position.
     void perft(const std::string &fen, uint16_t depth);
 }

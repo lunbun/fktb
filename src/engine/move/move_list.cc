@@ -75,7 +75,7 @@ bool RootMoveList::empty() const {
 }
 
 void RootMoveList::loadHashMove(const Board &board, const TranspositionTable &table) {
-    TranspositionTable::LockedEntry entry = table.load(board.hash());
+    TranspositionTable::Entry *entry = table.load(board.hash());
 
     if (entry == nullptr) {
         return;

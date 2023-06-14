@@ -254,9 +254,8 @@ void IterativeSearcher::start(const Board &board) {
             task->depth = 1;
 
             // Only permit the first thread to use the hash move, since otherwise, multiple threads will be searching
-            // the hash move at the same time, leading to lots of wasted search time (lots of time will be spent waiting
-            // on the transposition table lock since many threads are trying to access the same entry since they are
-            // searching the same tree).
+            // the hash move at the same time, leading to lots of wasted search time (lots of time will be wasted since they are
+            // all searching the same tree).
             task->canUseHashMove = true;
         } else {
             // Other threads are helper threads, so they should randomize the root move order and start at a higher

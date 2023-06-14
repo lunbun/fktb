@@ -68,7 +68,7 @@ SearchLine FixedDepthSearcher::search(RootMoveList moves) {
             break;
         }
 
-        TranspositionTable::LockedEntry entry = this->table_.load(board.hash());
+        TranspositionTable::Entry *entry = this->table_.load(board.hash());
         if (entry == nullptr || entry->depth() < depth || entry->flag() != TranspositionTable::Flag::Exact) {
             break;
         }
@@ -401,25 +401,23 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
 
     // Transposition table lookup
     Move hashMove = Move::invalid();
-    {
-        TranspositionTable::LockedEntry entry = table.load(board.hash());
-        if (entry != nullptr) {
-            hashMove = entry->bestMove();
+    TranspositionTable::Entry *entry = table.load(board.hash());
+    if (entry != nullptr) {
+        hashMove = entry->bestMove();
 
-            if (entry->depth() >= depth) {
-                this->stats_.incrementTranspositionHits();
+        if (entry->depth() >= depth) {
+            this->stats_.incrementTranspositionHits();
 
-                if (entry->flag() == TranspositionTable::Flag::Exact) {
-                    return entry->bestScore();
-                } else if (entry->flag() == TranspositionTable::Flag::LowerBound) {
-                    alpha = std::max(alpha, entry->bestScore());
-                } else if (entry->flag() == TranspositionTable::Flag::UpperBound) {
-                    beta = std::min(beta, entry->bestScore());
-                }
+            if (entry->flag() == TranspositionTable::Flag::Exact) {
+                return entry->bestScore();
+            } else if (entry->flag() == TranspositionTable::Flag::LowerBound) {
+                alpha = std::max(alpha, entry->bestScore());
+            } else if (entry->flag() == TranspositionTable::Flag::UpperBound) {
+                beta = std::min(beta, entry->bestScore());
+            }
 
-                if (alpha >= beta) {
-                    return entry->bestScore();
-                }
+            if (alpha >= beta) {
+                return entry->bestScore();
             }
         }
     }

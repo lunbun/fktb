@@ -74,21 +74,6 @@ uint64_t Zobrist::piece(Piece piece, Square square) {
 
 
 
-TranspositionTable::LockedEntry::LockedEntry() {
-    this->entry_ = nullptr;
-}
-
-TranspositionTable::LockedEntry::LockedEntry(Entry *entry) {
-    entry->lock().lock();
-    this->entry_ = entry;
-}
-
-TranspositionTable::LockedEntry::~LockedEntry() {
-    if (this->entry_ != nullptr) {
-        this->entry_->lock().unlock();
-    }
-}
-
 void TranspositionTable::Entry::store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
     this->key_ = key;
     this->depth_ = depth;
@@ -110,32 +95,22 @@ TranspositionTable::~TranspositionTable() {
     std::free(this->entries_);
 }
 
-TranspositionTable::LockedEntry TranspositionTable::load(uint64_t key) const {
-    LockedEntry lockedEntry(this->entries_ + (key & this->sizeMask_));
+TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {
+    Entry *entry = this->entries_ + (key & this->sizeMask_);
 
-    if (lockedEntry->isValid() && lockedEntry->key() == key) {
-        return lockedEntry;
+    if (entry->isValid() && entry->key() == key) {
+        return entry;
     } else {
-        return { };
+        return nullptr;
     }
 }
 
 void TranspositionTable::store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
-    LockedEntry lockedEntry(this->entries_ + (key & this->sizeMask_));
+    Entry *entry = this->entries_ + (key & this->sizeMask_);
 
     // Only overwrite an existing entry if the new entry has a higher depth
-    if (!lockedEntry->isValid() || depth > lockedEntry->depth()) {
+    if (!entry->isValid() || depth > entry->depth()) {
         // Write the new entry
-        lockedEntry->store(key, depth, flag, bestMove, bestScore);
+        entry->store(key, depth, flag, bestMove, bestScore);
     }
-}
-
-TranspositionTable::Entry *TranspositionTable::debugLoadWithoutLock(uint64_t key) {
-    return this->entries_ + (key & this->sizeMask_);
-}
-
-void TranspositionTable::debugStoreWithoutLock(uint64_t key, uint16_t depth, Flag flag, Move bestMove,
-    int32_t bestScore) {
-    Entry *entry = this->entries_ + (key & this->sizeMask_);
-    entry->store(key, depth, flag, bestMove, bestScore);
 }
