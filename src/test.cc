@@ -118,6 +118,28 @@ void Tests::moveOrderingTest(const std::string &fen, const std::vector<std::stri
 
 
 
+// Repetition test
+void Tests::repetitionTest(const std::string &fen, const std::vector<std::string> &movesSequence) {
+    Board board = Board::fromFen(fen);
+
+    // Make the moves
+    for (const std::string &moveStr : movesSequence) {
+        Move move = Move::fromUci(moveStr, board);
+
+        std::cout << move.debugName(board);
+
+        board.makeMove<MakeMoveType::All>(move);
+
+        if (board.isRepetition()) {
+            std::cout << " is a repetition" << std::endl;
+        } else {
+            std::cout << " is not a repetition" << std::endl;
+        }
+    }
+}
+
+
+
 // Benchmark
 void Tests::benchmark() {
     // Run the fixed depth search on starting position, depth 8 five times

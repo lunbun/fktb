@@ -5,6 +5,8 @@
 #include "engine/inline.h"
 
 namespace Score {
+    constexpr static int32_t Draw = 0;
+
     INLINE constexpr int32_t mateIn(uint16_t ply) { return -INT32_MAX + ply; }
 
     INLINE constexpr bool isMate(int32_t score) {

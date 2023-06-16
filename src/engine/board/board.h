@@ -33,8 +33,9 @@ namespace MakeMoveFlags {
                                                         // not synchronize with changes in gameplay information.
     constexpr uint32_t Evaluation   = 0x08;             // Update the evaluation (material and piece-square tables)?
     constexpr uint32_t Bitboards    = 0x10;             // Update the bitboards?
+    constexpr uint32_t Repetition   = 0x20;             // Update the three-fold repetition hash list?
 
-    constexpr uint32_t Unmake       = 0x20;             // Flag used internally to indicate a move is being unmade. Do not pass this flag
+    constexpr uint32_t Unmake       = 0x40;             // Flag used internally to indicate a move is being unmade. Do not pass this flag
                                                         // to makeMove/unmakeMove.
 }
 
@@ -42,11 +43,11 @@ namespace MakeMoveFlags {
 namespace MakeMoveType {
     // Makes a move and updates all information.
     constexpr uint32_t All                  = MakeMoveFlags::Turn | MakeMoveFlags::Gameplay | MakeMoveFlags::Hash |
-                                              MakeMoveFlags::Evaluation | MakeMoveFlags::Bitboards;
+                                              MakeMoveFlags::Evaluation | MakeMoveFlags::Bitboards | MakeMoveFlags::Repetition;
 
     // Makes a move and updates all information except the turn.
     constexpr uint32_t AllNoTurn            = MakeMoveFlags::Gameplay | MakeMoveFlags::Hash | MakeMoveFlags::Evaluation |
-                                              MakeMoveFlags::Bitboards;
+                                              MakeMoveFlags::Bitboards | MakeMoveFlags::Repetition;
 
     // Makes a move and updates only the hash.
     constexpr uint32_t HashOnly             = MakeMoveFlags::Hash;
@@ -59,6 +60,7 @@ namespace MakeMoveType {
 
 struct MakeMoveInfo {
     uint64_t oldHash;
+    uint32_t oldPliesSinceIrreversible;
     CastlingRights oldCastlingRights;
     Square oldEnPassantSquare;
     Piece captured;
@@ -125,6 +127,9 @@ public:
     template<Color Side>
     [[nodiscard]] bool isInCheck() const;
 
+    // Returns true if this position has existed before in the game.
+    [[nodiscard]] bool isRepetition() const;
+
     template<uint32_t Flags>
     void addKing(Color color, Square square);
     template<uint32_t Flags>
@@ -148,9 +153,13 @@ private:
     Color turn_;
     uint64_t hash_;
 
-    ColorMap<Square> kings_;
+    std::vector<uint64_t> repetitionHashes_;
+    uint32_t pliesSinceIrreversible_;
+
     CastlingRights castlingRights_;
     Square enPassantSquare_;
+
+    ColorMap<Square> kings_;
     SquareMap<Piece> pieces_;
     ColorMap<std::array<Bitboard, 5>> bitboards_;
 
@@ -165,6 +174,10 @@ private:
     // Updates the hash and en passant square.
     template<uint32_t Flags>
     void enPassantSquare(Square newEnPassantSquare);
+
+    // Updates the repetition hashes for making a move.
+    template<uint32_t Flags>
+    void updateRepetitionHashes(Move move);
 
     // Moves/unmoves a piece from one square to another. Returns the piece that was moved.
     template<uint32_t Flags>

@@ -16,6 +16,9 @@ namespace Tests {
     // desired position to analyze as a child node. This is why we need the movesSequence parameter.
     void moveOrderingTest(const std::string &fen, const std::vector<std::string> &movesSequence);
 
+    // For each move in the sequence, prints out if the move is a repetition or not.
+    void repetitionTest(const std::string &fen, const std::vector<std::string> &movesSequence);
+
     // Runs a benchmark on the fixed depth search.
     void benchmark();
 

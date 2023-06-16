@@ -13,7 +13,8 @@
 Board::Board(Color turn, CastlingRights castlingRights, Square enPassantSquare) : material_(), pieceSquareEval_(), turn_(turn),
                                                                                   hash_(0), castlingRights_(castlingRights),
                                                                                   enPassantSquare_(enPassantSquare), pieces_(),
-                                                                                  bitboards_(),
+                                                                                  bitboards_(), repetitionHashes_(),
+                                                                                  pliesSinceIrreversible_(0),
                                                                                   kings_(Square::Invalid, Square::Invalid) {
     this->pieces_.fill(Piece::empty());
     this->bitboards_.white().fill(0);
@@ -24,6 +25,8 @@ Board::Board(Color turn, CastlingRights castlingRights, Square enPassantSquare) 
     }
     this->hash_ ^= Zobrist::castlingRights(castlingRights);
     this->hash_ ^= Zobrist::enPassantSquare(enPassantSquare);
+
+    this->repetitionHashes_.reserve(64);
 }
 
 Board::~Board() = default;
@@ -91,6 +94,31 @@ bool Board::isInCheck() const {
 
 template bool Board::isInCheck<Color::White>() const;
 template bool Board::isInCheck<Color::Black>() const;
+
+// Returns true if this position has existed before in the game.
+bool Board::isRepetition() const {
+    // There must be at least 4 plies since the last irreversible move, because it takes at minimum 4 plies for both sides to
+    // shuffle back-and-forth to repeat a position.
+    constexpr uint32_t MinPliesSinceIrreversible = 4;
+
+    if (this->repetitionHashes_.empty() || this->pliesSinceIrreversible_ < MinPliesSinceIrreversible) {
+        return false;
+    }
+
+    // Iterate backwards through the repetition hashes, starting at the most recent one.
+    // We only have to check every other hash because of the turn.
+    //
+    // Kinda a hack, but using signed integers to avoid unsigned index underflow :)
+    auto startIndex = static_cast<int32_t>(this->repetitionHashes_.size() - MinPliesSinceIrreversible);
+    auto endIndex = static_cast<int32_t>(this->repetitionHashes_.size() - this->pliesSinceIrreversible_);
+    for (int32_t i = startIndex; i >= endIndex; i -= 2) {
+        if (this->repetitionHashes_[i] == this->hash_) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 
 
@@ -195,6 +223,29 @@ INLINE void Board::enPassantSquare(Square newEnPassantSquare) {
 
     if constexpr (Flags & MakeMoveFlags::Gameplay) {
         this->enPassantSquare_ = newEnPassantSquare;
+    }
+}
+
+// Updates the repetition hashes for making a move.
+template<uint32_t Flags>
+INLINE void Board::updateRepetitionHashes(Move move) {
+    static_assert(!(Flags & MakeMoveFlags::Unmake), "Can only update repetition hashes for making a move");
+    static_assert(Flags & MakeMoveFlags::Repetition, "Can only update repetition hashes if repetition is enabled");
+
+    // Push the current hash onto the repetition list
+    this->repetitionHashes_.push_back(this->hash_);
+
+    // Check if the move is irreversible
+    // TODO: Moves that lose castling rights are also irreversible
+    //  (imperfect move irreversibility does not affect the results, it just makes it slower because it has to check more previous
+    //  positions)
+    bool isIrreversible = move.isCapture() || move.isPromotion() || move.isCastle()
+        || (this->pieceAt(move.from()).type() == PieceType::Pawn);
+
+    if (isIrreversible) {
+        this->pliesSinceIrreversible_ = 0;
+    } else {
+        this->pliesSinceIrreversible_++;
     }
 }
 
@@ -338,6 +389,13 @@ MakeMoveInfo Board::makeMove(Move move) {
         oldEnPassantSquare = this->enPassantSquare();
     }
 
+    // Update the three-fold repetition hashes
+    uint32_t oldPliesSinceIrreversible;
+    if constexpr (Flags & MakeMoveFlags::Repetition) {
+        oldPliesSinceIrreversible = this->pliesSinceIrreversible_;
+        this->updateRepetitionHashes<Flags>(move);
+    }
+
     // Reset en passant square (if the move is a double pawn push, will be set to correct value later during makeQuietMove)
     this->enPassantSquare<Flags>(Square::Invalid);
 
@@ -375,7 +433,7 @@ MakeMoveInfo Board::makeMove(Move move) {
         this->turn_ = ~this->turn_;
     }
 
-    return { oldHash, oldCastlingRights, oldEnPassantSquare, captured };
+    return { oldHash, oldPliesSinceIrreversible, oldCastlingRights, oldEnPassantSquare, captured };
 }
 
 template<uint32_t Flags>
@@ -396,6 +454,12 @@ void Board::unmakeMove(Move move, MakeMoveInfo info) {
     if (move.isCapture()) { // Captures
         // Add the captured piece back
         this->addPiece<UnmakeFlags>(info.captured, move.capturedSquare());
+    }
+
+    // Restore the old repetition hashes
+    if constexpr (Flags & MakeMoveFlags::Repetition) {
+        this->repetitionHashes_.pop_back();
+        this->pliesSinceIrreversible_ = info.oldPliesSinceIrreversible;
     }
 
     // Restore the old hash
@@ -426,16 +490,19 @@ template void Board::unmakeMove<MakeMoveType::BitboardsOnly>(Move, MakeMoveInfo)
 // Makes/unmakes a null move.
 MakeMoveInfo Board::makeNullMove() {
     uint64_t oldHash = this->hash_;
+    uint32_t oldPliesSinceIrreversible = this->pliesSinceIrreversible_;
     CastlingRights oldCastlingRights = this->castlingRights_;
     Square oldEnPassantSquare = this->enPassantSquare_;
 
+    // TODO: Update three-fold repetition?
+
     // Reset en passant square
-    this->enPassantSquare<MakeMoveType::All>(Square::Invalid);
+    this->enPassantSquare<MakeMoveType::AllNoTurn>(Square::Invalid);
 
     // Switch the turn
     this->hash_ ^= Zobrist::blackToMove();
 
-    return { oldHash, oldCastlingRights, oldEnPassantSquare, Piece::empty() };
+    return { oldHash, oldPliesSinceIrreversible, oldCastlingRights, oldEnPassantSquare, Piece::empty() };
 }
 
 void Board::unmakeNullMove(MakeMoveInfo info) {

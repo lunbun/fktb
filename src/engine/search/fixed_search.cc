@@ -181,7 +181,12 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     Board &board = this->board_;
 
-    // Stage 1: Null move pruning
+    // Stage 1: Check for repetition
+    if (alpha < Score::Draw && board.isRepetition()) {
+        return Score::Draw;
+    }
+
+    // Stage 2: Null move pruning
     bool isInCheck = board.isInCheck<Turn>();
     // TODO: Make this less risky (e.g. zugzwang detection?)
     if (depth >= 3 && !isInCheck) {
@@ -201,7 +206,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     int32_t bestScore = -INT32_MAX;
 
-    // Stage 2: Hash move
+    // Stage 3: Hash move
     //
     // Try the hash move first, if it exists. We can save all move generation entirely if the hash move causes a beta-cutoff.
     //
@@ -232,7 +237,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
     }
 
-    // Stage 3: Tactical move search
+    // Stage 4: Tactical move search
     AlignedMoveEntry moveBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
@@ -273,7 +278,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
     }
 
-    // Stage 4: Killer moves
+    // Stage 5: Killer moves
     for (Move killer : this->heuristics_.killers[depth]) {
         if (!killer.isValid() || !legalityChecker.isLegal(killer)) {
             continue;
@@ -297,7 +302,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
     }
 
-    // Stage 5: Quiet move search
+    // Stage 6: Quiet move search
     {
         MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Quiet>(board, movesStart);
 
@@ -305,9 +310,10 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         if (moves.empty() && !hasTacticalMoves) {
             if (isInCheck) { // Checkmate
+                // TODO: If depth is reduced, the mate-in score will be incorrect
                 return Score::mateIn(this->depth_ - depth);
             } else { // Stalemate
-                return 0;
+                return Score::Draw;
             }
         }
 

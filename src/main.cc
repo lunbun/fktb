@@ -6,7 +6,7 @@
 #include "uci.h"
 
 [[noreturn]] void uci() {
-    UciHandler uci("chess engine", "me");
+    UciHandler uci("FKTB 0.0.48", "frogscats");
 
     uci.run();
 }
