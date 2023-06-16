@@ -494,8 +494,6 @@ MakeMoveInfo Board::makeNullMove() {
     CastlingRights oldCastlingRights = this->castlingRights_;
     Square oldEnPassantSquare = this->enPassantSquare_;
 
-    // TODO: Update three-fold repetition?
-
     // Reset en passant square
     this->enPassantSquare<MakeMoveType::AllNoTurn>(Square::Invalid);
 

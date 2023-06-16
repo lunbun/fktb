@@ -181,10 +181,15 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     Board &board = this->board_;
 
+    uint16_t gamePhase = TaperedEval::calculateContinuousPhase(board);
+
     // Stage 1: Null move pruning
     bool isInCheck = board.isInCheck<Turn>();
-    // TODO: Make this less risky (e.g. zugzwang detection?)
-    if (depth >= 3 && !isInCheck) {
+    // TODO: Make this less risky
+    // TODO: Null move pruning can sometimes cause the search to erroneously go for a draw by repetition when it has a mate
+    //  (example FEN: "8/8/3k4/2r5/1K6/8/8/8 w - - 22 78"). Need to figure out how to make null move pruning work well with
+    //  repetition detection.
+    if (depth >= 3 && gamePhase != GamePhase::End && !isInCheck) {
         MakeMoveInfo info = board.makeNullMove();
 
         // TODO: Is it safe to pass -beta + 1 as the beta parameter here?
