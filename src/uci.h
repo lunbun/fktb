@@ -5,7 +5,9 @@
 #include <string>
 #include <optional>
 #include <memory>
+#include <functional>
 
+#include "engine/board/color.h"
 #include "engine/board/board.h"
 #include "engine/search/iterative_search.h"
 
@@ -22,8 +24,14 @@ private:
     std::vector<std::string> tokens_;
 };
 
+struct TimeControl {
+    ColorMap<std::optional<int32_t>> time;
+    ColorMap<std::optional<int32_t>> increment;
+};
+
 struct SearchOptions {
     bool infinite = false;
+    TimeControl timeControl;
     std::optional<uint16_t> depth;
     std::optional<uint64_t> nodes;
     std::optional<int32_t> moveTime;
@@ -66,6 +74,8 @@ private:
 
 
     void startSearch(const SearchOptions &options);
+    void stopSearchAfter(std::chrono::milliseconds duration);
+    void stopSearchAfter(const std::function<bool()> &condition);
     void stopSearch();
     void iterationCallback(const SearchResult &result);
 };

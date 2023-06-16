@@ -186,6 +186,18 @@ void UciHandler::handleGo(TokenStream &tokens) {
 
         if (command == "infinite") {
             options.infinite = true;
+        } else if (command == "wtime") {
+            if (tokens.isEnd()) return this->error("wtime command requires an argument");
+            options.timeControl.time.white() = std::stoi(tokens.next());
+        } else if (command == "btime") {
+            if (tokens.isEnd()) return this->error("btime command requires an argument");
+            options.timeControl.time.black() = std::stoi(tokens.next());
+        } else if (command == "winc") {
+            if (tokens.isEnd()) return this->error("winc command requires an argument");
+            options.timeControl.increment.white() = std::stoi(tokens.next());
+        } else if (command == "binc") {
+            if (tokens.isEnd()) return this->error("binc command requires an argument");
+            options.timeControl.increment.black() = std::stoi(tokens.next());
         } else if (command == "depth") {
             if (tokens.isEnd()) return this->error("depth command requires an argument");
             options.depth = std::stoi(tokens.next());
@@ -265,28 +277,52 @@ void UciHandler::startSearch(const SearchOptions &options) {
 
     this->searcher_->start(*this->board_);
 
+    Color us = this->board_->turn();
+
+    // Time control
+    if (options.timeControl.time[us].has_value()) {
+        int32_t time = options.timeControl.time[us].value();
+
+        // Assume we have 40 moves left
+        int32_t movesLeft = 40;
+
+        int32_t timeLimit = time / movesLeft;
+        this->stopSearchAfter(std::chrono::milliseconds(timeLimit));
+    }
+
+    // Node limit
     if (options.nodes.has_value()) {
         uint64_t nodes = options.nodes.value();
-
-        // Start a new thread to stop the search after the given number of nodes
-        // It's possible that we may run into thread safety issues here
-        std::thread([this, nodes]() {
-            while (this->isSearching_ && this->searcher_->stats().nodeCount() < nodes) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            this->stopSearch();
-        }).detach();
+        this->stopSearchAfter([this, nodes]() {
+            return this->searcher_->stats().nodeCount() >= nodes;
+        });
     }
+
+    // Move time limit
     if (options.moveTime.has_value()) {
         int32_t moveTime = options.moveTime.value();
-
-        // Start a new thread to stop the search after the given time
-        // It's possible that we may run into thread safety issues here
-        std::thread([this, moveTime]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds(moveTime));
-            this->stopSearch();
-        }).detach();
+        this->stopSearchAfter(std::chrono::milliseconds(moveTime));
     }
+}
+
+void UciHandler::stopSearchAfter(std::chrono::milliseconds duration) {
+    // Start a new thread to stop the search after the given time
+    // It's possible that we may run into thread safety issues here
+    std::thread([this, duration]() {
+        std::this_thread::sleep_for(duration);
+        this->stopSearch();
+    }).detach();
+}
+
+void UciHandler::stopSearchAfter(const std::function<bool()> &condition) {
+    // Start a new thread to stop the search after the given number of nodes
+    // It's possible that we may run into thread safety issues here
+    std::thread([this, condition]() {
+        while (this->isSearching_ && !condition()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        this->stopSearch();
+    }).detach();
 }
 
 void UciHandler::stopSearch() {
@@ -338,7 +374,7 @@ void UciHandler::iterationCallback(const SearchResult &result) {
     }
     std::cout << std::endl;
 
-    // Check if we should stop searching based on search depth
+    // Depth limit
     if (this->searchOptions_->depth.has_value() && result.depth >= this->searchOptions_->depth.value()) {
         // Spawn a new thread to stop the search (cannot stop it from this thread because this thread IS the search
         // thread, since we are in the search callback). Trying to stop it from this thread would cause a deadlock.

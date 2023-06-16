@@ -341,7 +341,6 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
             Move move = moves.dequeue();
             MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
-            // TODO: Do not reduce moves that give check
             uint16_t depthReduction = 0;
             if (depth >= 3 && !isInCheck && nodeIndex >= 4) {
                 // Late move reduction
