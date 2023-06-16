@@ -128,7 +128,7 @@ public:
     [[nodiscard]] bool isInCheck() const;
 
     // Returns true if this position has existed before in the game.
-    [[nodiscard]] bool isRepetition() const;
+    [[nodiscard]] bool isTwofoldRepetition() const;
 
     template<uint32_t Flags>
     void addKing(Color color, Square square);

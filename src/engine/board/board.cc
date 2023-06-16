@@ -96,9 +96,9 @@ template bool Board::isInCheck<Color::White>() const;
 template bool Board::isInCheck<Color::Black>() const;
 
 // Returns true if this position has existed before in the game.
-bool Board::isRepetition() const {
-    // There must be at least 4 plies since the last irreversible move, because it takes at minimum 4 plies for both sides to
-    // shuffle back-and-forth to repeat a position.
+bool Board::isTwofoldRepetition() const {
+    // In order for a repetition to occur, there must be at least 4 plies since the last irreversible move because it takes at
+    // minimum 4 plies for both sides to shuffle back-and-forth to repeat a position.
     constexpr uint32_t MinPliesSinceIrreversible = 4;
 
     if (this->repetitionHashes_.empty() || this->pliesSinceIrreversible_ < MinPliesSinceIrreversible) {

@@ -181,12 +181,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     Board &board = this->board_;
 
-    // Stage 1: Check for repetition
-    if (alpha < Score::Draw && board.isRepetition()) {
-        return Score::Draw;
-    }
-
-    // Stage 2: Null move pruning
+    // Stage 1: Null move pruning
     bool isInCheck = board.isInCheck<Turn>();
     // TODO: Make this less risky (e.g. zugzwang detection?)
     if (depth >= 3 && !isInCheck) {
@@ -206,7 +201,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     int32_t bestScore = -INT32_MAX;
 
-    // Stage 3: Hash move
+    // Stage 2: Hash move
     //
     // Try the hash move first, if it exists. We can save all move generation entirely if the hash move causes a beta-cutoff.
     //
@@ -237,7 +232,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
     }
 
-    // Stage 4: Tactical move search
+    // Stage 3: Tactical move search
     AlignedMoveEntry moveBuffer[MaxMoveCount];
     MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
 
@@ -278,7 +273,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
     }
 
-    // Stage 5: Killer moves
+    // Stage 4: Killer moves
     for (Move killer : this->heuristics_.killers[depth]) {
         if (!killer.isValid() || !legalityChecker.isLegal(killer)) {
             continue;
@@ -302,7 +297,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         }
     }
 
-    // Stage 6: Quiet move search
+    // Stage 5: Quiet move search
     {
         MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Quiet>(board, movesStart);
 
@@ -402,6 +397,15 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
     }
 
     Board &board = this->board_;
+
+    // TODO: I would rather have threefold instead of twofold repetition for correctness, but I can't figure out how to solve the
+    //  problem of the transposition table causing an early return on the second repetition, thereby forgoing the third repetition.
+    // Check for repetition (needs to be done before transposition table lookup because if it's done after, we might return early
+    // due to transposition, and it will not consider repetitions)
+    if (board.isTwofoldRepetition()) {
+        return Score::Draw;
+    }
+
     TranspositionTable &table = this->table_;
 
     // Transposition table lookup

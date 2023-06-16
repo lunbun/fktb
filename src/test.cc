@@ -130,7 +130,7 @@ void Tests::repetitionTest(const std::string &fen, const std::vector<std::string
 
         board.makeMove<MakeMoveType::All>(move);
 
-        if (board.isRepetition()) {
+        if (board.isTwofoldRepetition()) {
             std::cout << " is a repetition" << std::endl;
         } else {
             std::cout << " is not a repetition" << std::endl;
