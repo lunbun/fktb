@@ -33,3 +33,10 @@ private:
 
     [[nodiscard]] bool isLegalCastle(Move move) const;
 };
+
+namespace LegalityCheck {
+    // Checks if a move is both pseudo-legal and legal.
+    // Warning: This is slow because it constructs a LegalityChecker every call, and uses a branch to determine the side. In
+    // performance-critical code, use the LegalityChecker template directly.
+    [[nodiscard]] bool isLegal(Board &board, Move move);
+}

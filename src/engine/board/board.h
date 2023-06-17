@@ -49,9 +49,6 @@ namespace MakeMoveType {
     constexpr uint32_t AllNoTurn            = MakeMoveFlags::Gameplay | MakeMoveFlags::Hash | MakeMoveFlags::Evaluation |
                                               MakeMoveFlags::Bitboards | MakeMoveFlags::Repetition;
 
-    // Makes a move and updates only the hash.
-    constexpr uint32_t HashOnly             = MakeMoveFlags::Hash;
-
     // Makes a move and updates only the bitboards.
     constexpr uint32_t BitboardsOnly        = MakeMoveFlags::Bitboards;
 }

@@ -369,8 +369,12 @@ void UciHandler::iterationCallback(const SearchResult &result) {
     std::cout << " nodes " << result.nodeCount;
     std::cout << " nps " << nps;
     std::cout << " pv ";
-    for (Move move : result.bestLine) {
-        std::cout << move.uci() << " ";
+    for (uint32_t i = 0; i < result.bestLine.size(); i++) {
+        std::cout << result.bestLine[i].uci();
+
+        if (i != result.bestLine.size() - 1) {
+            std::cout << " ";
+        }
     }
     std::cout << std::endl;
 

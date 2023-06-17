@@ -54,10 +54,15 @@ SearchLine FixedDepthSearcher::search(RootMoveList moves) {
     uint16_t depth = this->depth_;
     Move move = node.move;
     while (move.isValid()) {
+        // We have to check that the PV move is legal in case of rare hash key collisions (see
+        // https://www.chessprogramming.org/Transposition_Table#KeyCollisions)
+        if (!LegalityCheck::isLegal(board, move)) {
+            break;
+        }
+
         bestLine.push_back(move);
 
-        // We are only using the board's hash, so we don't need to update anything else
-        board.makeMove<MakeMoveType::HashOnly>(move);
+        board.makeMove<MakeMoveType::All>(move);
 
         // Find the next best move in the line
         depth--;

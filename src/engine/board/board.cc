@@ -479,11 +479,9 @@ void Board::unmakeMove(Move move, MakeMoveInfo info) {
 
 template MakeMoveInfo Board::makeMove<MakeMoveType::All>(Move);
 template MakeMoveInfo Board::makeMove<MakeMoveType::AllNoTurn>(Move);
-template MakeMoveInfo Board::makeMove<MakeMoveType::HashOnly>(Move);
 template MakeMoveInfo Board::makeMove<MakeMoveType::BitboardsOnly>(Move);
 template void Board::unmakeMove<MakeMoveType::All>(Move, MakeMoveInfo);
 template void Board::unmakeMove<MakeMoveType::AllNoTurn>(Move, MakeMoveInfo);
-template void Board::unmakeMove<MakeMoveType::HashOnly>(Move, MakeMoveInfo);
 template void Board::unmakeMove<MakeMoveType::BitboardsOnly>(Move, MakeMoveInfo);
 
 

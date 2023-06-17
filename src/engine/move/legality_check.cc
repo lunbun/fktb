@@ -24,18 +24,21 @@ INLINE bool LegalityChecker<Side>::isPseudoLegalQuiet(Move move, Piece piece) co
         // Ensure the pawn is moving forward, and that we are not moving to the promotion rank.
         if constexpr (Side == Color::White) {
             constexpr uint8_t PromotionRank = 7;
-            if (to.rank() != from.rank() + 1 && to.rank() != PromotionRank) {
+            if (to.rank() != from.rank() + 1 || to.rank() == PromotionRank) {
                 return false;
             }
         } else {
             constexpr uint8_t PromotionRank = 0;
-            if (to.rank() != from.rank() - 1 && to.rank() != PromotionRank) {
+            if (to.rank() != from.rank() - 1 || to.rank() == PromotionRank) {
                 return false;
             }
         }
 
-        // Ensure there is no piece on the to square.
-        return this->empty_.get(to);
+        // Ensure the pawn is moving straight.
+        return (to.file() == from.file())
+
+            // Ensure there is no piece on the to square.
+            && this->empty_.get(to);
     } else {
         Bitboard attacks = Bitboards::nonPawnAttacks(piece.type(), from, this->occupied_);
 
@@ -188,6 +191,7 @@ INLINE bool LegalityChecker<Side>::isPseudoLegalPromotion(Move move, Piece piece
         && (from.file() == to.file());
 }
 
+// Checks if a move is pseudo-legal.
 template<Color Side>
 bool LegalityChecker<Side>::isPseudoLegal(Move move) const {
     if (!move.isValid()) {
@@ -248,6 +252,7 @@ bool LegalityChecker<Side>::isLegalCastle(Move move) const {
     }
 }
 
+// Checks if a move is both pseudo-legal and legal.
 template<Color Side>
 bool LegalityChecker<Side>::isLegal(Move move) const {
     if (!this->isPseudoLegal(move)) {
@@ -274,3 +279,16 @@ bool LegalityChecker<Side>::isLegal(Move move) const {
 
 template class LegalityChecker<Color::White>;
 template class LegalityChecker<Color::Black>;
+
+
+
+// Checks if a move is both pseudo-legal and legal.
+// Warning: This is slow because it constructs a LegalityChecker every call, and uses a branch to determine the side. In
+// performance-critical code, use the LegalityChecker template directly.
+bool LegalityCheck::isLegal(Board &board, Move move) {
+    if (board.turn() == Color::White) {
+        return LegalityChecker<Color::White>(board).isLegal(move);
+    } else {
+        return LegalityChecker<Color::Black>(board).isLegal(move);
+    }
+}
