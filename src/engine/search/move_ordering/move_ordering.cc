@@ -75,7 +75,7 @@ int32_t MoveScorer<Side, Flags>::score(Move move) {
     // History heuristics
     if constexpr (Flags & MoveOrdering::Flags::History) {
         if (isQuiet) {
-            score += this->history().score(Side, piece.type(), move.to(), 5000);
+            score += this->history().score(Side, piece.type(), move.to());
         }
     }
 

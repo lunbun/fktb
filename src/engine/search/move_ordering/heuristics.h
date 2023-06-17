@@ -19,7 +19,7 @@ public:
 
     // Returns the history score for the given move. The returned score is normalized based off of the total sum of all history
     // scores so that at higher depths, the history scores aren't insanely high compared to at lower depths.
-    [[nodiscard]] INLINE int32_t score(Color color, PieceType type, Square to, uint32_t scale) const;
+    [[nodiscard]] INLINE int32_t score(Color color, PieceType type, Square to) const;
 
 private:
     ColorMap<PieceTypeMap<SquareMap<uint32_t>>> table_;
@@ -33,7 +33,7 @@ INLINE void HistoryTable::add(Color color, const Board &board, Move move, uint16
 
 // Returns the history score for the given move. The returned score is normalized based off of the total sum of all history scores
 // so that at higher depths, the history scores aren't insanely high compared to at lower depths.
-[[nodiscard]] INLINE int32_t HistoryTable::score(Color color, PieceType type, Square to, uint32_t scale) const {
+[[nodiscard]] INLINE int32_t HistoryTable::score(Color color, PieceType type, Square to) const {
     return static_cast<int32_t>(this->table_[color][type][to]);
 }
 

@@ -33,7 +33,7 @@ private:
     std::vector<std::string> fields_;
 
     std::string pieceField_;
-    int pieceIndex_;
+    uint32_t pieceIndex_;
     int8_t file_, rank_;
 
     std::optional<Entry> nextPiece_;
