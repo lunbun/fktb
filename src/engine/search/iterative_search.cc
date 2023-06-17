@@ -59,13 +59,16 @@ private:
     std::thread thread_;
 
     // Task mutex is used for synchronizing access to task_.
-    std::mutex taskMutex_;
+    //
+    // IMPORTANT NOTE: In order to avoid deadlocks, if you need to lock both the task mutex and manager's mutex, you MUST lock the
+    // manager's mutex first, and then the task mutex.
+    ami::mutex taskMutex_;
 
     // Search mutex is locked when the searcher is searching, and unlocked when it is not. This allows the main thread
     // to wait for the searcher to finish by locking the search mutex.
-    std::mutex searchMutex_;
+    ami::mutex searchMutex_;
 
-    std::condition_variable isSearchingCondition_;
+    std::condition_variable_any isSearchingCondition_;
 
     // IMPORTANT NOTE: Every time you access this, you MUST check if it is nullptr, because there is always the possibility that
     // the search was stopped immediately before you could lock the task mutex.
@@ -86,8 +89,14 @@ IterativeSearcher::SearchThread::SearchThread(IterativeSearcher &manager) : mana
     this->thread_.detach();
 }
 
+// Starts an iterative deepening search beginning from the given depth and root node move order.
 void IterativeSearcher::SearchThread::start(std::unique_ptr<SearchTask> task) {
-    std::lock_guard<std::mutex> lock(this->taskMutex_);
+    assert(this->manager_.mutex_.locked_by_caller() && "SearchThread::start() must be called with the manager's mutex locked");
+    assert(!this->taskMutex_.locked_by_caller() && "SearchThread::start() must not be called with the task mutex locked");
+    assert(!this->searchMutex_.locked_by_caller() && "SearchThread::start() called, but the search mutex is locked (this means "
+                                                     "we tried to start a search while another search is in progress!)");
+
+    std::lock_guard taskLock(this->taskMutex_);
 
     if (this->isSearching()) {
         throw std::runtime_error("Already searching");
@@ -99,7 +108,11 @@ void IterativeSearcher::SearchThread::start(std::unique_ptr<SearchTask> task) {
 }
 
 void IterativeSearcher::SearchThread::stop() {
-    std::lock_guard<std::mutex> lock(this->taskMutex_);
+    assert(this->manager_.mutex_.locked_by_caller() && "SearchThread::stop() must be called with the manager's mutex locked");
+    assert(!this->taskMutex_.locked_by_caller() && "SearchThread::stop() must not be called with the task mutex locked");
+    assert(!this->searchMutex_.locked_by_caller() && "SearchThread::stop() must not be called with the search mutex locked");
+
+    std::lock_guard taskLock(this->taskMutex_);
 
     if (!this->isSearching()) {
         throw std::runtime_error("Not searching");
@@ -115,7 +128,7 @@ void IterativeSearcher::SearchThread::stop() {
 
     // Wait for the search to stop by waiting for the search mutex to be released (will be released when the searcher
     // is done)
-    std::lock_guard<std::mutex> searchLock(this->searchMutex_);
+    std::lock_guard searchLock(this->searchMutex_);
 
     this->task_ = nullptr;
 }
@@ -123,10 +136,12 @@ void IterativeSearcher::SearchThread::stop() {
 
 
 void IterativeSearcher::SearchThread::awaitTask() {
+    assert(!this->taskMutex_.locked_by_caller() && "SearchThread::awaitTask() must not be called with the task mutex locked");
+
     // Check if we already have a task
     bool hasTask;
     {
-        std::lock_guard<std::mutex> lock(this->taskMutex_);
+        std::lock_guard taskLock(this->taskMutex_);
         hasTask = (this->task_ != nullptr);
     }
 
@@ -135,13 +150,16 @@ void IterativeSearcher::SearchThread::awaitTask() {
     }
 
     // Wait for a task to be assigned
-    std::unique_lock<std::mutex> lock(this->taskMutex_);
-    this->isSearchingCondition_.wait(lock, [this]() {
+    std::unique_lock<ami::mutex> taskLock(this->taskMutex_);
+    this->isSearchingCondition_.wait(taskLock, [this]() {
         return this->isSearching();
     });
 }
 
 SearchResult IterativeSearcher::SearchThread::searchIteration() {
+    assert(!this->taskMutex_.locked_by_caller() && "SearchThread::searchIteration() must not be called with the task mutex locked");
+    assert(!this->searchMutex_.locked_by_caller() && "SearchThread::searchIteration() must not be called with the search mutex locked");
+
     // Create a copy of parts of the task that we need, so that we are not holding the task mutex while searching.
     // Also create the FixedDepthSearcher here.
     uint16_t depth;
@@ -150,7 +168,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
     FixedDepthSearcher *iteration;
 
     {
-        std::lock_guard<std::mutex> lock(this->taskMutex_);
+        std::lock_guard taskLock(this->taskMutex_);
 
         // Check if the search was stopped immediately before we could lock the task mutex
         if (this->task_ == nullptr) {
@@ -175,7 +193,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
     }
 
     // Search
-    std::lock_guard<std::mutex> lock(this->searchMutex_);
+    std::lock_guard searchLock(this->searchMutex_);
     SearchLine line = iteration->search(rootMoveOrder.value());
     return { depth, std::move(line), *stats };
 }
@@ -187,7 +205,8 @@ void IterativeSearcher::SearchThread::loop() {
         SearchResult result = this->searchIteration();
 
         if (result.isValid()) {
-            std::lock_guard<std::mutex> lock(this->taskMutex_);
+            std::lock_guard managerLock(this->manager_.mutex_);
+            std::lock_guard taskLock(this->taskMutex_);
 
             // Check if the search was stopped immediately before we could lock the task mutex
             if (this->task_ == nullptr) {
@@ -223,13 +242,15 @@ void IterativeSearcher::addIterationCallback(IterationCallback callback) {
 }
 
 void IterativeSearcher::notifyCallbacks(const SearchResult &result) {
+    assert(this->mutex_.locked_by_caller() && "IterativeSearcher::notifyCallbacks() must be called with the manager's mutex locked");
+
     for (const auto &callback : this->callbacks_) {
         callback(result);
     }
 }
 
 void IterativeSearcher::receiveResultFromThread(const SearchResult &result) {
-    std::lock_guard<std::mutex> lock(this->mutex_);
+    assert(this->mutex_.locked_by_caller() && "IterativeSearcher::receiveResultFromThread() must be called with the manager's mutex locked");
 
     if (!result.isValid()) {
         return;
@@ -243,7 +264,9 @@ void IterativeSearcher::receiveResultFromThread(const SearchResult &result) {
 }
 
 void IterativeSearcher::start(const Board &board) {
-    std::lock_guard<std::mutex> lock(this->mutex_);
+    assert(!this->mutex_.locked_by_caller() && "IterativeSearcher::start() must not be called with the manager's mutex locked");
+
+    std::lock_guard managerLock(this->mutex_);
 
     this->result_ = SearchResult::invalid();
     this->table_.clear();
@@ -313,7 +336,9 @@ void IterativeSearcher::start(const Board &board) {
 }
 
 SearchResult IterativeSearcher::stop() {
-    std::lock_guard<std::mutex> lock(this->mutex_);
+    assert(!this->mutex_.locked_by_caller() && "IterativeSearcher::stop() must not be called with the manager's mutex locked");
+
+    std::lock_guard managerLock(this->mutex_);
 
     for (const auto &thread : this->threads_) {
         thread->stop();

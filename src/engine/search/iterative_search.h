@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <mutex>
 #include <memory>
 #include <vector>
 #include <chrono>
@@ -10,6 +9,7 @@
 #include "statistics.h"
 #include "fixed_search.h"
 #include "engine/inline.h"
+#include "engine/mutex.h"
 #include "engine/board/piece.h"
 #include "engine/hash/transposition.h"
 
@@ -49,7 +49,7 @@ private:
     class SearchThread;
 
     std::vector<std::unique_ptr<SearchThread>> threads_;
-    std::mutex mutex_;
+    ami::mutex mutex_;
 
     std::vector<IterationCallback> callbacks_;
     SearchResult result_;
