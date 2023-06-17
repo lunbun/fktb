@@ -6,7 +6,7 @@
 #include "uci.h"
 
 [[noreturn]] void uci() {
-    UciHandler uci("FKTB 0.0.51", "frogscats");
+    UciHandler uci("FKTB 0.0.52", "frogscats");
 
     uci.run();
 }

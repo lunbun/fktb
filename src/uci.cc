@@ -10,6 +10,7 @@
 #include "test.h"
 #include "engine/board/board.h"
 #include "engine/search/score.h"
+#include "engine/move/movegen.h"
 #include "engine/search/iterative_search.h"
 
 TokenStream::TokenStream(const std::string &input) : index_(0), tokens_() {
@@ -51,11 +52,7 @@ void UciHandler::run() {
 }
 
 void UciHandler::error(const std::string &message) {
-    if (!this->isDebug_) {
-        return;
-    }
-
-    std::cerr << message << std::endl;
+    std::cerr  << message << std::endl;
 }
 
 void UciHandler::handleInput(const std::string &input) {
@@ -101,18 +98,7 @@ void UciHandler::handleUci(TokenStream &tokens) {
 }
 
 void UciHandler::handleDebug(TokenStream &tokens) {
-    if (tokens.isEnd()) {
-        return this->error("debug command requires arguments");
-    }
-
-    const std::string &arg = tokens.next();
-    if (arg == "on") {
-        this->isDebug_ = true;
-    } else if (arg == "off") {
-        this->isDebug_ = false;
-    } else {
-        return this->error("debug command requires 'on' or 'off' as first argument");
-    }
+    return this->error("Debug mode does not do anything");
 }
 
 void UciHandler::handleIsReady(TokenStream &tokens) {
@@ -319,7 +305,7 @@ void UciHandler::stopSearchAfter(const std::function<bool()> &condition) {
     // It's possible that we may run into thread safety issues here
     std::thread([this, condition]() {
         while (this->isSearching_ && !condition()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
         this->stopSearch();
     }).detach();
@@ -333,13 +319,22 @@ void UciHandler::stopSearch() {
     this->isSearching_ = false;
     this->searchOptions_ = std::nullopt;
 
-    std::optional<SearchResult> result = this->searcher_->stop();
+    SearchResult result = this->searcher_->stop();
 
-    if (!result.has_value() || result->bestLine.empty()) {
-        return this->error("Search stopped before it could find a move");
+    if (!result.isValid()) {
+        // Search was stopped before it could find any move (this happens if the user stops the search immediately after it is
+        // started)
+
+        // We still need to print a bestmove, so just pick the first legal move we generate
+        RootMoveList moves = MoveGeneration::generateLegalRoot(*this->board_);
+        if (moves.empty()) {
+            return this->error("Tried to search while in checkmate/stalemate");
+        }
+
+        result.bestLine = { moves.dequeue() };
     }
 
-    std::cout << "bestmove " << result->bestLine[0].uci() << std::endl;
+    std::cout << "bestmove " << result.bestLine[0].uci() << std::endl;
 }
 
 void UciHandler::iterationCallback(const SearchResult &result) {

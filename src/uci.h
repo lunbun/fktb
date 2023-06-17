@@ -45,7 +45,6 @@ public:
 
 private:
     std::string name_, author_;
-    bool isDebug_ = true;
 
     bool isSearching_ = false;
     std::optional<SearchOptions> searchOptions_;

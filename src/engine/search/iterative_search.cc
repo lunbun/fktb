@@ -67,6 +67,8 @@ private:
 
     std::condition_variable isSearchingCondition_;
 
+    // IMPORTANT NOTE: Every time you access this, you MUST check if it is nullptr, because there is always the possibility that
+    // the search was stopped immediately before you could lock the task mutex.
     std::unique_ptr<SearchTask> task_;
 
     void awaitTask();
@@ -104,7 +106,12 @@ void IterativeSearcher::SearchThread::stop() {
     }
 
     // Stop the current search
-    this->task_->iteration->halt();
+    //
+    // this->task_->iteration can be nullptr if the search was stopped before the first iteration was started (i.e. the user
+    // immediately stopped the search after starting it)
+    if (this->task_->iteration != nullptr) {
+        this->task_->iteration->halt();
+    }
 
     // Wait for the search to stop by waiting for the search mutex to be released (will be released when the searcher
     // is done)
@@ -145,6 +152,11 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
     {
         std::lock_guard<std::mutex> lock(this->taskMutex_);
 
+        // Check if the search was stopped immediately before we could lock the task mutex
+        if (this->task_ == nullptr) {
+            return SearchResult::invalid();
+        }
+
         SearchTask &task = *this->task_;
 
         depth = task.depth;
@@ -176,6 +188,11 @@ void IterativeSearcher::SearchThread::loop() {
 
         if (result.isValid()) {
             std::lock_guard<std::mutex> lock(this->taskMutex_);
+
+            // Check if the search was stopped immediately before we could lock the task mutex
+            if (this->task_ == nullptr) {
+                continue;
+            }
 
             // Increment depth
             this->task_->depth++;
