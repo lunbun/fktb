@@ -52,7 +52,7 @@ void UciHandler::run() {
 }
 
 void UciHandler::error(const std::string &message) {
-    std::cerr  << message << std::endl;
+    std::cerr << message << std::endl;
 }
 
 void UciHandler::handleInput(const std::string &input) {
