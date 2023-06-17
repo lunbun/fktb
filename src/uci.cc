@@ -316,9 +316,6 @@ void UciHandler::stopSearch() {
         return this->error("Not searching");
     }
 
-    this->isSearching_ = false;
-    this->searchOptions_ = std::nullopt;
-
     SearchResult result = this->searcher_->stop();
 
     if (!result.isValid()) {
@@ -335,6 +332,11 @@ void UciHandler::stopSearch() {
     }
 
     std::cout << "bestmove " << result.bestLine[0].uci() << std::endl;
+
+    // Search state needs to be reset last, in case any iteration callbacks are called between the time stopSearch() is called
+    // and now.
+    this->isSearching_ = false;
+    this->searchOptions_ = std::nullopt;
 }
 
 void UciHandler::iterationCallback(const SearchResult &result) {
