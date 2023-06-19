@@ -207,7 +207,7 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
     return { depth, std::move(line), *stats };
 }
 
-void IterativeSearcher::SearchThread::loop() {
+[[noreturn]] void IterativeSearcher::SearchThread::loop() {
     while (true) {
         this->awaitTask();
 

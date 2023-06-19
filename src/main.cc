@@ -6,7 +6,7 @@
 #include "uci.h"
 
 [[noreturn]] void uci() {
-    std::string name = "FKTB 0.0.58";
+    std::string name = "FKTB 0.0.59";
 #ifndef NDEBUG
     name += " Debug";
 #endif // #ifndef NDEBUG
@@ -18,7 +18,5 @@
 int main() {
     EngineInit::init();
 
-    //  2. Also, unrelated bug I discovered while debugging this one: the search stop threads can actually "leak" into the next
-    //              search, causing the next search to stop erroneously.
     uci();
 }

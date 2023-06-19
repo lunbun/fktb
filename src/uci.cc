@@ -6,8 +6,11 @@
 #include <iostream>
 #include <optional>
 #include <thread>
+#include <chrono>
+#include <cassert>
 
 #include "test.h"
+#include "engine/mutex.h"
 #include "engine/board/board.h"
 #include "engine/search/score.h"
 #include "engine/move/movegen.h"
@@ -28,6 +31,99 @@ const std::string &TokenStream::next() {
 
 
 
+// Search stopping needs to be asynchronous from a separate thread so that the main thread can continue to process input while we
+// wait for a duration/node count to pass.
+// TODO: Add a destructor to properly kill the thread.
+class UciHandler::SearchStopThread {
+public:
+    explicit SearchStopThread(UciHandler &uci);
+
+    void limitNodes(uint64_t nodeCount);
+    void limitTime(std::chrono::milliseconds duration);
+
+    void enable();
+    void disable();
+
+private:
+    UciHandler &uci_;
+    std::thread thread_;
+
+    ami::mutex mutex_;
+    bool isEnabled_ = false;
+    std::optional<uint64_t> nodeLimit_ = std::nullopt;
+    std::optional<std::chrono::time_point<std::chrono::steady_clock>> timeLimit_ = std::nullopt;
+
+    [[noreturn]] void loop();
+};
+
+UciHandler::SearchStopThread::SearchStopThread(UciHandler &uci) : uci_(uci) {
+    this->thread_ = std::thread(&SearchStopThread::loop, this);
+    this->thread_.detach();
+}
+
+void UciHandler::SearchStopThread::limitNodes(uint64_t nodeCount) {
+    assert(!this->mutex_.locked_by_caller() && "SearchStopThread::limitNodes() must not be called with the mutex locked.");
+    std::lock_guard lock(this->mutex_);
+
+    // If there is already a node limit, choose whichever is smaller, since that one will always stop the search first.
+    if (!this->nodeLimit_.has_value() || nodeCount < this->nodeLimit_.value()) {
+        this->nodeLimit_ = nodeCount;
+    }
+}
+
+void UciHandler::SearchStopThread::limitTime(std::chrono::milliseconds duration) {
+    assert(!this->mutex_.locked_by_caller() && "SearchStopThread::limitTime() must not be called with the mutex locked.");
+    std::lock_guard lock(this->mutex_);
+
+    // If there is already a time limit, choose whichever is sooner, since that one will always stop the search first.
+    auto timeLimit = std::chrono::steady_clock::now() + duration;
+    if (!this->timeLimit_.has_value() || timeLimit < this->timeLimit_.value()) {
+        this->timeLimit_ = timeLimit;
+    }
+}
+
+void UciHandler::SearchStopThread::enable() {
+    assert(!this->mutex_.locked_by_caller() && "SearchStopThread::enable() must not be called with the mutex locked.");
+    std::lock_guard lock(this->mutex_);
+    this->isEnabled_ = true;
+}
+
+void UciHandler::SearchStopThread::disable() {
+    assert(!this->mutex_.locked_by_caller() && "SearchStopThread::disable() must not be called with the mutex locked.");
+    std::lock_guard lock(this->mutex_);
+    this->isEnabled_ = false;
+    this->nodeLimit_ = std::nullopt;
+    this->timeLimit_ = std::nullopt;
+}
+
+[[noreturn]] void UciHandler::SearchStopThread::loop() {
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+        bool shouldStop = false;
+        {
+            std::lock_guard lock(this->mutex_);
+
+            if (!this->isEnabled_) {
+                continue;
+            }
+
+            // Node limit
+            shouldStop |= (this->nodeLimit_.has_value() && this->uci_.searcher_->stats().nodeCount() >= this->nodeLimit_.value());
+
+            // Time limit
+            shouldStop |= (this->timeLimit_.has_value() && std::chrono::steady_clock::now() >= this->timeLimit_.value());
+        }
+
+        // Stop the search if necessary.
+        if (shouldStop) {
+            this->uci_.stopSearch();
+        }
+    }
+}
+
+
+
 UciHandler::UciHandler(std::string name, std::string author) : name_(std::move(name)), author_(std::move(author)),
                                                                board_(nullptr) {
 //    this->searcher_ = std::make_unique<IterativeSearcher>(std::thread::hardware_concurrency());
@@ -35,9 +131,13 @@ UciHandler::UciHandler(std::string name, std::string author) : name_(std::move(n
     this->searcher_->addIterationCallback([this](const SearchResult &result) {
         this->iterationCallback(result);
     });
+
+    this->searchStopThread_ = std::make_unique<SearchStopThread>(*this);
 }
 
-void UciHandler::run() {
+UciHandler::~UciHandler() = default;
+
+[[noreturn]] void UciHandler::run() {
     while (true) {
         std::string input;
 
@@ -273,42 +373,22 @@ void UciHandler::startSearch(const SearchOptions &options) {
         int32_t movesLeft = 40;
 
         int32_t timeLimit = time / movesLeft;
-        this->stopSearchAfter(std::chrono::milliseconds(timeLimit));
+        this->searchStopThread_->limitTime(std::chrono::milliseconds(timeLimit));
     }
 
     // Node limit
     if (options.nodes.has_value()) {
-        uint64_t nodes = options.nodes.value();
-        this->stopSearchAfter([this, nodes]() {
-            return this->searcher_->stats().nodeCount() >= nodes;
-        });
+        this->searchStopThread_->limitNodes(options.nodes.value());
     }
 
     // Move time limit
     if (options.moveTime.has_value()) {
         int32_t moveTime = options.moveTime.value();
-        this->stopSearchAfter(std::chrono::milliseconds(moveTime));
+        this->searchStopThread_->limitTime(std::chrono::milliseconds(moveTime));
     }
-}
 
-void UciHandler::stopSearchAfter(std::chrono::milliseconds duration) {
-    // Start a new thread to stop the search after the given time
-    // It's possible that we may run into thread safety issues here
-    std::thread([this, duration]() {
-        std::this_thread::sleep_for(duration);
-        this->stopSearch();
-    }).detach();
-}
-
-void UciHandler::stopSearchAfter(const std::function<bool()> &condition) {
-    // Start a new thread to stop the search after the given number of nodes
-    // It's possible that we may run into thread safety issues here
-    std::thread([this, condition]() {
-        while (this->isSearching_ && !condition()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        }
-        this->stopSearch();
-    }).detach();
+    // Enable search stop thread
+    this->searchStopThread_->enable();
 }
 
 void UciHandler::stopSearch() {
@@ -316,6 +396,10 @@ void UciHandler::stopSearch() {
         return this->error("Not searching");
     }
 
+    // Disable any search stop thread limits
+    this->searchStopThread_->disable();
+
+    // Stop the search
     SearchResult result = this->searcher_->stop();
 
     if (!result.isValid()) {

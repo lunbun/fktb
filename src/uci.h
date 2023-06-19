@@ -40,14 +40,18 @@ struct SearchOptions {
 class UciHandler {
 public:
     UciHandler(std::string name, std::string author);
+    ~UciHandler();
 
     [[noreturn]] void run();
 
 private:
+    class SearchStopThread;
+
     std::string name_, author_;
 
     bool isSearching_ = false;
     std::optional<SearchOptions> searchOptions_;
+    std::unique_ptr<SearchStopThread> searchStopThread_;
 
     std::unique_ptr<Board> board_;
     std::unique_ptr<IterativeSearcher> searcher_;
@@ -73,8 +77,6 @@ private:
 
 
     void startSearch(const SearchOptions &options);
-    void stopSearchAfter(std::chrono::milliseconds duration);
-    void stopSearchAfter(const std::function<bool()> &condition);
     void stopSearch();
     void iterationCallback(const SearchResult &result);
 };
