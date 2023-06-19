@@ -60,8 +60,10 @@ private:
 
     // Task mutex is used for synchronizing access to task_.
     //
-    // IMPORTANT NOTE: In order to avoid deadlocks, if you need to lock both the task mutex and manager's mutex, you MUST lock the
-    // manager's mutex first, and then the task mutex.
+    // IMPORTANT NOTE: To avoid deadlocks, you MUST lock mutexes in this order:
+    //  1. this->manager_.mutex_
+    //  2. this->taskMutex_
+    //  3. this->searchMutex_
     ami::mutex taskMutex_;
 
     // Search mutex is locked when the searcher is searching, and unlocked when it is not. This allows the main thread
@@ -160,6 +162,8 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
     assert(!this->taskMutex_.locked_by_caller() && "SearchThread::searchIteration() must not be called with the task mutex locked");
     assert(!this->searchMutex_.locked_by_caller() && "SearchThread::searchIteration() must not be called with the search mutex locked");
 
+    std::optional<std::lock_guard<ami::mutex>> searchLock;
+
     // Create a copy of parts of the task that we need, so that we are not holding the task mutex while searching.
     // Also create the FixedDepthSearcher here.
     uint16_t depth;
@@ -169,6 +173,12 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
 
     {
         std::lock_guard taskLock(this->taskMutex_);
+
+        // The search mutex must be locked here before we create the searcher, because we have to prevent SearchThread::stop()
+        // from destroying this->task_. If we were to instead lock the search mutex after creating the searcher but before we
+        // search, then it is possible that SearchThread::stop() can acquire the search mutex before we do, and destroy
+        // this->task_. The searcher stores references to parts of this->task_, so it cannot be destroyed while we are searching.
+        searchLock.emplace(this->searchMutex_);
 
         // Check if the search was stopped immediately before we could lock the task mutex
         if (this->task_ == nullptr) {
@@ -193,7 +203,6 @@ SearchResult IterativeSearcher::SearchThread::searchIteration() {
     }
 
     // Search
-    std::lock_guard searchLock(this->searchMutex_);
     SearchLine line = iteration->search(rootMoveOrder.value());
     return { depth, std::move(line), *stats };
 }
