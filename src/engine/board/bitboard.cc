@@ -312,15 +312,7 @@ void initKingAttacks() {
     }
 }
 
-void Bitboards::maybeInit() {
-    static bool isInitialized = false;
-
-    if (isInitialized) {
-        return;
-    }
-
-    isInitialized = true;
-
+void Bitboards::init() {
     initBetweenTable();
 
     uint32_t attackOffset = 0;

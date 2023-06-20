@@ -13,22 +13,14 @@
 #include "engine/board/piece.h"
 
 namespace {
-    bool isInitialized = false;
-
     uint64_t blackToMoveNumber = 0;
     std::array<uint64_t, 16> castlingRightsNumbers;
     std::array<uint64_t, 9> enPassantFileNumbers; // Index 0 is for no en passant.
     ColorMap<PieceTypeMap<SquareMap<uint64_t>>> pieceNumbers;
 }
 
-void Zobrist::maybeInit() {
+void Zobrist::init() {
     constexpr uint64_t seed = 0;
-
-    if (isInitialized) {
-        return;
-    }
-
-    isInitialized = true;
 
     std::mt19937_64 generator(seed);
 

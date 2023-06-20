@@ -346,18 +346,18 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         MoveOrdering::score<Turn, MoveOrdering::Type::Quiet>(moves, board, &this->heuristics_.history);
 
         // Search all quiet moves
-        uint16_t nodeIndex = 0;
+        uint16_t moveIndex = 0;
 
         while (!moves.empty()) {
             Move move = moves.dequeue();
             MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
             uint16_t depthReduction = 0;
-            if (depth >= 3 && !isInCheck && nodeIndex >= 4) {
+            if (depth >= 3 && !isInCheck && moveIndex >= 4) {
                 // Late move reduction
                 depthReduction = 1;
 
-                if (nodeIndex >= 10) {
+                if (moveIndex >= 10) {
                     depthReduction = (depth / 3);
                 }
             }
@@ -393,7 +393,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
                 return bestScore;
             }
 
-            nodeIndex++;
+            moveIndex++;
         }
     }
 

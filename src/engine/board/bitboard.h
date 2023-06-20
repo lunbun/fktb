@@ -129,8 +129,8 @@ namespace Bitboards {
     INLINE constexpr Bitboard rank(uint8_t rank) { return Rank1 << (8 * (rank - 1)); }
     // @formatter:on
 
-    // Initialize the bitboard attack tables, if they haven't been initialized already.
-    void maybeInit();
+    // Initializes the bitboard tables.
+    void init();
 
     // Returns a bitboard with all the squares between the two given squares, exclusive.
     Bitboard between(Square a, Square b);

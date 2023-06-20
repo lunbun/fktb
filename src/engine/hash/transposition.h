@@ -11,7 +11,7 @@
 
 namespace Zobrist {
     // Initializes the Zobrist hash numbers, if not already initialized.
-    void maybeInit();
+    void init();
 
     uint64_t blackToMove();
     uint64_t castlingRights(CastlingRights castlingRights);
