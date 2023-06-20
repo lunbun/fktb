@@ -64,7 +64,6 @@ public:
     [[nodiscard]] INLINE MoveEntry *end() const { return this->end_; }
 
 private:
-    Move hashMove_;
     MoveEntry *start_;
     MoveEntry *end_;
 };

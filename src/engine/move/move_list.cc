@@ -8,17 +8,9 @@
 #include "engine/board/board.h"
 #include "engine/hash/transposition.h"
 
-MovePriorityQueue::MovePriorityQueue(MoveEntry *start, MoveEntry *end) : hashMove_(Move::invalid()), start_(start),
-                                                                         end_(end) { }
+MovePriorityQueue::MovePriorityQueue(MoveEntry *start, MoveEntry *end) : start_(start), end_(end) { }
 
 Move MovePriorityQueue::dequeue() {
-    if (this->hashMove_.isValid()) {
-        // Always check the hash move first
-        Move move = this->hashMove_;
-        this->hashMove_ = Move::invalid();
-        return move;
-    }
-
     // Find the move with the highest score
     MoveEntry *bestMove;
     int32_t bestScore = -INT32_MAX;
@@ -40,7 +32,7 @@ Move MovePriorityQueue::dequeue() {
 }
 
 bool MovePriorityQueue::empty() const {
-    return !this->hashMove_.isValid() && this->end_ == this->start_;
+    return this->end_ == this->start_;
 }
 
 // Removes the first instance of the move from the queue, if it exists.
