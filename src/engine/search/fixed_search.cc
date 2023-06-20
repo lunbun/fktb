@@ -197,9 +197,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
     if (depth >= 3 && gamePhase != GamePhase::End && !isInCheck) {
         MakeMoveInfo info = board.makeNullMove();
 
-        // TODO: Is it safe to pass -beta + 1 as the beta parameter here?
-        //  This is just what Copilot spit out, it seems to work fine but I'm not sure if it's correct. It definitely causes more
-        //  pruning than just passing -alpha though.
+        // Pass -beta + 1 as alpha since it is a null window search (see https://www.chessprogramming.org/Null_Window).
         int32_t score = -this->search<~Turn>(depth - 3, -beta, -beta + 1);
 
         board.unmakeNullMove(info);
