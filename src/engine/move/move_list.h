@@ -35,7 +35,7 @@ static_assert(sizeof(MoveEntry) == 8, "MoveEntry must be 8 bytes");
 // is on the stack).
 class MoveList {
 public:
-    constexpr explicit MoveList(MoveEntry *entries) : pointer_(entries) { }
+    INLINE constexpr explicit MoveList(MoveEntry *entries) : pointer_(entries) { }
 
     INLINE void push(Move move) { *(this->pointer_++) = { move, 0 }; }
 
@@ -45,17 +45,17 @@ private:
     MoveEntry *pointer_;
 };
 
-// A wrapper around a raw array of MoveEntries that provides a priority queue interface.
+// A lightweight wrapper around a raw array of MoveEntries that provides a priority queue interface.
 //
 // This does not actually allocate any memory, it just wraps a pointer to an array of MoveEntries (ideally on the array
 // is on the stack).
 class MovePriorityQueue {
 public:
-    MovePriorityQueue(MoveEntry *start, MoveEntry *end);
+    INLINE constexpr MovePriorityQueue(MoveEntry *start, MoveEntry *end) : start_(start), end_(end) { }
 
     // Dequeues the move with the highest score (performs a selection sort on the array).
     [[nodiscard]] Move dequeue();
-    [[nodiscard]] bool empty() const;
+    [[nodiscard]] INLINE bool empty() const { return this->start_ == this->end_; }
 
     // Removes the first instance of the move from the queue, if it exists.
     void remove(Move move);

@@ -8,8 +8,6 @@
 #include "engine/board/board.h"
 #include "engine/hash/transposition.h"
 
-MovePriorityQueue::MovePriorityQueue(MoveEntry *start, MoveEntry *end) : start_(start), end_(end) { }
-
 Move MovePriorityQueue::dequeue() {
     // Find the move with the highest score
     MoveEntry *bestMove;
@@ -29,10 +27,6 @@ Move MovePriorityQueue::dequeue() {
     *bestMove = *(--this->end_);
 
     return move;
-}
-
-bool MovePriorityQueue::empty() const {
-    return this->end_ == this->start_;
 }
 
 // Removes the first instance of the move from the queue, if it exists.
