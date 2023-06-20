@@ -122,7 +122,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
     }
 
     // Transposition table store
-    table.store(board.hash(), depth, TranspositionTable::Flag::Exact, bestMove, alpha);
+    table.maybeStore(board.hash(), depth, TranspositionTable::Flag::Exact, bestMove, alpha);
 
     return { bestMove, alpha };
 }
@@ -454,7 +454,7 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
         } else {
             flag = TranspositionTable::Flag::Exact;
         }
-        table.store(board.hash(), depth, flag, bestMove, score);
+        table.maybeStore(board.hash(), depth, flag, bestMove, score);
     }
 
     return score;

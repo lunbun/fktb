@@ -103,6 +103,7 @@ void TranspositionTable::clear() {
     std::memset(this->entries_, 0, (this->size_) * sizeof(Entry));
 }
 
+// Returns nullptr if the entry is invalid or the key does not match.
 TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {
     Entry *entry = this->entries_ + (key & this->indexMask_);
 
@@ -115,7 +116,9 @@ TranspositionTable::Entry *TranspositionTable::load(uint64_t key) const {
     }
 }
 
-void TranspositionTable::store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
+// Stores the entry if there was no entry previously, or if the new entry is "higher quality" than the previous entry (e.g.
+// does the new entry have a higher depth?).
+void TranspositionTable::maybeStore(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore) {
     Entry *entry = this->entries_ + (key & this->indexMask_);
 
     // Only overwrite an existing entry if the new entry has a higher depth

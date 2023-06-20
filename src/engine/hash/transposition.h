@@ -83,7 +83,9 @@ public:
     // Returns nullptr if the entry is invalid or the key does not match.
     [[nodiscard]] Entry *load(uint64_t key) const;
 
-    void store(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore);
+    // Stores the entry if there was no entry previously, or if the new entry is "higher quality" than the previous entry (e.g.
+    // does the new entry have a higher depth?).
+    void maybeStore(uint64_t key, uint16_t depth, Flag flag, Move bestMove, int32_t bestScore);
 
 private:
     // Data 1 fields:
