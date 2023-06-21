@@ -41,6 +41,9 @@ INLINE void HistoryTable::add(Color color, const Board &board, Move move, uint16
 
 class KillerTable {
 public:
+    constexpr static uint32_t MaxKillerMoves = 2;
+    using Ply = std::array<Move, MaxKillerMoves>;
+
     KillerTable();
     ~KillerTable();
 
@@ -53,9 +56,6 @@ public:
     [[nodiscard]] INLINE const auto &operator[](uint16_t depth) const;
 
 private:
-    constexpr static uint32_t MaxKillerMoves = 2;
-    using Ply = std::array<Move, MaxKillerMoves>;
-
     // The KillerTable owns the memory for the table. We are using manual memory management to have better control over how
     // resizing works. With std::vector, when it resizes, the elements are anchored to the front of the vector and new spaces is
     // added to the end. However, because we are using depth as the index, we want the elements to be anchored to the end of the

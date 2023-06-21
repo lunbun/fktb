@@ -17,6 +17,7 @@
 #include "engine/hash/transposition.h"
 #include "engine/search/fixed_search.h"
 #include "engine/search/iterative_search.h"
+#include "engine/search/move_ordering/move_stream.h"
 
 std::string formatNumber(uint64_t number, uint64_t divisor, char suffix) {
     std::stringstream ss;
@@ -103,16 +104,21 @@ void Tests::moveOrderingTest(const std::string &fen, const std::vector<std::stri
         board.makeMove<MakeMoveType::All>(move);
     }
 
-    RootMoveList movesList = MoveGeneration::generateLegalRoot(board);
+    if (board.turn() != Color::White) {
+        throw std::runtime_error("Move ordering test only works for white to move at the moment");
+    }
 
-    MoveOrdering::score<MoveOrdering::Type::All>(movesList, board, &heuristics.history);
-    movesList.sort();
+    Move hashMove = Move::invalid();
+    TranspositionTable::Entry *entry = table.load(board.hash());
+    if (entry != nullptr) {
+        hashMove = entry->bestMove();
+    }
 
-    const std::vector<MoveEntry> &moves = movesList.moves();
+    MoveStream stream(board, hashMove, heuristics, movesSequence.size());
 
-    // Iterate in reverse order, since the moves are sorted from smallest to largest (this was done to optimize dequeueing)
-    for (auto it = moves.rbegin(); it != moves.rend(); it++) {
-        std::cout << it->move.debugName(board) << " " << it->score << std::endl;
+    Move move = Move::invalid();
+    while ((move = stream.next<Color::White>()).isValid()) {
+        std::cout << move.debugName(board) << std::endl;
     }
 }
 

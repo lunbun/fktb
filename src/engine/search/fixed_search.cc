@@ -10,6 +10,7 @@
 #include "engine/move/movegen.h"
 #include "engine/move/legality_check.h"
 #include "engine/eval/evaluation.h"
+#include "engine/search/move_ordering/move_stream.h"
 
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HeuristicTables &heuristics,
     SearchStatistics &stats) : board_(board.copy()), depth_(depth), table_(table), heuristics_(heuristics), stats_(stats) { }
@@ -209,189 +210,93 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     int32_t bestScore = -INT32_MAX;
 
-    // Stage 2: Hash move
-    //
-    // Try the hash move first, if it exists. We can save all move generation entirely if the hash move causes a beta-cutoff.
-    //
-    // We also have to check the legality of the hash move in case of rare hash key collisions (see
-    // https://www.chessprogramming.org/Transposition_Table#KeyCollisions).
-    LegalityChecker<Turn> legalityChecker(board);
+    MoveStream stream(board, hashMove, this->heuristics_, depth);
 
-    if (hashMove.isValid() && legalityChecker.isLegal(hashMove)) {
-        MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(hashMove);
+    uint16_t moveIndex = 0;
+    uint16_t quietMoveIndex = 0;
 
-        int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+    while (true) {
+        uint8_t previousStage = stream.stage();
 
-        board.unmakeMove<MakeMoveType::AllNoTurn>(hashMove, info);
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestMove = hashMove;
-            alpha = std::max(alpha, score);
+        Move move = stream.next<Turn>();
+        if (!move.isValid()) {
+            break;
         }
 
-        if (score >= beta) {
-            if (hashMove.isQuiet()) {
-                this->heuristics_.history.add(Turn, board, hashMove, depth);
-                this->heuristics_.killers.add(depth, hashMove);
-            }
+        uint16_t depthReduction = 0;
 
-            return bestScore;
-        }
-    }
+        if (stream.stage() == 4 || stream.stage() == 5) {
+            if (previousStage <= 4) {
+                // Futility pruning
+                if (depth == 1 && !isInCheck) {
+                    constexpr int32_t FutilityMargin = 300;
 
-    // Stage 3: Tactical move search
-    AlignedMoveEntry moveBuffer[MaxMoveCount];
-    MoveEntry *movesStart = MoveEntry::fromAligned(moveBuffer);
+                    int32_t evaluation = Evaluation::evaluate<Turn>(board, alpha, beta);
 
-    bool hasTacticalMoves;
-
-    {
-        MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Tactical>(board, movesStart);
-
-        MovePriorityQueue moves(movesStart, movesEnd);
-
-        hasTacticalMoves = !moves.empty();
-
-        // We already tried the hash move, so remove it from the list of moves to search
-        if (hashMove.isValid() && hashMove.isTactical()) {
-            moves.remove(hashMove);
-        }
-
-        MoveOrdering::score<Turn, MoveOrdering::Type::Tactical>(moves, board, nullptr);
-
-        // Search all tactical moves
-        while (!moves.empty()) {
-            Move move = moves.dequeue();
-            MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
-
-            int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
-
-            board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestMove = move;
-                alpha = std::max(alpha, score);
-            }
-
-            if (score >= beta) {
-                return bestScore;
-            }
-        }
-    }
-
-    // Stage 4: Killer moves
-    for (Move killer : this->heuristics_.killers[depth]) {
-        if (!killer.isValid() || !legalityChecker.isLegal(killer)) {
-            continue;
-        }
-
-        MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(killer);
-
-        int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
-
-        board.unmakeMove<MakeMoveType::AllNoTurn>(killer, info);
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestMove = killer;
-            alpha = std::max(alpha, score);
-        }
-
-        if (score >= beta) {
-            this->heuristics_.history.add(Turn, board, killer, depth);
-            return bestScore;
-        }
-    }
-
-    // Stage 5: Quiet move search
-    {
-        MoveEntry *movesEnd = MoveGeneration::generate<Turn, MoveGeneration::Type::Quiet>(board, movesStart);
-
-        MovePriorityQueue moves(movesStart, movesEnd);
-
-        if (moves.empty() && !hasTacticalMoves) {
-            if (isInCheck) { // Checkmate
-                // TODO: If depth is reduced, the mate-in score will be incorrect
-                return Score::mateIn(this->depth_ - depth);
-            } else { // Stalemate
-                return Score::Draw;
-            }
-        }
-
-        // Futility pruning
-        if (depth == 1 && !isInCheck) {
-            constexpr int32_t FutilityMargin = 300;
-
-            int32_t evaluation = Evaluation::evaluate<Turn>(board, alpha, beta);
-
-            if (evaluation + FutilityMargin <= alpha) {
-                return alpha;
-            }
-        }
-
-        // We already searched the hash move and killer moves, so remove them from the list of moves to search
-        if (hashMove.isValid() && hashMove.isQuiet()) {
-            moves.remove(hashMove);
-        }
-        for (Move killer : this->heuristics_.killers[depth]) {
-            if (killer.isValid()) {
-                moves.remove(killer);
-            }
-        }
-
-        MoveOrdering::score<Turn, MoveOrdering::Type::Quiet>(moves, board, &this->heuristics_.history);
-
-        // Search all quiet moves
-        uint16_t moveIndex = 0;
-
-        while (!moves.empty()) {
-            Move move = moves.dequeue();
-            MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
-
-            uint16_t depthReduction = 0;
-            if (depth >= 3 && !isInCheck && moveIndex >= 4) {
-                // Late move reduction
-                depthReduction = 1;
-
-                if (moveIndex >= 10) {
-                    depthReduction = (depth / 3);
-                }
-            }
-
-            int32_t score = -this->search<~Turn>(depth - 1 - depthReduction, -beta, -alpha);
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestMove = move;
-
-                if (score > alpha) {
-                    if (depthReduction > 0) {
-                        // If the move was above alpha, but we reduced the depth, we have to search the move again with the full
-                        // depth.
-                        score = -this->search<~Turn>(depth - 1, -beta, -alpha);
-
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestMove = move;
-                            alpha = std::max(alpha, score);
-                        }
-                    } else {
-                        alpha = score;
+                    if (evaluation + FutilityMargin <= alpha) {
+                        return alpha;
                     }
                 }
             }
 
-            board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
+            if (depth >= 3 && !isInCheck && quietMoveIndex >= 4) {
+                // Late move reduction
+                depthReduction = 1;
 
-            if (score >= beta) {
-                this->heuristics_.history.add(Turn, board, move, depth);
-                this->heuristics_.killers.add(depth, move);
-                return bestScore;
+                if (quietMoveIndex >= 10) {
+                    depthReduction = (depth / 3);
+                }
             }
 
-            moveIndex++;
+            quietMoveIndex++;
+        }
+
+        MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
+
+        int32_t score = -this->search<~Turn>(depth - 1 - depthReduction, -beta, -alpha);
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = move;
+
+            if (score > alpha) {
+                if (depthReduction > 0) {
+                    // If the move was above alpha, but we reduced the depth, we have to search the move again with the full
+                    // depth.
+                    score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = move;
+                        alpha = std::max(alpha, score);
+                    }
+                } else {
+                    alpha = score;
+                }
+            }
+        }
+
+        board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
+
+        if (score >= beta) {
+            if (move.isQuiet()) {
+                this->heuristics_.history.add(Turn, board, move, depth);
+                this->heuristics_.killers.add(depth, move);
+            }
+
+            return bestScore;
+        }
+
+        moveIndex++;
+    }
+
+    if (moveIndex == 0) {
+        // We had no legal moves, so we must be in checkmate or stalemate.
+        if (isInCheck) { // Checkmate
+            // TODO: If depth is reduced, the mate-in score will be incorrect
+            return Score::mateIn(this->depth_ - depth);
+        } else { // Stalemate
+            return Score::Draw;
         }
     }
 

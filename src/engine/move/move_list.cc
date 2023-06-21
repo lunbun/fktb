@@ -31,10 +31,6 @@ Move MovePriorityQueue::dequeue() {
 
 // Removes the first instance of the move from the queue, if it exists.
 void MovePriorityQueue::remove(Move move) {
-    if (!move.isValid()) {
-        return;
-    }
-
     for (MoveEntry *entry = this->start_; entry < this->end_; entry++) {
         if (entry->move == move) {
             // Because order does not matter in the buffer (since we sort it anyway), we can quickly remove a move from
