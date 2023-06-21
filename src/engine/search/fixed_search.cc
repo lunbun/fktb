@@ -225,6 +225,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         uint16_t depthReduction = 0;
 
+        // TODO: Don't hardcode stages
         if (stream.stage() == 4 || stream.stage() == 5) {
             if (previousStage <= 4) {
                 // Futility pruning
@@ -255,28 +256,13 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         int32_t score = -this->search<~Turn>(depth - 1 - depthReduction, -beta, -alpha);
 
+        board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
+
         if (score > bestScore) {
             bestScore = score;
             bestMove = move;
-
-            if (score > alpha) {
-                if (depthReduction > 0) {
-                    // If the move was above alpha, but we reduced the depth, we have to search the move again with the full
-                    // depth.
-                    score = -this->search<~Turn>(depth - 1, -beta, -alpha);
-
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestMove = move;
-                        alpha = std::max(alpha, score);
-                    }
-                } else {
-                    alpha = score;
-                }
-            }
+            alpha = std::max(alpha, score);
         }
-
-        board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
 
         if (score >= beta) {
             if (move.isQuiet()) {
