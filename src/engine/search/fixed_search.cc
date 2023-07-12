@@ -365,22 +365,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = move;
-
-                if (score > alpha) {
-                    if (depthReduction > 0) {
-                        // If the move was above alpha, but we reduced the depth, we have to search the move again with the full
-                        // depth.
-                        score = -this->search<~Turn>(depth - 1, -beta, -alpha);
-
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestMove = move;
-                            alpha = std::max(alpha, score);
-                        }
-                    } else {
-                        alpha = score;
-                    }
-                }
+                alpha = std::max(alpha, score);
             }
 
             board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
