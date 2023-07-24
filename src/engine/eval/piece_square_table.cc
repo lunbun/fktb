@@ -1,5 +1,7 @@
 #include "piece_square_table.h"
 
+namespace FKTB {
+
 // Tables taken from https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function
 //
 // Important Note: The tables are actually flipped vertically from what is visually shown here since index 0 (rank 1)
@@ -150,3 +152,5 @@ constexpr PieceTypeMap<const PieceSquareTable *> PieceSquareTables::Tables(
     &Queen,
     &King
 );
+
+} // namespace FKTB

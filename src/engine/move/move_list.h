@@ -8,6 +8,8 @@
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
 
+namespace FKTB {
+
 class TranspositionTable;
 
 constexpr uint32_t MaxMoveCount = 128;
@@ -95,3 +97,5 @@ public:
 private:
     std::vector<MoveEntry> moves_;
 };
+
+} // namespace FKTB

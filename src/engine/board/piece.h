@@ -8,21 +8,23 @@
 #include "color.h"
 #include "engine/inline.h"
 
+namespace FKTB {
+
 // @formatter:off
 namespace PieceTypeNamespace {
-    enum PieceType : uint8_t {
-        Pawn        = 0,
-        Knight      = 1,
-        Bishop      = 2,
-        Rook        = 3,
-        Queen       = 4,
-        King        = 5,
+enum PieceType : uint8_t {
+    Pawn        = 0,
+    Knight      = 1,
+    Bishop      = 2,
+    Rook        = 3,
+    Queen       = 4,
+    King        = 5,
 
-        Empty       = 7
-    };
+    Empty       = 7
+};
 
-    [[nodiscard]] std::string debugName(PieceType pieceType);
-}
+[[nodiscard]] std::string debugName(PieceType pieceType);
+} // namespace PieceTypeNamespace
 using PieceType = PieceTypeNamespace::PieceType;
 // @formatter:on
 
@@ -65,7 +67,7 @@ namespace PieceMaterial {
     constexpr int32_t BishopPair    = 50;
 
     [[nodiscard]] INLINE constexpr int32_t value(PieceType type);
-}
+} // namespace PieceMaterial
 
 INLINE constexpr int32_t PieceMaterial::value(PieceType type) {
     assert(type != PieceType::King);
@@ -107,3 +109,5 @@ private:
 };
 
 static_assert(sizeof(Piece) == 1, "Piece must be 1 byte");
+
+} // namespace FKTB

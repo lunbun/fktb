@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cstring>
 
+namespace FKTB {
+
 HistoryTable::HistoryTable() : table_() { }
 
 
@@ -54,3 +56,5 @@ void KillerTable::add(uint16_t depth, Move move) {
 
 
 HeuristicTables::HeuristicTables() : history(), killers() { }
+
+} // namespace FKTB

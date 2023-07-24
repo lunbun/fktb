@@ -9,15 +9,19 @@
 #include "engine/board/castling.h"
 #include "engine/board/piece.h"
 
-namespace Zobrist {
-    // Initializes the Zobrist hash numbers, if not already initialized.
-    void init();
+namespace FKTB {
 
-    uint64_t blackToMove();
-    uint64_t castlingRights(CastlingRights castlingRights);
-    uint64_t enPassantSquare(Square square);
-    uint64_t piece(Piece piece, Square square);
-}
+namespace Zobrist {
+
+// Initializes the Zobrist hash numbers, if not already initialized.
+void init();
+
+uint64_t blackToMove();
+uint64_t castlingRights(CastlingRights castlingRights);
+uint64_t enPassantSquare(Square square);
+uint64_t piece(Piece piece, Square square);
+
+} // namespace Zobrist
 
 
 
@@ -135,3 +139,5 @@ INLINE constexpr Move TranspositionTable::Entry::bestMove() const {
 INLINE constexpr int32_t TranspositionTable::Entry::bestScore() const {
     return static_cast<int32_t>((this->data2_ >> BestScoreShift) & BestScoreMask);
 }
+
+} // namespace FKTB

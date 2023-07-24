@@ -11,37 +11,39 @@
 #include "engine/board/piece.h"
 #include "engine/board/castling.h"
 
+namespace FKTB {
+
 class Board;
 
 // @formatter:off
 namespace MoveFlagNamespace {
-    enum MoveFlag : uint8_t {
-        TacticalMask        = 0b1100,
-        Quiet               = 0b0000,
-        DoublePawnPush      = 0b0001,
+enum MoveFlag : uint8_t {
+    TacticalMask        = 0b1100,
+    Quiet               = 0b0000,
+    DoublePawnPush      = 0b0001,
 
-        // IMPORTANT NOTE: Some promotion flags have the castle bits, so if you want to use CastleMask to check if a
-        // move is a castle, you also have to make sure it's not a promotion.
-        CastleMask          = 0b0010,
-        KingCastle          = 0b0010,
-        QueenCastle         = 0b0011,
+    // IMPORTANT NOTE: Some promotion flags have the castle bits, so if you want to use CastleMask to check if a
+    // move is a castle, you also have to make sure it's not a promotion.
+    CastleMask          = 0b0010,
+    KingCastle          = 0b0010,
+    QueenCastle         = 0b0011,
 
-        CaptureMask         = 0b0100,
-        Capture             = 0b0100,
-        EnPassant           = 0b0101,
+    CaptureMask         = 0b0100,
+    Capture             = 0b0100,
+    EnPassant           = 0b0101,
 
-        PromotionMask       = 0b1000,
-        KnightPromotion     = 0b1000,
-        BishopPromotion     = 0b1001,
-        RookPromotion       = 0b1010,
-        QueenPromotion      = 0b1011,
+    PromotionMask       = 0b1000,
+    KnightPromotion     = 0b1000,
+    BishopPromotion     = 0b1001,
+    RookPromotion       = 0b1010,
+    QueenPromotion      = 0b1011,
 
-        KnightPromoCapture  = KnightPromotion  | CaptureMask,
-        BishopPromoCapture  = BishopPromotion  | CaptureMask,
-        RookPromoCapture    = RookPromotion    | CaptureMask,
-        QueenPromoCapture   = QueenPromotion   | CaptureMask,
-    };
-}
+    KnightPromoCapture  = KnightPromotion  | CaptureMask,
+    BishopPromoCapture  = BishopPromotion  | CaptureMask,
+    RookPromoCapture    = RookPromotion    | CaptureMask,
+    QueenPromoCapture   = QueenPromotion   | CaptureMask,
+};
+} // namespace MoveFlagNamespace
 using MoveFlag = MoveFlagNamespace::MoveFlag;
 // @formatter:on
 
@@ -122,3 +124,5 @@ INLINE constexpr PieceType Move::promotion() const {
 }
 
 static_assert(sizeof(Move) == 2, "Move must be 2 bytes");
+
+} // namespace FKTB

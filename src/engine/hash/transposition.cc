@@ -12,12 +12,16 @@
 #include "engine/board/square.h"
 #include "engine/board/piece.h"
 
+namespace FKTB {
+
 namespace {
-    uint64_t blackToMoveNumber = 0;
-    std::array<uint64_t, 16> castlingRightsNumbers;
-    std::array<uint64_t, 9> enPassantFileNumbers; // Index 0 is for no en passant.
-    ColorMap<PieceTypeMap<SquareMap<uint64_t>>> pieceNumbers;
-}
+
+uint64_t blackToMoveNumber = 0;
+std::array<uint64_t, 16> castlingRightsNumbers;
+std::array<uint64_t, 9> enPassantFileNumbers; // Index 0 is for no en passant.
+ColorMap<PieceTypeMap<SquareMap<uint64_t>>> pieceNumbers;
+
+} // namespace
 
 void Zobrist::init() {
     constexpr uint64_t seed = 0;
@@ -127,3 +131,5 @@ void TranspositionTable::maybeStore(uint64_t key, uint16_t depth, Flag flag, Mov
         entry->store(key, depth, flag, bestMove, bestScore);
     }
 }
+
+} // namespace FKTB

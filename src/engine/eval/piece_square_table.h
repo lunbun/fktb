@@ -9,6 +9,8 @@
 #include "engine/board/piece.h"
 #include "engine/board/square.h"
 
+namespace FKTB {
+
 constexpr SquareMap<int16_t> flipVertical(const SquareMap<int16_t> &table) {
     SquareMap<int16_t> flippedTable = { 0 };
     for (uint8_t rank = 0; rank < 8; rank++) {
@@ -38,18 +40,22 @@ private:
 };
 
 namespace PieceSquareTables {
-    extern const PieceSquareTable Pawn;
-    extern const PieceSquareTable Knight;
-    extern const PieceSquareTable Bishop;
-    extern const PieceSquareTable Rook;
-    extern const PieceSquareTable Queen;
-    extern const PieceSquareTable King;
-    extern const PieceTypeMap<const PieceSquareTable *> Tables;
 
-    [[nodiscard]] INLINE int16_t evaluate(GamePhase phase, Piece piece, Square square) {
-        return (*Tables[piece.type()])[phase][piece.color()][square];
-    }
-    [[nodiscard]] INLINE int16_t interpolate(Piece piece, Square square, uint16_t phase) {
-        return (*Tables[piece.type()]).interpolate(piece.color(), square, phase);
-    }
+extern const PieceSquareTable Pawn;
+extern const PieceSquareTable Knight;
+extern const PieceSquareTable Bishop;
+extern const PieceSquareTable Rook;
+extern const PieceSquareTable Queen;
+extern const PieceSquareTable King;
+extern const PieceTypeMap<const PieceSquareTable *> Tables;
+
+[[nodiscard]] INLINE int16_t evaluate(GamePhase phase, Piece piece, Square square) {
+    return (*Tables[piece.type()])[phase][piece.color()][square];
 }
+[[nodiscard]] INLINE int16_t interpolate(Piece piece, Square square, uint16_t phase) {
+    return (*Tables[piece.type()]).interpolate(piece.color(), square, phase);
+}
+
+} // namespace PieceSquareTables
+
+} // namespace FKTB

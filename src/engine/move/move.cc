@@ -3,9 +3,14 @@
 #include <stdexcept>
 #include <cstring>
 
+#include "engine/inline.h"
 #include "engine/board/board.h"
 
-MoveFlag promotionFlagFromUciChar(char c) {
+namespace FKTB {
+
+namespace {
+
+INLINE MoveFlag promotionFlagFromUciChar(char c) {
     // @formatter:off
     switch (c) {
         case 'n': return MoveFlag::KnightPromotion;
@@ -17,7 +22,7 @@ MoveFlag promotionFlagFromUciChar(char c) {
     // @formatter:on
 }
 
-char pieceTypeToUciChar(PieceType type) {
+INLINE char pieceTypeToUciChar(PieceType type) {
     // @formatter:off
     switch (type) {
         case PieceType::Knight: return 'n';
@@ -28,6 +33,8 @@ char pieceTypeToUciChar(PieceType type) {
     }
     // @formatter:on
 }
+
+} // namespace
 
 Move Move::fromUci(const std::string &uci, const Board &board) {
     if (uci.length() != 4 && uci.length() != 5) {
@@ -130,3 +137,5 @@ std::string Move::debugName(const Board &board) const {
 
     return name;
 }
+
+} // namespace FKTB

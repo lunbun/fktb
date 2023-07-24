@@ -6,15 +6,17 @@
 
 #include "engine/inline.h"
 
+namespace FKTB {
+
 // @formatter:off
 namespace ColorNamespace {
-    enum Color : uint8_t {
-        White       = 0,
-        Black       = 1
-    };
+enum Color : uint8_t {
+    White       = 0,
+    Black       = 1
+};
 
-    [[nodiscard]] std::string debugName(Color color);
-}
+[[nodiscard]] std::string debugName(Color color);
+} // namespace ColorNamespace
 using Color = ColorNamespace::Color;
 // @formatter:on
 
@@ -39,3 +41,5 @@ public:
 private:
     std::array<T, 2> values_;
 };
+
+} // namespace FKTB

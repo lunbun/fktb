@@ -10,6 +10,8 @@
 #include "engine/inline.h"
 #include "engine/intrinsics.h"
 
+namespace FKTB {
+
 std::string Bitboard::debug() const {
     std::string result;
     for (int8_t rank = 7; rank >= 0; --rank) {
@@ -29,6 +31,8 @@ std::string Bitboard::debug() const {
 }
 
 
+
+namespace {
 
 // Table of bitboards with all the squares between two squares.
 // See https://www.chessprogramming.org/Square_Attacked_By#0x88_Difference
@@ -312,6 +316,8 @@ void initKingAttacks() {
     }
 }
 
+} // namespace
+
 void Bitboards::init() {
     initBetweenTable();
 
@@ -447,3 +453,5 @@ Bitboard Bitboards::allAttacks(const Board &board, Bitboard occupied) {
 
 template Bitboard Bitboards::allAttacks<Color::White>(const Board &, Bitboard);
 template Bitboard Bitboards::allAttacks<Color::Black>(const Board &, Bitboard);
+
+} // namespace FKTB

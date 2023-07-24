@@ -9,28 +9,34 @@
 #include "engine/board/piece.h"
 #include "engine/board/bitboard.h"
 
+namespace FKTB {
+
+namespace {
+
 // We need a separate piece material table for SEE because SEE does not check for move legality, so we need the king to have an
 // insanely high material value to discourage capturing with the king if it would leave it in check.
 namespace SeeMaterial {
-    constexpr int32_t King = 200000;
-    constexpr PieceTypeMap<int32_t> Values = {
-        PieceMaterial::Pawn,
-        PieceMaterial::Knight,
-        PieceMaterial::Bishop,
-        PieceMaterial::Rook,
-        PieceMaterial::Queen,
-        King
-    };
 
-    [[nodiscard]] INLINE constexpr int32_t value(PieceType type) {
-        assert(type != PieceType::Empty);
-        return Values[type];
-    }
+constexpr int32_t King = 200000;
+constexpr PieceTypeMap<int32_t> Values = {
+    PieceMaterial::Pawn,
+    PieceMaterial::Knight,
+    PieceMaterial::Bishop,
+    PieceMaterial::Rook,
+    PieceMaterial::Queen,
+    King
+};
 
-    [[nodiscard]] INLINE constexpr int32_t value(Piece piece) {
-        return value(piece.type());
-    }
+[[nodiscard]] INLINE constexpr int32_t value(PieceType type) {
+    assert(type != PieceType::Empty);
+    return Values[type];
 }
+
+[[nodiscard]] INLINE constexpr int32_t value(Piece piece) {
+    return value(piece.type());
+}
+
+} // namespace SeeMaterial
 
 // Returns a bitboard of all attackers of a square of either color.
 INLINE Bitboard findAllAttackers(Square square, Bitboard diagonalSliders, Bitboard orthogonalSliders, Bitboard occupied,
@@ -70,6 +76,8 @@ INLINE LvaResult findLeastValuableAttacker(Color side, Bitboard attackers, const
 
     return LvaResult::invalid();
 }
+
+} // namespace
 
 
 
@@ -164,3 +172,5 @@ template int32_t See::evaluate<Color::White>(Square, const Board &);
 template int32_t See::evaluate<Color::Black>(Square, const Board &);
 template int32_t See::evaluate<Color::White>(Move, Board &);
 template int32_t See::evaluate<Color::Black>(Move, Board &);
+
+} // namespace FKTB

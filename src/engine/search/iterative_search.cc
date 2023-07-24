@@ -13,6 +13,8 @@
 #include "engine/move/movegen.h"
 #include "engine/search/move_ordering/move_ordering.h"
 
+namespace FKTB {
+
 SearchResult::SearchResult() : depth(0), bestLine(), score(0), nodeCount(0), transpositionHits(0), elapsed() { }
 
 SearchResult::SearchResult(uint16_t depth, SearchLine line, const SearchStatistics &stats) : elapsed() {
@@ -159,8 +161,10 @@ void IterativeSearcher::SearchThread::awaitTask() {
 }
 
 SearchResult IterativeSearcher::SearchThread::searchIteration() {
-    assert(!this->taskMutex_.locked_by_caller() && "SearchThread::searchIteration() must not be called with the task mutex locked");
-    assert(!this->searchMutex_.locked_by_caller() && "SearchThread::searchIteration() must not be called with the search mutex locked");
+    assert(
+        !this->taskMutex_.locked_by_caller() && "SearchThread::searchIteration() must not be called with the task mutex locked");
+    assert(
+        !this->searchMutex_.locked_by_caller() && "SearchThread::searchIteration() must not be called with the search mutex locked");
 
     std::optional<std::lock_guard<ami::mutex>> searchLock;
 
@@ -251,7 +255,8 @@ void IterativeSearcher::addIterationCallback(IterationCallback callback) {
 }
 
 void IterativeSearcher::notifyCallbacks(const SearchResult &result) {
-    assert(this->mutex_.locked_by_caller() && "IterativeSearcher::notifyCallbacks() must be called with the manager's mutex locked");
+    assert(
+        this->mutex_.locked_by_caller() && "IterativeSearcher::notifyCallbacks() must be called with the manager's mutex locked");
 
     for (const auto &callback : this->callbacks_) {
         callback(result);
@@ -259,7 +264,8 @@ void IterativeSearcher::notifyCallbacks(const SearchResult &result) {
 }
 
 void IterativeSearcher::receiveResultFromThread(const SearchResult &result) {
-    assert(this->mutex_.locked_by_caller() && "IterativeSearcher::receiveResultFromThread() must be called with the manager's mutex locked");
+    assert(
+        this->mutex_.locked_by_caller() && "IterativeSearcher::receiveResultFromThread() must be called with the manager's mutex locked");
 
     if (!result.isValid()) {
         return;
@@ -361,3 +367,5 @@ SearchResult IterativeSearcher::stop() {
 
     return result;
 }
+
+} // namespace FKTB

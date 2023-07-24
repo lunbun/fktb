@@ -10,6 +10,8 @@
 #include "engine/board/bitboard.h"
 #include "engine/board/board.h"
 
+namespace FKTB {
+
 class HistoryTable {
 public:
     HistoryTable();
@@ -77,3 +79,5 @@ struct HeuristicTables {
 
     HeuristicTables();
 };
+
+} // namespace FKTB

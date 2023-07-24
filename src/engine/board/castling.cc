@@ -3,6 +3,10 @@
 #include <vector>
 #include <string>
 
+#include "engine/inline.h"
+
+namespace FKTB {
+
 Square CastlingRook::from(Color color, CastlingSide side) {
     // White king   -> H1 (7)
     // White queen  -> A1 (0)
@@ -37,7 +41,9 @@ CastlingRights CastlingRights::fromRookSquare(Square square) {
     return (2 - (square & 1)) << (((square & 16) >> 4) * 2);
 }
 
-std::string join(const std::vector<std::string> &strings, const std::string &delimiter) {
+namespace {
+
+INLINE std::string join(const std::vector<std::string> &strings, const std::string &delimiter) {
     std::string result;
 
     for (size_t i = 0; i < strings.size(); i++) {
@@ -51,6 +57,8 @@ std::string join(const std::vector<std::string> &strings, const std::string &del
     return result;
 }
 
+} // namespace
+
 // @formatter:off
 std::string CastlingRights::debugName() const {
     std::vector<std::string> whiteRights, blackRights;
@@ -62,3 +70,5 @@ std::string CastlingRights::debugName() const {
     return "White(" + join(whiteRights, ", ") + "), Black(" + join(blackRights, ", ") + ")";
 }
 // @formatter:on
+
+} // namespace FKTB

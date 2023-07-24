@@ -6,17 +6,17 @@
 #include "uci.h"
 
 [[noreturn]] void uci() {
-    std::string name = "FKTB 0.0.66";
+    std::string name = "FKTB 0.0.67";
 #ifndef NDEBUG
     name += " Debug";
 #endif // #ifndef NDEBUG
-    UciHandler uci(name, "frogscats");
+    FKTB::UCIHandler uci(name, "frogscats");
 
     uci.run();
 }
 
 int main() {
-    EngineInit::init();
+    FKTB::init();
 
     uci();
 }

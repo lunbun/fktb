@@ -10,6 +10,8 @@
 #include "engine/hash/transposition.h"
 #include "engine/eval/piece_square_table.h"
 
+namespace FKTB {
+
 Board::Board(Color turn, CastlingRights castlingRights, Square enPassantSquare) : material_(), pieceSquareEval_(), turn_(turn),
                                                                                   hash_(0), castlingRights_(castlingRights),
                                                                                   enPassantSquare_(enPassantSquare), pieces_(),
@@ -507,3 +509,5 @@ void Board::unmakeNullMove(MakeMoveInfo info) {
     this->castlingRights_ = info.oldCastlingRights;
     this->enPassantSquare_ = info.oldEnPassantSquare;
 }
+
+} // namespace FKTB

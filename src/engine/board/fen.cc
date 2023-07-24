@@ -4,34 +4,26 @@
 #include <optional>
 #include <sstream>
 
+#include "engine/inline.h"
+
+namespace FKTB {
+
 namespace {
-    std::vector<std::string> split(const std::string &s, char delim) {
-        std::vector<std::string> result;
-        std::stringstream ss(s);
-        std::string item;
 
-        while (getline(ss, item, delim)) {
-            result.push_back(item);
-        }
+INLINE std::vector<std::string> split(const std::string &s, char delim) {
+    std::vector<std::string> result;
+    std::stringstream ss(s);
+    std::string item;
 
-        return result;
-    }
-}
-
-FenReader::FenReader(const std::string &fen) : file_(0), rank_(7) {
-    this->fields_ = split(fen, ' ');
-    if (this->fields_.empty()) {
-        throw std::runtime_error("Invalid FEN string");
+    while (getline(ss, item, delim)) {
+        result.push_back(item);
     }
 
-    this->pieceField_ = this->fields_[0];
-    this->pieceIndex_ = 0;
-
-    this->readNextPiece();
+    return result;
 }
 
 // @formatter:off
-PieceType fenCharToPieceType(char c) {
+INLINE PieceType fenCharToPieceType(char c) {
     switch (c) {
         case 'p': return PieceType::Pawn;
         case 'n': return PieceType::Knight;
@@ -44,12 +36,50 @@ PieceType fenCharToPieceType(char c) {
 }
 // @formatter:on
 
-FenReader::Entry fenCharToPiece(char c, Square square) {
+INLINE FenReader::Entry fenCharToPiece(char c, Square square) {
     if (isupper(c)) {
         return { Piece::white(fenCharToPieceType(static_cast<char>(tolower(c)))), square };
     } else {
         return { Piece::black(fenCharToPieceType(c)), square };
     }
+}
+
+// @formatter:off
+INLINE char pieceTypeToFenChar(PieceType type) {
+    switch (type) {
+        case PieceType::Pawn: return 'p';
+        case PieceType::Knight: return 'n';
+        case PieceType::Bishop: return 'b';
+        case PieceType::Rook: return 'r';
+        case PieceType::Queen: return 'q';
+        case PieceType::King: return 'k';
+        default: throw std::runtime_error("Invalid piece type");
+    }
+}
+// @formatter:on
+
+INLINE char pieceToFenChar(Piece piece) {
+    if (piece.color() == Color::White) {
+        return static_cast<char>(toupper(pieceTypeToFenChar(piece.type())));
+    } else {
+        return static_cast<char>(tolower(pieceTypeToFenChar(piece.type())));
+    }
+}
+
+} // namespace
+
+
+
+FenReader::FenReader(const std::string &fen) : file_(0), rank_(7) {
+    this->fields_ = split(fen, ' ');
+    if (this->fields_.empty()) {
+        throw std::runtime_error("Invalid FEN string");
+    }
+
+    this->pieceField_ = this->fields_[0];
+    this->pieceIndex_ = 0;
+
+    this->readNextPiece();
 }
 
 bool FenReader::hasNext() const {
@@ -79,7 +109,7 @@ void FenReader::readNextPiece() {
         } else if (isdigit(c)) {
             this->file_ += static_cast<int8_t>(c - '0');
         } else {
-            this->nextPiece_ = fenCharToPiece(c, Square(this->file_, this->rank_ ));
+            this->nextPiece_ = fenCharToPiece(c, Square(this->file_, this->rank_));
             this->file_++;
         }
 
@@ -144,28 +174,6 @@ Square FenReader::enPassantSquare() const {
 
 
 FenWriter::FenWriter() : rank_(7), file_(0), emptyFilesInARow_(0), fen_() { }
-
-// @formatter:off
-char pieceTypeToFenChar(PieceType type) {
-    switch (type) {
-        case PieceType::Pawn: return 'p';
-        case PieceType::Knight: return 'n';
-        case PieceType::Bishop: return 'b';
-        case PieceType::Rook: return 'r';
-        case PieceType::Queen: return 'q';
-        case PieceType::King: return 'k';
-        default: throw std::runtime_error("Invalid piece type");
-    }
-}
-// @formatter:on
-
-char pieceToFenChar(Piece piece) {
-    if (piece.color() == Color::White) {
-        return static_cast<char>(toupper(pieceTypeToFenChar(piece.type())));
-    } else {
-        return static_cast<char>(tolower(pieceTypeToFenChar(piece.type())));
-    }
-}
 
 void FenWriter::piece(Piece piece) {
     this->maybeAddEmptyFilesToFen();
@@ -233,3 +241,5 @@ void FenWriter::maybeAddEmptyFilesToFen() {
         this->emptyFilesInARow_ = 0;
     }
 }
+
+} // namespace FKTB

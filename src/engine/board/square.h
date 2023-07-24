@@ -6,6 +6,8 @@
 
 #include "engine/inline.h"
 
+namespace FKTB {
+
 // Square can technically fit into 6 bits.
 class Square {
 public:
@@ -49,3 +51,5 @@ static_assert(sizeof(Square) == 1, "Square must be 1 byte");
 
 template<typename T>
 using SquareMap = std::array<T, 64>;
+
+} // namespace FKTB

@@ -5,35 +5,37 @@
 #include <vector>
 #include <chrono>
 
-namespace Tests {
-    // Prints out all the moves for a given position.
-    void pseudoLegalMoveGenTest(const std::string &fen);
-    void legalMoveGenTest(const std::string &fen);
+namespace FKTB::Tests {
 
-    // Prints out all moves and their ordering scores for a given position.
-    //
-    // In order for the move ordering to have history heuristic data to work with, a search must be run on a position that has the
-    // desired position to analyze as a child node. This is why we need the movesSequence parameter.
-    void moveOrderingTest(const std::string &fen, const std::vector<std::string> &movesSequence);
+// Prints out all the moves for a given position.
+void pseudoLegalMoveGenTest(const std::string &fen);
+void legalMoveGenTest(const std::string &fen);
 
-    // For each move in the sequence, prints out if the move is a repetition or not.
-    void repetitionTest(const std::string &fen, const std::vector<std::string> &movesSequence);
+// Prints out all moves and their ordering scores for a given position.
+//
+// In order for the move ordering to have history heuristic data to work with, a search must be run on a position that has the
+// desired position to analyze as a child node. This is why we need the movesSequence parameter.
+void moveOrderingTest(const std::string &fen, const std::vector<std::string> &movesSequence);
 
-    // Runs a benchmark on the fixed depth search.
-    void benchmark();
+// For each move in the sequence, prints out if the move is a repetition or not.
+void repetitionTest(const std::string &fen, const std::vector<std::string> &movesSequence);
 
-    // Runs a fixed depth search on a given position.
-    std::chrono::milliseconds fixedDepthTest(const std::string &fen, uint16_t depth);
+// Runs a benchmark on the fixed depth search.
+void benchmark();
 
-    // Runs an iterative deepening search on a given position.
-    void iterativeTest(const std::string &fen, uint16_t depth, uint32_t threads);
+// Runs a fixed depth search on a given position.
+std::chrono::milliseconds fixedDepthTest(const std::string &fen, uint16_t depth);
 
-    // Verifies that unmakeMove is working correctly.
-    void unmakeMoveTest(const std::string &fen);
+// Runs an iterative deepening search on a given position.
+void iterativeTest(const std::string &fen, uint16_t depth, uint32_t threads);
 
-    // Verifies that the Zobrist hash is working correctly.
-    void hashTest(const std::string &fen, uint16_t depth);
+// Verifies that unmakeMove is working correctly.
+void unmakeMoveTest(const std::string &fen);
 
-    // Performs a perft test on a given position.
-    void perft(const std::string &fen, uint16_t depth);
-}
+// Verifies that the Zobrist hash is working correctly.
+void hashTest(const std::string &fen, uint16_t depth);
+
+// Performs a perft test on a given position.
+void perft(const std::string &fen, uint16_t depth);
+
+} // namespace FKTB::Tests

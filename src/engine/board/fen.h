@@ -9,6 +9,8 @@
 #include "piece.h"
 #include "castling.h"
 
+namespace FKTB {
+
 class FenReader {
 public:
     struct Entry {
@@ -69,3 +71,5 @@ private:
     // Adds empty files to the FEN string if necessary.
     void maybeAddEmptyFilesToFen();
 };
+
+} // namespace FKTB

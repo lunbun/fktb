@@ -7,6 +7,10 @@
 #include "engine/board/square.h"
 #include "engine/board/bitboard.h"
 
+namespace FKTB {
+
+namespace {
+
 template<Color Side>
 INLINE int32_t evaluatePawnShield(const Board &board);
 
@@ -279,6 +283,8 @@ int32_t evaluateComplete(const Board &board) {
     return evaluateCompleteForSide<Phase, Side>(board) - evaluateCompleteForSide<Phase, ~Side>(board);
 }
 
+} // namespace
+
 // Evaluates the board for the given side, subtracting the evaluation for the other side. Interpolates between the opening and end
 // game phases.
 template<Color Side>
@@ -329,3 +335,5 @@ int32_t Evaluation::evaluate(const Board &board, int32_t alpha, int32_t beta) {
 
 template int32_t Evaluation::evaluate<Color::White>(const Board &, int32_t, int32_t);
 template int32_t Evaluation::evaluate<Color::Black>(const Board &, int32_t, int32_t);
+
+} // namespace FKTB

@@ -11,6 +11,8 @@
 #include "engine/move/legality_check.h"
 #include "engine/eval/evaluation.h"
 
+namespace FKTB {
+
 FixedDepthSearcher::FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HeuristicTables &heuristics,
     SearchStatistics &stats) : board_(board.copy()), depth_(depth), table_(table), heuristics_(heuristics), stats_(stats) { }
 
@@ -444,3 +446,5 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
 
     return score;
 }
+
+} // namespace FKTB

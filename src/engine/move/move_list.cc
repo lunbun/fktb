@@ -8,6 +8,8 @@
 #include "engine/board/board.h"
 #include "engine/hash/transposition.h"
 
+namespace FKTB {
+
 Move MovePriorityQueue::dequeue() {
     // Find the move with the highest score
     MoveEntry *bestMove;
@@ -84,3 +86,5 @@ void RootMoveList::sort() {
         return a.score < b.score;
     });
 }
+
+} // namespace FKTB

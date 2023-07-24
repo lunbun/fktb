@@ -11,6 +11,10 @@
 #include "engine/board/board.h"
 #include "engine/search/iterative_search.h"
 
+namespace FKTB {
+
+namespace UCI {
+
 class TokenStream {
 public:
     explicit TokenStream(const std::string &input);
@@ -37,10 +41,10 @@ struct SearchOptions {
     std::optional<int32_t> moveTime;
 };
 
-class UciHandler {
+class Handler {
 public:
-    UciHandler(std::string name, std::string author);
-    ~UciHandler();
+    Handler(std::string name, std::string author);
+    ~Handler();
 
     [[noreturn]] void run();
 
@@ -80,3 +84,9 @@ private:
     void stopSearch();
     void iterationCallback(const SearchResult &result);
 };
+
+} // namespace UCI
+
+using UCIHandler = UCI::Handler;
+
+} // namespace FKTB

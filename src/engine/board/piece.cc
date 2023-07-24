@@ -5,6 +5,8 @@
 
 #include "color.h"
 
+namespace FKTB {
+
 std::string PieceTypeNamespace::debugName(PieceType pieceType) {
     // @formatter:off
     switch (pieceType) {
@@ -23,3 +25,5 @@ std::string PieceTypeNamespace::debugName(PieceType pieceType) {
 std::string Piece::debugName() const {
     return ColorNamespace::debugName(this->color()) + " " + PieceTypeNamespace::debugName(this->type());
 }
+
+} // namespace FKTB

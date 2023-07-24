@@ -13,6 +13,8 @@
 #include "engine/board/piece.h"
 #include "engine/hash/transposition.h"
 
+namespace FKTB {
+
 // Note: In IterativeSearcher, nodeCount, transpositionHits, and elapsed are the amount of nodes/hits/elapsed time since
 // the start of the entire iterative search, not just the current iteration.
 struct SearchResult {
@@ -59,3 +61,5 @@ private:
     void notifyCallbacks(const SearchResult &result);
     void receiveResultFromThread(const SearchResult &result);
 };
+
+} // namespace FKTB

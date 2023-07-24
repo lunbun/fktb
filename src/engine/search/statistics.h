@@ -6,6 +6,8 @@
 
 #include "engine/inline.h"
 
+namespace FKTB {
+
 // Stores information like node count and transposition hits about the current search.
 // This class is thread safe.
 class SearchStatistics {
@@ -40,3 +42,5 @@ INLINE void SearchStatistics::reset() {
 INLINE std::chrono::milliseconds SearchStatistics::elapsed() const {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - this->start_);
 }
+
+} // namespace FKTB

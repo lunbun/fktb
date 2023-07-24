@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+namespace FKTB {
+
 Square Square::fromUci(const std::string &uci) {
     if (uci.length() != 2) {
         throw std::invalid_argument("Square string must be 2 characters long");
@@ -35,3 +37,5 @@ std::string Square::fen() const {
 std::string Square::debugName() const {
     return this->uci();
 }
+
+} // namespace FKTB

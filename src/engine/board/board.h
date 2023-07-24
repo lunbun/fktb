@@ -16,6 +16,7 @@
 #include "engine/move/move.h"
 #include "engine/eval/game_phase.h"
 
+namespace FKTB {
 
 // @formatter:off
 
@@ -37,7 +38,7 @@ namespace MakeMoveFlags {
 
     constexpr uint32_t Unmake       = 0x40;             // Flag used internally to indicate a move is being unmade. Do not pass this flag
                                                         // to makeMove/unmakeMove.
-}
+} // namespace MakeMoveFlags
 
 // Only these sets of flags will link properly with the makeMove/unmakeMove methods.
 namespace MakeMoveType {
@@ -51,7 +52,7 @@ namespace MakeMoveType {
 
     // Makes a move and updates only the bitboards.
     constexpr uint32_t BitboardsOnly        = MakeMoveFlags::Bitboards;
-}
+} // namespace MakeMoveType
 
 // @formatter:on
 
@@ -219,3 +220,5 @@ Bitboard Board::composite(Color color) const {
 Bitboard Board::composite(PieceType type) const {
     return this->bitboards_[Color::White][type] | this->bitboards_[Color::Black][type];
 }
+
+} // namespace FKTB

@@ -10,6 +10,10 @@
 #include "engine/eval/game_phase.h"
 #include "engine/eval/piece_square_table.h"
 
+namespace FKTB {
+
+namespace {
+
 // Class is used for convenience so that we don't have to pass around the board, history table, and bitboards separately as
 // parameters.
 template<Color Side, uint32_t Flags>
@@ -96,6 +100,8 @@ int32_t MoveScorer<Side, Flags>::score(Move move) {
     return score;
 }
 
+} // namespace
+
 
 
 template<Color Side, uint32_t Flags>
@@ -142,3 +148,5 @@ template void MoveOrdering::score<MoveOrdering::Type::Tactical>(RootMoveList &, 
 template void MoveOrdering::score<MoveOrdering::Type::All>(RootMoveList &, Board &, const HistoryTable *);
 template void MoveOrdering::score<MoveOrdering::Type::AllNoHistory>(RootMoveList &, Board &, const HistoryTable *);
 // @formatter:on
+
+} // namespace FKTB

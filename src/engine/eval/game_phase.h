@@ -5,14 +5,16 @@
 
 #include "engine/inline.h"
 
+namespace FKTB {
+
 // @formatter:off
 namespace GamePhaseNamespace {
-    enum GamePhase : uint16_t {
-        // These values are also the bounds of the result of calculateContinuousPhase.
-        Opening = 0,
-        End     = 256
-    };
-}
+enum GamePhase : uint16_t {
+    // These values are also the bounds of the result of calculateContinuousPhase.
+    Opening = 0,
+    End     = 256
+};
+} // namespace GamePhaseNamespace
 using GamePhase = GamePhaseNamespace::GamePhase;
 // @formatter:on
 
@@ -39,11 +41,15 @@ class Board;
 
 // Code mostly taken from https://www.chessprogramming.org/Tapered_Eval
 namespace TaperedEval {
-    // Returns a value between 0 and 256, where 0 is the opening and 256 is the end game.
-    [[nodiscard]] uint16_t calculateContinuousPhase(const Board &board);
 
-    // Interpolates the evaluation between the opening and end game based on the continuous phase.
-    [[nodiscard]] INLINE constexpr int32_t interpolate(int32_t opening, int32_t endGame, uint8_t phase) {
-        return ((opening * (256 - phase)) + (endGame * phase)) / 256;
-    }
+// Returns a value between 0 and 256, where 0 is the opening and 256 is the end game.
+[[nodiscard]] uint16_t calculateContinuousPhase(const Board &board);
+
+// Interpolates the evaluation between the opening and end game based on the continuous phase.
+[[nodiscard]] INLINE constexpr int32_t interpolate(int32_t opening, int32_t endGame, uint8_t phase) {
+    return ((opening * (256 - phase)) + (endGame * phase)) / 256;
 }
+
+} // namespace TaperedEval
+
+} // namespace FKTB

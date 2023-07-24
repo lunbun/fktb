@@ -2,6 +2,8 @@
 
 #include "engine/inline.h"
 
+namespace FKTB {
+
 template<Color Side>
 LegalityChecker<Side>::LegalityChecker(Board &board) : board_(board) {
     Bitboard friendly = board.composite(Side);
@@ -292,3 +294,5 @@ bool LegalityCheck::isLegal(Board &board, Move move) {
         return LegalityChecker<Color::Black>(board).isLegal(move);
     }
 }
+
+} // namespace FKTB

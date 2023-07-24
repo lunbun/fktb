@@ -15,6 +15,8 @@
 #include "engine/move/move_list.h"
 #include "engine/hash/transposition.h"
 
+namespace FKTB {
+
 struct SearchRootNode {
     INLINE constexpr static SearchRootNode invalid() { return { Move::invalid(), 0 }; };
 
@@ -25,7 +27,7 @@ struct SearchRootNode {
 };
 
 struct SearchLine {
-    INLINE static SearchLine invalid() { return { {}, 0 }; };
+    INLINE static SearchLine invalid() { return {{ }, 0 }; };
 
     std::vector<Move> moves;
     int32_t score;
@@ -37,7 +39,8 @@ struct SearchLine {
 
 class FixedDepthSearcher {
 public:
-    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HeuristicTables &heuristics, SearchStatistics &stats);
+    FixedDepthSearcher(const Board &board, uint16_t depth, TranspositionTable &table, HeuristicTables &heuristics,
+        SearchStatistics &stats);
 
     [[nodiscard]] SearchLine search();
 
@@ -72,3 +75,5 @@ private:
     template<Color Turn>
     [[nodiscard]] int32_t search(uint16_t depth, int32_t alpha, int32_t beta);
 };
+
+} // namespace FKTB

@@ -9,6 +9,10 @@
 #include "engine/board/board.h"
 #include "engine/board/bitboard.h"
 
+namespace FKTB {
+
+namespace {
+
 // Class is used for convenience so that we don't have to pass around the board, move list, and bitboards separately as
 // parameters.
 template<Color Side, uint32_t Flags>
@@ -518,6 +522,8 @@ INLINE MoveEntry *filterLegal(Board &board, MoveEntry *start, MoveEntry *end) {
     return result;
 }
 
+} // namespace
+
 template<Color Side, uint32_t Flags>
 MoveEntry *MoveGeneration::generate(Board &board, MoveEntry *moves) {
     if constexpr (Flags & MoveGeneration::Flags::Legal) {
@@ -561,3 +567,5 @@ template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type:
 template MoveEntry *MoveGeneration::generate<Color::Black, MoveGeneration::Type::Tactical>(Board &, MoveEntry *);
 template MoveEntry *MoveGeneration::generate<Color::White, MoveGeneration::Type::Legal>(Board &, MoveEntry *);
 template MoveEntry *MoveGeneration::generate<Color::Black, MoveGeneration::Type::Legal>(Board &, MoveEntry *);
+
+} // namespace FKTB

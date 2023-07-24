@@ -5,6 +5,8 @@
 
 #include "engine/board/board.h"
 
+namespace FKTB {
+
 // https://www.chessprogramming.org/Tapered_Eval#Implementation_example
 uint16_t TaperedEval::calculateContinuousPhase(const Board &board) {
     // Pawns are not included in the game phase calculation, since there are usually lots of pawns in the end game.
@@ -37,3 +39,5 @@ uint16_t TaperedEval::calculateContinuousPhase(const Board &board) {
 
     return ((lostPiecesWeight - OpeningGameWeight) * 256) / (EndGameWeight - OpeningGameWeight);
 }
+
+} // namespace FKTB

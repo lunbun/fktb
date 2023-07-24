@@ -7,23 +7,27 @@
 #include "piece.h"
 #include "square.h"
 
+namespace FKTB {
+
 // @formatter:off
 namespace CastlingSideNamespace {
-    enum CastlingSide : uint8_t {
-        King    = 0b0001,
-        Queen   = 0b0010
-    };
-}
+enum CastlingSide : uint8_t {
+    King    = 0b0001,
+    Queen   = 0b0010
+};
+} // namespace CastlingSideNamespace
 using CastlingSide = CastlingSideNamespace::CastlingSide;
 // @formatter:on
 
 namespace CastlingRook {
-    // Returns the square that the rook is on for the given color and side.
-    [[nodiscard]] Square from(Color color, CastlingSide side);
 
-    // Returns the square that the rook will be on for the given color and side.
-    [[nodiscard]] Square to(Color color, CastlingSide side);
-}
+// Returns the square that the rook is on for the given color and side.
+[[nodiscard]] Square from(Color color, CastlingSide side);
+
+// Returns the square that the rook will be on for the given color and side.
+[[nodiscard]] Square to(Color color, CastlingSide side);
+
+} // namespace CastlingRook
 
 class CastlingRights {
 public:
@@ -65,3 +69,5 @@ public:
 private:
     uint8_t bits_;
 };
+
+} // namespace FKTB

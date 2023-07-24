@@ -1,5 +1,7 @@
 #include "color.h"
 
+namespace FKTB {
+
 std::string ColorNamespace::debugName(Color color) {
     // @formatter:off
     switch (color) {
@@ -9,3 +11,5 @@ std::string ColorNamespace::debugName(Color color) {
     }
     // @formatter:on
 }
+
+} // namespace FKTB

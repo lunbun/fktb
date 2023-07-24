@@ -16,6 +16,8 @@
 #include "engine/move/movegen.h"
 #include "engine/search/iterative_search.h"
 
+namespace FKTB::UCI {
+
 TokenStream::TokenStream(const std::string &input) : index_(0), tokens_() {
     std::stringstream ss(input);
     std::string item;
@@ -34,9 +36,9 @@ const std::string &TokenStream::next() {
 // Search stopping needs to be asynchronous from a separate thread so that the main thread can continue to process input while we
 // wait for a duration/node count to pass.
 // TODO: Add a destructor to properly kill the thread.
-class UciHandler::SearchStopThread {
+class Handler::SearchStopThread {
 public:
-    explicit SearchStopThread(UciHandler &uci);
+    explicit SearchStopThread(Handler &uci);
 
     void limitNodes(uint64_t nodeCount);
     void limitTime(std::chrono::milliseconds duration);
@@ -45,7 +47,7 @@ public:
     void disable();
 
 private:
-    UciHandler &uci_;
+    Handler &uci_;
     std::thread thread_;
 
     ami::mutex mutex_;
@@ -56,12 +58,12 @@ private:
     [[noreturn]] void loop();
 };
 
-UciHandler::SearchStopThread::SearchStopThread(UciHandler &uci) : uci_(uci) {
+Handler::SearchStopThread::SearchStopThread(Handler &uci) : uci_(uci) {
     this->thread_ = std::thread(&SearchStopThread::loop, this);
     this->thread_.detach();
 }
 
-void UciHandler::SearchStopThread::limitNodes(uint64_t nodeCount) {
+void Handler::SearchStopThread::limitNodes(uint64_t nodeCount) {
     assert(!this->mutex_.locked_by_caller() && "SearchStopThread::limitNodes() must not be called with the mutex locked.");
     std::lock_guard lock(this->mutex_);
 
@@ -71,7 +73,7 @@ void UciHandler::SearchStopThread::limitNodes(uint64_t nodeCount) {
     }
 }
 
-void UciHandler::SearchStopThread::limitTime(std::chrono::milliseconds duration) {
+void Handler::SearchStopThread::limitTime(std::chrono::milliseconds duration) {
     assert(!this->mutex_.locked_by_caller() && "SearchStopThread::limitTime() must not be called with the mutex locked.");
     std::lock_guard lock(this->mutex_);
 
@@ -82,13 +84,13 @@ void UciHandler::SearchStopThread::limitTime(std::chrono::milliseconds duration)
     }
 }
 
-void UciHandler::SearchStopThread::enable() {
+void Handler::SearchStopThread::enable() {
     assert(!this->mutex_.locked_by_caller() && "SearchStopThread::enable() must not be called with the mutex locked.");
     std::lock_guard lock(this->mutex_);
     this->isEnabled_ = true;
 }
 
-void UciHandler::SearchStopThread::disable() {
+void Handler::SearchStopThread::disable() {
     assert(!this->mutex_.locked_by_caller() && "SearchStopThread::disable() must not be called with the mutex locked.");
     std::lock_guard lock(this->mutex_);
     this->isEnabled_ = false;
@@ -96,7 +98,7 @@ void UciHandler::SearchStopThread::disable() {
     this->timeLimit_ = std::nullopt;
 }
 
-[[noreturn]] void UciHandler::SearchStopThread::loop() {
+[[noreturn]] void Handler::SearchStopThread::loop() {
     while (true) {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
@@ -124,7 +126,7 @@ void UciHandler::SearchStopThread::disable() {
 
 
 
-UciHandler::UciHandler(std::string name, std::string author) : name_(std::move(name)), author_(std::move(author)),
+Handler::Handler(std::string name, std::string author) : name_(std::move(name)), author_(std::move(author)),
                                                                board_(nullptr) {
 //    this->searcher_ = std::make_unique<IterativeSearcher>(std::thread::hardware_concurrency());
     this->searcher_ = std::make_unique<IterativeSearcher>(1);
@@ -135,9 +137,9 @@ UciHandler::UciHandler(std::string name, std::string author) : name_(std::move(n
     this->searchStopThread_ = std::make_unique<SearchStopThread>(*this);
 }
 
-UciHandler::~UciHandler() = default;
+Handler::~Handler() = default;
 
-[[noreturn]] void UciHandler::run() {
+[[noreturn]] void Handler::run() {
     while (true) {
         std::string input;
 
@@ -151,11 +153,11 @@ UciHandler::~UciHandler() = default;
     }
 }
 
-void UciHandler::error(const std::string &message) {
+void Handler::error(const std::string &message) {
     std::cerr << message << std::endl;
 }
 
-void UciHandler::handleInput(const std::string &input) {
+void Handler::handleInput(const std::string &input) {
     TokenStream tokens(input);
     if (tokens.isEnd()) {
         return this->error("Empty input");
@@ -187,7 +189,7 @@ void UciHandler::handleInput(const std::string &input) {
     }
 }
 
-void UciHandler::handleUci(TokenStream &tokens) {
+void Handler::handleUci(TokenStream &tokens) {
     if (!tokens.isEnd()) {
         return this->error("uci command does not take arguments");
     }
@@ -197,11 +199,11 @@ void UciHandler::handleUci(TokenStream &tokens) {
     std::cout << "uciok" << std::endl;
 }
 
-void UciHandler::handleDebug(TokenStream &tokens) {
+void Handler::handleDebug(TokenStream &tokens) {
     return this->error("Debug mode does not do anything");
 }
 
-void UciHandler::handleIsReady(TokenStream &tokens) {
+void Handler::handleIsReady(TokenStream &tokens) {
     if (!tokens.isEnd()) {
         return this->error("isready command does not take arguments");
     }
@@ -209,7 +211,7 @@ void UciHandler::handleIsReady(TokenStream &tokens) {
     std::cout << "readyok" << std::endl;
 }
 
-void UciHandler::handleSetOption(TokenStream &tokens) {
+void Handler::handleSetOption(TokenStream &tokens) {
     if (tokens.isEnd()) {
         return this->error("setoption command requires arguments");
     }
@@ -217,7 +219,7 @@ void UciHandler::handleSetOption(TokenStream &tokens) {
     return this->error("No options supported");
 }
 
-void UciHandler::handleUciNewGame(TokenStream &tokens) {
+void Handler::handleUciNewGame(TokenStream &tokens) {
     if (!tokens.isEnd()) {
         return this->error("ucinewgame command does not take arguments");
     }
@@ -225,7 +227,7 @@ void UciHandler::handleUciNewGame(TokenStream &tokens) {
     this->board_ = nullptr;
 }
 
-void UciHandler::handlePosition(TokenStream &tokens) {
+void Handler::handlePosition(TokenStream &tokens) {
     if (tokens.isEnd()) {
         return this->error("position command requires arguments");
     }
@@ -260,7 +262,7 @@ void UciHandler::handlePosition(TokenStream &tokens) {
     }
 }
 
-void UciHandler::handleGo(TokenStream &tokens) {
+void Handler::handleGo(TokenStream &tokens) {
     if (tokens.isEnd()) {
         return this->error("go command requires arguments");
     }
@@ -301,7 +303,7 @@ void UciHandler::handleGo(TokenStream &tokens) {
     this->startSearch(options);
 }
 
-void UciHandler::handleStop(TokenStream &tokens) {
+void Handler::handleStop(TokenStream &tokens) {
     if (!tokens.isEnd()) {
         return this->error("stop command does not take arguments");
     }
@@ -309,7 +311,7 @@ void UciHandler::handleStop(TokenStream &tokens) {
     this->stopSearch();
 }
 
-void UciHandler::handleQuit(TokenStream &tokens) {
+void Handler::handleQuit(TokenStream &tokens) {
     if (!tokens.isEnd()) {
         return this->error("quit command does not take arguments");
     }
@@ -319,7 +321,7 @@ void UciHandler::handleQuit(TokenStream &tokens) {
 
 
 
-void UciHandler::handleTest(TokenStream &tokens) {
+void Handler::handleTest(TokenStream &tokens) {
     const std::string &command = tokens.next();
 
     if (command == "movegen") {
@@ -331,7 +333,7 @@ void UciHandler::handleTest(TokenStream &tokens) {
     }
 }
 
-void UciHandler::handleTestMoveGen(TokenStream &tokens) {
+void Handler::handleTestMoveGen(TokenStream &tokens) {
     if (this->board_ == nullptr) {
         return this->error("No board set");
     }
@@ -339,7 +341,7 @@ void UciHandler::handleTestMoveGen(TokenStream &tokens) {
     Tests::legalMoveGenTest(this->board_->toFen());
 }
 
-void UciHandler::handleTestPrintFen(TokenStream &tokens) {
+void Handler::handleTestPrintFen(TokenStream &tokens) {
     if (this->board_ == nullptr) {
         return this->error("No board set");
     }
@@ -349,7 +351,7 @@ void UciHandler::handleTestPrintFen(TokenStream &tokens) {
 
 
 
-void UciHandler::startSearch(const SearchOptions &options) {
+void Handler::startSearch(const SearchOptions &options) {
     if (this->isSearching_) {
         return this->error("Already searching");
     }
@@ -391,7 +393,7 @@ void UciHandler::startSearch(const SearchOptions &options) {
     this->searchStopThread_->enable();
 }
 
-void UciHandler::stopSearch() {
+void Handler::stopSearch() {
     if (!this->isSearching_) {
         return this->error("Not searching");
     }
@@ -423,7 +425,7 @@ void UciHandler::stopSearch() {
     this->searchOptions_ = std::nullopt;
 }
 
-void UciHandler::iterationCallback(const SearchResult &result) {
+void Handler::iterationCallback(const SearchResult &result) {
     if (!this->isSearching_ || !this->searchOptions_.has_value()) {
         return this->error("Iteration callback somehow called when not searching");
     }
@@ -468,3 +470,5 @@ void UciHandler::iterationCallback(const SearchResult &result) {
         }).detach();
     }
 }
+
+} // namespace FKTB::UCI

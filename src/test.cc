@@ -18,9 +18,13 @@
 #include "engine/search/fixed_search.h"
 #include "engine/search/iterative_search.h"
 
+namespace FKTB {
+
+namespace {
+
 std::string formatNumber(uint64_t number, uint64_t divisor, char suffix) {
     std::stringstream ss;
-    ss << std::fixed << std::setprecision(2) << (number / (double) divisor) << suffix;
+    ss << std::fixed << std::setprecision(2) << (static_cast<double>(number) / static_cast<double>(divisor)) << suffix;
     return ss.str();
 }
 
@@ -43,6 +47,8 @@ std::string formatWithExact(uint64_t number) {
         return formatNumber(number) + " (exact " + std::to_string(number) + ")";
     }
 }
+
+} // namespace
 
 
 
@@ -363,3 +369,5 @@ void Tests::perft(const std::string &fen, uint16_t depth) {
     std::cout << "Nodes: " << formatWithExact(nodeCount) << std::endl;
     std::cout << "Time: " << duration << "ms" << std::endl;
 }
+
+} // namespace FKTB
