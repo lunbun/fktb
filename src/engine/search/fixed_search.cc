@@ -192,11 +192,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     // Stage 1: Null move pruning
     bool isInCheck = board.isInCheck<Turn>();
-    // TODO: Make this less risky
-    // TODO: Null move pruning can sometimes cause the search to erroneously go for a draw by repetition when it has a mate
-    //  (example FEN: "8/8/3k4/2r5/1K6/8/8/8 w - - 22 78"). Need to figure out how to make null move pruning work well with
-    //  repetition detection.
-    if (depth >= 3 && gamePhase != GamePhase::End && !isInCheck) {
+    if (depth >= 3 && !isInCheck) {
         MakeMoveInfo info = board.makeNullMove();
 
         // Pass -beta + 1 as alpha since it is a null window search (see https://www.chessprogramming.org/Null_Window).
