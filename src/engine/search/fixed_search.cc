@@ -279,7 +279,11 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     // Stage 4: Killer moves
     for (Move killer : this->heuristics_.killers[depth]) {
-        if (!killer.isValid() || !legalityChecker.isLegal(killer)) {
+        // We already tried the hash move, so skip it if it is also a killer move.
+        //
+        // We also have to check if the killer move is legal, since killers are just moves that caused a beta-cutoff in a sibling
+        // node (or any node on the same ply in general), so it is possible that the killer move is not legal.
+        if (!killer.isValid() || killer == hashMove || !legalityChecker.isLegal(killer)) {
             continue;
         }
 
