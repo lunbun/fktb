@@ -25,4 +25,17 @@ INLINE constexpr int32_t matePlies(int32_t score) {
     }
 }
 
+// Returns the number of moves until mate. Returns a positive number if opponent is getting mated, and a negative
+// number if we are getting mated. Assumes the score is a mate score, otherwise returns garbage.
+INLINE constexpr int32_t mateMoves(int32_t score) {
+    int32_t plies = matePlies(score);
+
+    // Divide by 2, rounding away from 0 to convert from plies to moves.
+    if (plies < 0) {
+        return (plies - 1) / 2;
+    } else {
+        return (plies + 1) / 2;
+    }
+}
+
 } // namespace FKTB::Score

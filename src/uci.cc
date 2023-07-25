@@ -444,7 +444,7 @@ void Handler::iterationCallback(const SearchResult &result) {
     std::cout << "info depth " << result.depth;
     std::cout << " score ";
     if (Score::isMate(result.score)) {
-        std::cout << "mate " << Score::matePlies(result.score);
+        std::cout << "mate " << Score::mateMoves(result.score);
     } else {
         std::cout << "cp " << result.score;
     }

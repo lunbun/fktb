@@ -71,9 +71,9 @@ private:
     template<Color Turn>
     [[nodiscard]] int32_t searchQuiesce(int32_t alpha, int32_t beta);
     template<Color Turn>
-    [[nodiscard]] int32_t searchAlphaBeta(Move &bestMove, Move hashMove, uint16_t depth, int32_t &alpha, int32_t beta);
+    [[nodiscard]] int32_t searchAlphaBeta(Move &bestMove, Move hashMove, uint16_t depth, uint16_t ply, int32_t &alpha, int32_t beta);
     template<Color Turn>
-    [[nodiscard]] int32_t search(uint16_t depth, int32_t alpha, int32_t beta);
+    [[nodiscard]] int32_t search(uint16_t depth, uint16_t ply, int32_t alpha, int32_t beta);
 };
 
 } // namespace FKTB

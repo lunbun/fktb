@@ -113,7 +113,7 @@ SearchRootNode FixedDepthSearcher::searchRoot(RootMoveList moves) {
         Move move = moves.dequeue();
         MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
-        int32_t score = -search<~Turn>(depth - 1, -INT32_MAX, -alpha);
+        int32_t score = -search<~Turn>(depth - 1, 1, -INT32_MAX, -alpha);
 
         if (score > alpha) {
             bestMove = move;
@@ -179,7 +179,7 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
 }
 
 template<Color Turn>
-INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove, uint16_t depth, int32_t &alpha, int32_t beta) {
+INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove, uint16_t depth, uint16_t ply, int32_t &alpha, int32_t beta) {
     if (depth == 0) {
         return this->searchQuiesce<Turn>(alpha, beta);
     }
@@ -196,7 +196,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         MakeMoveInfo info = board.makeNullMove();
 
         // Pass -beta + 1 as alpha since it is a null window search (see https://www.chessprogramming.org/Null_Window).
-        int32_t score = -this->search<~Turn>(depth - 3, -beta, -beta + 1);
+        int32_t score = -this->search<~Turn>(depth - 3, ply + 1, -beta, -beta + 1);
 
         board.unmakeNullMove(info);
 
@@ -218,7 +218,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
     if (hashMove.isValid() && legalityChecker.isLegal(hashMove)) {
         MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(hashMove);
 
-        int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+        int32_t score = -this->search<~Turn>(depth - 1, ply + 1, -beta, -alpha);
 
         board.unmakeMove<MakeMoveType::AllNoTurn>(hashMove, info);
 
@@ -263,7 +263,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
             Move move = moves.dequeue();
             MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(move);
 
-            int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+            int32_t score = -this->search<~Turn>(depth - 1, ply + 1, -beta, -alpha);
 
             board.unmakeMove<MakeMoveType::AllNoTurn>(move, info);
 
@@ -287,7 +287,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         MakeMoveInfo info = board.makeMove<MakeMoveType::AllNoTurn>(killer);
 
-        int32_t score = -this->search<~Turn>(depth - 1, -beta, -alpha);
+        int32_t score = -this->search<~Turn>(depth - 1, ply + 1, -beta, -alpha);
 
         board.unmakeMove<MakeMoveType::AllNoTurn>(killer, info);
 
@@ -311,8 +311,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
         if (moves.empty() && !hasTacticalMoves) {
             if (isInCheck) { // Checkmate
-                // TODO: If depth is reduced, the mate-in score will be incorrect
-                return Score::mateIn(this->depth_ - depth);
+                return Score::mateIn(ply);
             } else { // Stalemate
                 return Score::Draw;
             }
@@ -358,7 +357,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
                 }
             }
 
-            int32_t score = -this->search<~Turn>(depth - 1 - depthReduction, -beta, -alpha);
+            int32_t score = -this->search<~Turn>(depth - 1 - depthReduction, ply + 1, -beta, -alpha);
 
             if (score > bestScore) {
                 bestScore = score;
@@ -382,7 +381,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 }
 
 template<Color Turn>
-int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) {
+int32_t FixedDepthSearcher::search(uint16_t depth, uint16_t ply, int32_t alpha, int32_t beta) {
     if (this->isHalted_) {
         return 0;
     }
@@ -425,7 +424,7 @@ int32_t FixedDepthSearcher::search(uint16_t depth, int32_t alpha, int32_t beta) 
     int32_t originalAlpha = alpha;
 
     Move bestMove = Move::invalid();
-    int32_t score = this->searchAlphaBeta<Turn>(bestMove, hashMove, depth, alpha, beta);
+    int32_t score = this->searchAlphaBeta<Turn>(bestMove, hashMove, depth, ply, alpha, beta);
 
     // Transposition table store
     if (bestMove.isValid()) {
