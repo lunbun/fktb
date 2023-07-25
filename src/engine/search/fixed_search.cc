@@ -188,8 +188,6 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
 
     Board &board = this->board_;
 
-    uint16_t gamePhase = TaperedEval::calculateContinuousPhase(board);
-
     // Stage 1: Null move pruning
     bool isInCheck = board.isInCheck<Turn>();
     if (depth >= 3 && !isInCheck) {
