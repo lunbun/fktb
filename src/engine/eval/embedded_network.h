@@ -8,6 +8,6 @@
 static_assert(false, "Embedded NNUE network not found");
 #endif
 
-extern const float NNUE_NETWORK_START[];
-extern const float NNUE_NETWORK_END[];
+extern const char NNUE_NETWORK_START[];
+extern const char NNUE_NETWORK_END[];
 extern const size_t NNUE_NETWORK_SIZE;

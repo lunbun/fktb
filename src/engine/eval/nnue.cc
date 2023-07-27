@@ -25,14 +25,26 @@ constexpr uint32_t Hidden2Size = 64;
 constexpr uint32_t Hidden3Size = 32;
 constexpr uint32_t OutputSize = 1;
 
-constexpr const float *Hidden1Weights = NNUE_NETWORK_START;
-constexpr const float *Hidden1Biases = Hidden1Weights + Hidden1Size * InputSize;
-constexpr const float *Hidden2Weights = Hidden1Biases + Hidden1Size;
-constexpr const float *Hidden2Biases = Hidden2Weights + Hidden2Size * Hidden1Size;
-constexpr const float *Hidden3Weights = Hidden2Biases + Hidden2Size;
-constexpr const float *Hidden3Biases = Hidden3Weights + Hidden3Size * Hidden2Size;
-constexpr const float *OutputWeights = Hidden3Biases + Hidden3Size;
-constexpr const float *OutputBiases = OutputWeights + OutputSize * Hidden3Size;
+const float *Hidden1Weights;
+const float *Hidden1Biases;
+const float *Hidden2Weights;
+const float *Hidden2Biases;
+const float *Hidden3Weights;
+const float *Hidden3Biases;
+const float *OutputWeights;
+const float *OutputBiases;
+
+// Loads the neural network from the data embedded in the executable.
+INLINE void load() {
+    Hidden1Weights = reinterpret_cast<const float *>(NNUE_NETWORK_START);
+    Hidden1Biases = Hidden1Weights + Hidden1Size * InputSize;
+    Hidden2Weights = Hidden1Biases + Hidden1Size;
+    Hidden2Biases = Hidden2Weights + Hidden2Size * Hidden1Size;
+    Hidden3Weights = Hidden2Biases + Hidden2Size;
+    Hidden3Biases = Hidden3Weights + Hidden3Size * Hidden2Size;
+    OutputWeights = Hidden3Biases + Hidden3Size;
+    OutputBiases = OutputWeights + OutputSize * Hidden3Size;
+}
 
 
 
@@ -133,6 +145,11 @@ INLINE float forward(const float *input) {
 }
 
 } // namespace
+
+// Loads the neural network.
+void NNUE::init() {
+    load();
+}
 
 // Evaluates the given board position from the perspective of the given side.
 template<Color Side>
