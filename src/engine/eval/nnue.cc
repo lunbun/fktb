@@ -2,11 +2,11 @@
 
 #include <cstdint>
 #include <array>
-#include <fstream>
 #include <cmath>
 
 #include <immintrin.h>
 
+#include "embedded_network.h"
 #include "engine/inline.h"
 #include "engine/board/color.h"
 #include "engine/board/piece.h"
@@ -25,26 +25,14 @@ constexpr uint32_t Hidden2Size = 64;
 constexpr uint32_t Hidden3Size = 32;
 constexpr uint32_t OutputSize = 1;
 
-std::array<float, InputSize * Hidden1Size> Hidden1Weights = { 0 };
-std::array<float, Hidden1Size> Hidden1Biases = { 0 };
-std::array<float, Hidden1Size * Hidden2Size> Hidden2Weights = { 0 };
-std::array<float, Hidden2Size> Hidden2Biases = { 0 };
-std::array<float, Hidden2Size * Hidden3Size> Hidden3Weights = { 0 };
-std::array<float, Hidden3Size> Hidden3Biases = { 0 };
-std::array<float, Hidden3Size * OutputSize> OutputWeights = { 0 };
-std::array<float, OutputSize> OutputBiases = { 0 };
-
-// Loads the neural network from the given binary stream.
-INLINE void load(std::istream &stream) {
-    stream.read(reinterpret_cast<char *>(Hidden1Weights.data()), Hidden1Weights.size() * sizeof(float));
-    stream.read(reinterpret_cast<char *>(Hidden1Biases.data()), Hidden1Biases.size() * sizeof(float));
-    stream.read(reinterpret_cast<char *>(Hidden2Weights.data()), Hidden2Weights.size() * sizeof(float));
-    stream.read(reinterpret_cast<char *>(Hidden2Biases.data()), Hidden2Biases.size() * sizeof(float));
-    stream.read(reinterpret_cast<char *>(Hidden3Weights.data()), Hidden3Weights.size() * sizeof(float));
-    stream.read(reinterpret_cast<char *>(Hidden3Biases.data()), Hidden3Biases.size() * sizeof(float));
-    stream.read(reinterpret_cast<char *>(OutputWeights.data()), OutputWeights.size() * sizeof(float));
-    stream.read(reinterpret_cast<char *>(OutputBiases.data()), OutputBiases.size() * sizeof(float));
-}
+constexpr const float *Hidden1Weights = NNUE_NETWORK_START;
+constexpr const float *Hidden1Biases = Hidden1Weights + Hidden1Size * InputSize;
+constexpr const float *Hidden2Weights = Hidden1Biases + Hidden1Size;
+constexpr const float *Hidden2Biases = Hidden2Weights + Hidden2Size * Hidden1Size;
+constexpr const float *Hidden3Weights = Hidden2Biases + Hidden2Size;
+constexpr const float *Hidden3Biases = Hidden3Weights + Hidden3Size * Hidden2Size;
+constexpr const float *OutputWeights = Hidden3Biases + Hidden3Size;
+constexpr const float *OutputBiases = OutputWeights + OutputSize * Hidden3Size;
 
 
 
@@ -136,28 +124,15 @@ INLINE float forward(const float *input) {
     float hidden3[Hidden3Size];
     float output[OutputSize];
 
-    forwardLayer<InputSize, Hidden1Size, relu>(input, Hidden1Weights.data(), Hidden1Biases.data(), hidden1);
-    forwardLayer<Hidden1Size, Hidden2Size, relu>(hidden1, Hidden2Weights.data(), Hidden2Biases.data(), hidden2);
-    forwardLayer<Hidden2Size, Hidden3Size, relu>(hidden2, Hidden3Weights.data(), Hidden3Biases.data(), hidden3);
-    forwardLayer<Hidden3Size, OutputSize, linear>(hidden3, OutputWeights.data(), OutputBiases.data(), output);
+    forwardLayer<InputSize, Hidden1Size, relu>(input, Hidden1Weights, Hidden1Biases, hidden1);
+    forwardLayer<Hidden1Size, Hidden2Size, relu>(hidden1, Hidden2Weights, Hidden2Biases, hidden2);
+    forwardLayer<Hidden2Size, Hidden3Size, relu>(hidden2, Hidden3Weights, Hidden3Biases, hidden3);
+    forwardLayer<Hidden3Size, OutputSize, linear>(hidden3, OutputWeights, OutputBiases, output);
 
     return output[0];
 }
 
 } // namespace
-
-// Loads the neural network.
-void NNUE::init() {
-    // TODO: Embed neural network into compiled binary.
-    constexpr const char *NetworkPath = "nnue/network.pt.bin";
-
-    std::ifstream file(NetworkPath, std::ios::in | std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open neural network file.");
-    }
-
-    load(file);
-}
 
 // Evaluates the given board position from the perspective of the given side.
 template<Color Side>
