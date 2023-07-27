@@ -14,7 +14,6 @@
 #include "bitboard.h"
 #include "engine/inline.h"
 #include "engine/move/move.h"
-#include "engine/eval/game_phase.h"
 
 namespace FKTB {
 
@@ -32,7 +31,8 @@ namespace MakeMoveFlags {
     constexpr uint32_t Hash         = 0x04 | Gameplay;  // Update the Zobrist hash?
                                                         // Note: Hash requires the Gameplay flag, because otherwise, the hash will
                                                         // not synchronize with changes in gameplay information.
-    constexpr uint32_t Evaluation   = 0x08;             // Update the evaluation (material and piece-square tables)?
+    // TODO: Once a NNUE accumulator is added, have the Evaluation flag update it.
+    constexpr uint32_t Evaluation   = 0x08;             // This flag does not do anything yet.
     constexpr uint32_t Bitboards    = 0x10;             // Update the bitboards?
     constexpr uint32_t Repetition   = 0x20;             // Update the three-fold repetition hash list?
 
@@ -95,8 +95,6 @@ public:
 
     [[nodiscard]] Board copy() const;
 
-    [[nodiscard]] INLINE int32_t material(Color color) const { return this->material_[color]; }
-    [[nodiscard]] INLINE int32_t pieceSquareEval(GamePhase phase, Color color) const;
     [[nodiscard]] INLINE Color turn() const { return this->turn_; }
     [[nodiscard]] INLINE uint64_t hash() const { return this->hash_; }
     [[nodiscard]] INLINE CastlingRights castlingRights() const { return this->castlingRights_; }
@@ -146,8 +144,6 @@ public:
     void unmakeNullMove(MakeMoveInfo info);
 
 private:
-    ColorMap<int32_t> material_;
-    GamePhaseMap<ColorMap<int32_t>> pieceSquareEval_;
     Color turn_;
     uint64_t hash_;
 
@@ -193,12 +189,6 @@ private:
     template<uint32_t Flags>
     void makeQuietMove(Move move);
 };
-
-
-
-INLINE int32_t Board::pieceSquareEval(GamePhase phase, Color color) const {
-    return this->pieceSquareEval_[phase][color];
-}
 
 INLINE Bitboard &Board::bitboard(Piece piece) {
     assert(piece.type() != PieceType::King);

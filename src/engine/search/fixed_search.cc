@@ -9,7 +9,7 @@
 #include "engine/move/move_list.h"
 #include "engine/move/movegen.h"
 #include "engine/move/legality_check.h"
-#include "engine/eval/evaluation.h"
+#include "engine/eval/nnue.h"
 
 namespace FKTB {
 
@@ -137,7 +137,7 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
 
     Board &board = this->board_;
 
-    int32_t standPat = Evaluation::evaluate<Turn>(board, alpha, beta);
+    int32_t standPat = NNUE::evaluate<Turn>(board);
     if (standPat >= beta) {
         return beta;
     }
@@ -323,7 +323,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         if (depth == 1 && !isInCheck) {
             constexpr int32_t FutilityMargin = 300;
 
-            int32_t evaluation = Evaluation::evaluate<Turn>(board, alpha, beta);
+            int32_t evaluation = NNUE::evaluate<Turn>(board);
 
             if (evaluation + FutilityMargin <= alpha) {
                 return alpha;

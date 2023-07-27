@@ -13,7 +13,7 @@
 #include "engine/board/piece.h"
 #include "engine/move/movegen.h"
 #include "engine/move/move_list.h"
-#include "engine/eval/evaluation.h"
+#include "engine/eval/nnue.h"
 #include "engine/hash/transposition.h"
 #include "engine/search/fixed_search.h"
 #include "engine/search/iterative_search.h"

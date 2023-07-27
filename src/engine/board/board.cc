@@ -8,12 +8,11 @@
 #include "fen.h"
 #include "engine/inline.h"
 #include "engine/hash/transposition.h"
-#include "engine/eval/piece_square_table.h"
 
 namespace FKTB {
 
-Board::Board(Color turn, CastlingRights castlingRights, Square enPassantSquare) : material_(), pieceSquareEval_(), turn_(turn),
-                                                                                  hash_(0), castlingRights_(castlingRights),
+Board::Board(Color turn, CastlingRights castlingRights, Square enPassantSquare) : turn_(turn), hash_(0),
+                                                                                  castlingRights_(castlingRights),
                                                                                   enPassantSquare_(enPassantSquare), pieces_(),
                                                                                   bitboards_(), repetitionHashes_(),
                                                                                   pliesSinceIrreversible_(0),
@@ -134,11 +133,6 @@ INLINE void Board::addKing(Color color, Square square) {
     assert(this->pieceAt(square).isEmpty());
     this->pieces_[square] = king;
 
-    if constexpr (Flags & MakeMoveFlags::Evaluation) {
-        this->pieceSquareEval_[GamePhase::Opening][color] += PieceSquareTables::evaluate(GamePhase::Opening, king, square);
-        this->pieceSquareEval_[GamePhase::End][color] += PieceSquareTables::evaluate(GamePhase::End, king, square);
-    }
-
     if constexpr (Flags & MakeMoveFlags::Hash) {
         this->hash_ ^= Zobrist::piece(Piece::king(color), square);
     }
@@ -154,13 +148,6 @@ INLINE void Board::addPiece(Piece piece, Square square) {
         this->bitboard(piece).set(square);
     }
 
-    if constexpr (Flags & MakeMoveFlags::Evaluation) {
-        this->material_[piece.color()] += piece.material();
-        this->pieceSquareEval_[GamePhase::Opening][piece.color()] += PieceSquareTables::evaluate(GamePhase::Opening, piece,
-            square);
-        this->pieceSquareEval_[GamePhase::End][piece.color()] += PieceSquareTables::evaluate(GamePhase::End, piece, square);
-    }
-
     if constexpr (Flags & MakeMoveFlags::Hash) {
         this->hash_ ^= Zobrist::piece(piece, square);
     }
@@ -174,13 +161,6 @@ INLINE void Board::removePiece(Piece piece, Square square) {
     if constexpr (Flags & MakeMoveFlags::Bitboards) {
         assert(this->bitboard(piece).get(square));
         this->bitboard(piece).clear(square);
-    }
-
-    if constexpr (Flags & MakeMoveFlags::Evaluation) {
-        this->material_[piece.color()] -= piece.material();
-        this->pieceSquareEval_[GamePhase::Opening][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Opening, piece,
-            square);
-        this->pieceSquareEval_[GamePhase::End][piece.color()] -= PieceSquareTables::evaluate(GamePhase::End, piece, square);
     }
 
     if constexpr (Flags & MakeMoveFlags::Hash) {
@@ -280,14 +260,6 @@ INLINE Piece Board::movePiece(Square from, Square to) {
             bitboard.clear(from);
             bitboard.set(to);
         }
-    }
-
-    // Update piece square evaluation
-    if constexpr (Flags & MakeMoveFlags::Evaluation) {
-        this->pieceSquareEval_[GamePhase::Opening][piece.color()] -= PieceSquareTables::evaluate(GamePhase::Opening, piece, from);
-        this->pieceSquareEval_[GamePhase::Opening][piece.color()] += PieceSquareTables::evaluate(GamePhase::Opening, piece, to);
-        this->pieceSquareEval_[GamePhase::End][piece.color()] -= PieceSquareTables::evaluate(GamePhase::End, piece, from);
-        this->pieceSquareEval_[GamePhase::End][piece.color()] += PieceSquareTables::evaluate(GamePhase::End, piece, to);
     }
 
     if constexpr (Flags & MakeMoveFlags::Hash) {

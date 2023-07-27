@@ -7,8 +7,6 @@
 #include "engine/move/move_list.h"
 #include "engine/board/piece.h"
 #include "engine/board/board.h"
-#include "engine/eval/game_phase.h"
-#include "engine/eval/piece_square_table.h"
 
 namespace FKTB {
 
@@ -27,8 +25,6 @@ private:
     Board &board_;
     const HistoryTable *history_;
 
-    uint16_t gamePhase_;
-
     [[nodiscard]] INLINE const HistoryTable &history() const {
         static_assert(Flags & MoveOrdering::Flags::History, "History flag is not set.");
         return *this->history_;
@@ -36,14 +32,12 @@ private:
 };
 
 template<Color Side, uint32_t Flags>
-MoveScorer<Side, Flags>::MoveScorer(Board &board, const HistoryTable *history) : board_(board), history_(history), gamePhase_(0) {
+MoveScorer<Side, Flags>::MoveScorer(Board &board, const HistoryTable *history) : board_(board), history_(history) {
     if constexpr (Flags & MoveOrdering::Flags::History) {
         assert(history != nullptr && "History flag is set but history table is null.");
     } else {
         assert(history == nullptr && "History flag is not set but history table is not null.");
     }
-
-    this->gamePhase_ = TaperedEval::calculateContinuousPhase(board);
 }
 
 
@@ -90,10 +84,6 @@ int32_t MoveScorer<Side, Flags>::score(Move move) {
             if (move.isCastle()) {
                 score += 500;
             }
-
-            // Piece square tables
-            score += PieceSquareTables::interpolate(piece, move.to(), this->gamePhase_);
-            score -= PieceSquareTables::interpolate(piece, move.from(), this->gamePhase_);
         }
     }
 
