@@ -36,6 +36,9 @@ SearchLine FixedDepthSearcher::search(RootMoveList moves) {
     // Resize the killer table to the depth of the search
     this->heuristics_.killers.resize(this->depth_);
 
+    // Refresh the NNUE accumulator to alleviate any floating point errors that may have accumulated
+    this->board_.accumulator().refresh(this->board_);
+
     // Search the root node
     SearchRootNode node = SearchRootNode::invalid();
     if (this->board_.turn() == Color::White) {
@@ -137,7 +140,7 @@ int32_t FixedDepthSearcher::searchQuiesce(int32_t alpha, int32_t beta) {
 
     Board &board = this->board_;
 
-    int32_t standPat = NNUE::evaluate<Turn>(board);
+    int32_t standPat = NNUE::evaluate(Turn, board.accumulator());
     if (standPat >= beta) {
         return beta;
     }
@@ -323,7 +326,7 @@ INLINE int32_t FixedDepthSearcher::searchAlphaBeta(Move &bestMove, Move hashMove
         if (depth == 1 && !isInCheck) {
             constexpr int32_t FutilityMargin = 300;
 
-            int32_t evaluation = NNUE::evaluate<Turn>(board);
+            int32_t evaluation = NNUE::evaluate(Turn, board.accumulator());
 
             if (evaluation + FutilityMargin <= alpha) {
                 return alpha;

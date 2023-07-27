@@ -14,6 +14,7 @@
 #include "bitboard.h"
 #include "engine/inline.h"
 #include "engine/move/move.h"
+#include "engine/eval/accumulator.h"
 
 namespace FKTB {
 
@@ -31,8 +32,7 @@ namespace MakeMoveFlags {
     constexpr uint32_t Hash         = 0x04 | Gameplay;  // Update the Zobrist hash?
                                                         // Note: Hash requires the Gameplay flag, because otherwise, the hash will
                                                         // not synchronize with changes in gameplay information.
-    // TODO: Once a NNUE accumulator is added, have the Evaluation flag update it.
-    constexpr uint32_t Evaluation   = 0x08;             // This flag does not do anything yet.
+    constexpr uint32_t Evaluation   = 0x08;             // Update the evaluation (NNUE accumulator)?
     constexpr uint32_t Bitboards    = 0x10;             // Update the bitboards?
     constexpr uint32_t Repetition   = 0x20;             // Update the three-fold repetition hash list?
 
@@ -57,6 +57,8 @@ namespace MakeMoveType {
 // @formatter:on
 
 struct MakeMoveInfo {
+    // TODO: Store the accumulator state here so that we don't have to recompute it when unmaking a move. Doing so will also help
+    //  alleviate some floating point errors that can accumulate over time.
     uint64_t oldHash;
     uint32_t oldPliesSinceIrreversible;
     CastlingRights oldCastlingRights;
@@ -99,6 +101,8 @@ public:
     [[nodiscard]] INLINE uint64_t hash() const { return this->hash_; }
     [[nodiscard]] INLINE CastlingRights castlingRights() const { return this->castlingRights_; }
     [[nodiscard]] INLINE Square enPassantSquare() const { return this->enPassantSquare_; }
+    [[nodiscard]] INLINE NNUE::Accumulator &accumulator() { return this->accumulator_; }
+    [[nodiscard]] INLINE const NNUE::Accumulator &accumulator() const { return this->accumulator_; }
 
     [[nodiscard]] INLINE Square king(Color color) const { return this->kings_[color]; }
     [[nodiscard]] INLINE Piece pieceAt(Square square) const { return this->pieces_[square]; }
@@ -152,6 +156,8 @@ private:
 
     CastlingRights castlingRights_;
     Square enPassantSquare_;
+
+    NNUE::Accumulator accumulator_;
 
     ColorMap<Square> kings_;
     SquareMap<Piece> pieces_;
