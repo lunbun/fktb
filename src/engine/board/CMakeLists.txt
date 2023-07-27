@@ -1,4 +1,4 @@
-target_sources(chess PRIVATE
+target_sources(fktb PRIVATE
         bitboard.cc
         bitboard.h
         board.cc

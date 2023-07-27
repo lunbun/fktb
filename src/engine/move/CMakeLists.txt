@@ -1,4 +1,4 @@
-target_sources(chess PRIVATE
+target_sources(fktb PRIVATE
         legality_check.cc
         legality_check.h
         move.cc

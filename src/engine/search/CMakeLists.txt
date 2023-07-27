@@ -1,6 +1,6 @@
 add_subdirectory(move_ordering)
 
-target_sources(chess PRIVATE
+target_sources(fktb PRIVATE
         fixed_search.cc
         fixed_search.h
         iterative_search.cc

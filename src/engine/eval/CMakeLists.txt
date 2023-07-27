@@ -1,4 +1,4 @@
-target_sources(chess PRIVATE
+target_sources(fktb PRIVATE
         evaluation.cc
         evaluation.h
         game_phase.cc

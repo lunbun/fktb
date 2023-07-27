@@ -1,4 +1,4 @@
-target_sources(chess PRIVATE
+target_sources(fktb PRIVATE
         heuristics.cc
         heuristics.h
         move_ordering.cc
