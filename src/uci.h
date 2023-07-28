@@ -6,6 +6,8 @@
 #include <optional>
 #include <memory>
 #include <functional>
+#include <optional>
+#include <fstream>
 
 #include "engine/board/color.h"
 #include "engine/board/board.h"
@@ -22,6 +24,13 @@ public:
     [[nodiscard]] bool isEnd() const { return this->index_ >= this->tokens_.size(); }
     [[nodiscard]] const std::string &next();
     [[nodiscard]] const std::string &peek() const { return this->tokens_[this->index_]; }
+
+    // Reads the tokens until the given condition is met. Returns the tokens read (space separated), not including the token that
+    // caused the condition to be met.
+    [[nodiscard]] std::string readUntil(const std::function<bool(const std::string &)> &condition);
+
+    [[nodiscard]] std::string readUntilEnd();
+    [[nodiscard]] std::string readUntil(const std::string &token);
 
 private:
     uint32_t index_;
@@ -53,6 +62,8 @@ private:
 
     std::string name_, author_;
 
+    std::unique_ptr<std::ofstream> logFile_;
+
     bool isSearching_ = false;
     std::optional<SearchOptions> searchOptions_;
     std::unique_ptr<SearchStopThread> searchStopThread_;
@@ -60,7 +71,12 @@ private:
     std::unique_ptr<Board> board_;
     std::unique_ptr<IterativeSearcher> searcher_;
 
+    void send(const std::string &message);
     void error(const std::string &message);
+    std::string readInput();
+
+    // Logs the message if a log file is set.
+    void maybeLog(const std::string &message);
 
     void handleInput(const std::string &input);
 
@@ -73,6 +89,8 @@ private:
     void handleGo(TokenStream &tokens);
     void handleStop(TokenStream &tokens);
     void handleQuit(TokenStream &tokens);
+
+    void handleSetLogFile(const std::string &path);
 
     void handleTest(TokenStream &tokens);
     void handleTestMoveGen(TokenStream &tokens);
