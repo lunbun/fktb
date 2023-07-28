@@ -31,6 +31,32 @@ const std::string &TokenStream::next() {
     return this->tokens_[this->index_++];
 }
 
+std::string TokenStream::readUntil(const std::function<bool(const std::string &)> &condition) {
+    std::string result;
+    while (!this->isEnd() && !condition(this->peek())) {
+        result += this->next() + ' ';
+    }
+
+    // Remove the trailing space.
+    if (!result.empty()) {
+        result.pop_back();
+    }
+
+    return result;
+}
+
+std::string TokenStream::readUntilEnd() {
+    return this->readUntil([](const std::string &token) {
+        return false;
+    });
+}
+
+std::string TokenStream::readUntil(const std::string &token) {
+    return this->readUntil([&token](const std::string &t) {
+        return t == token;
+    });
+}
+
 
 
 // Search stopping needs to be asynchronous from a separate thread so that the main thread can continue to process input while we
@@ -127,7 +153,7 @@ void Handler::SearchStopThread::disable() {
 
 
 Handler::Handler(std::string name, std::string author) : name_(std::move(name)), author_(std::move(author)),
-                                                               board_(nullptr) {
+                                                         board_(nullptr) {
 //    this->searcher_ = std::make_unique<IterativeSearcher>(std::thread::hardware_concurrency());
     this->searcher_ = std::make_unique<IterativeSearcher>(1);
     this->searcher_->addIterationCallback([this](const SearchResult &result) {
@@ -141,11 +167,9 @@ Handler::~Handler() = default;
 
 [[noreturn]] void Handler::run() {
     while (true) {
-        std::string input;
-
-        std::getline(std::cin, input);
-
         try {
+            std::string input = this->readInput();
+
             this->handleInput(input);
         } catch (const std::exception &e) {
             this->error(std::string("Uncaught exception: ") + e.what());
@@ -153,8 +177,27 @@ Handler::~Handler() = default;
     }
 }
 
+void Handler::send(const std::string &message) {
+    std::cout << message << std::endl;
+    this->maybeLog("[out] " + message);
+}
+
 void Handler::error(const std::string &message) {
     std::cerr << message << std::endl;
+    this->maybeLog("[err] " + message);
+}
+
+std::string Handler::readInput() {
+    std::string input;
+    std::getline(std::cin, input);
+    this->maybeLog("[in] " + input);
+    return input;
+}
+
+void Handler::maybeLog(const std::string &message) {
+    if (this->logFile_) {
+        *this->logFile_ << message << std::endl;
+    }
 }
 
 void Handler::handleInput(const std::string &input) {
@@ -194,9 +237,10 @@ void Handler::handleUci(TokenStream &tokens) {
         return this->error("uci command does not take arguments");
     }
 
-    std::cout << "id name " << this->name_ << std::endl;
-    std::cout << "id author " << this->author_ << std::endl;
-    std::cout << "uciok" << std::endl;
+    this->send("id name " + this->name_);
+    this->send("id author " + this->author_);
+    this->send("option name Log File type string default");
+    this->send("uciok");
 }
 
 void Handler::handleDebug(TokenStream &tokens) {
@@ -208,7 +252,7 @@ void Handler::handleIsReady(TokenStream &tokens) {
         return this->error("isready command does not take arguments");
     }
 
-    std::cout << "readyok" << std::endl;
+    this->send("readyok");
 }
 
 void Handler::handleSetOption(TokenStream &tokens) {
@@ -216,7 +260,28 @@ void Handler::handleSetOption(TokenStream &tokens) {
         return this->error("setoption command requires arguments");
     }
 
-    return this->error("No options supported");
+    // Read name
+    if (tokens.next() != "name") {
+        return this->error("setoption command requires 'name' as first argument");
+    }
+
+    std::string name = tokens.readUntil("value");
+    if (name.empty()) {
+        return this->error("Empty name in setoption command");
+    }
+
+    // Read value (if any)
+    std::string value;
+    if (!tokens.isEnd() && tokens.next() == "value") {
+        value = tokens.readUntilEnd();
+    }
+
+    // Handle option
+    if (name == "Log File") {
+        this->handleSetLogFile(value);
+    } else {
+        return this->error("Unknown option: " + name);
+    }
 }
 
 void Handler::handleUciNewGame(TokenStream &tokens) {
@@ -236,12 +301,7 @@ void Handler::handlePosition(TokenStream &tokens) {
     if (positionType == "startpos") {
         this->board_ = std::make_unique<Board>(Board::startingPosition());
     } else if (positionType == "fen") {
-        std::string fen;
-
-        while (!tokens.isEnd() && tokens.peek() != "moves") {
-            fen += tokens.next() + " ";
-        }
-
+        std::string fen = tokens.readUntil("moves");
         this->board_ = std::make_unique<Board>(Board::fromFen(fen));
     } else {
         return this->error("position command requires 'startpos' or 'fen' as first argument");
@@ -321,6 +381,18 @@ void Handler::handleQuit(TokenStream &tokens) {
 
 
 
+void Handler::handleSetLogFile(const std::string &path) {
+    this->logFile_ = std::make_unique<std::ofstream>(path);
+    if (!this->logFile_->is_open()) {
+        this->logFile_ = nullptr;
+        return this->error("Could not open log file: " + path);
+    }
+
+    this->send("info string Log file set to: " + path);
+}
+
+
+
 void Handler::handleTest(TokenStream &tokens) {
     const std::string &command = tokens.next();
 
@@ -346,7 +418,7 @@ void Handler::handleTestPrintFen(TokenStream &tokens) {
         return this->error("No board set");
     }
 
-    std::cout << this->board_->toFen() << std::endl;
+    this->send(this->board_->toFen());
 }
 
 
@@ -417,7 +489,7 @@ void Handler::stopSearch() {
         result.bestLine = { moves.dequeue() };
     }
 
-    std::cout << "bestmove " << result.bestLine[0].uci() << std::endl;
+    this->send("bestmove " + result.bestLine[0].uci());
 
     // Search state needs to be reset last, in case any iteration callbacks are called between the time stopSearch() is called
     // and now.
@@ -441,25 +513,26 @@ void Handler::iterationCallback(const SearchResult &result) {
     }
 
     // Print the search result
-    std::cout << "info depth " << result.depth;
-    std::cout << " score ";
+    std::string message = "info";
+    message += " depth " + std::to_string(result.depth);
+    message += " score ";
     if (Score::isMate(result.score)) {
-        std::cout << "mate " << Score::mateMoves(result.score);
+        message += "mate " + std::to_string(Score::mateMoves(result.score));
     } else {
-        std::cout << "cp " << result.score;
+        message += "cp " + std::to_string(result.score);
     }
-    std::cout << " time " << millis;
-    std::cout << " nodes " << result.nodeCount;
-    std::cout << " nps " << nps;
-    std::cout << " pv ";
+    message += " time " + std::to_string(millis);
+    message += " nodes " + std::to_string(result.nodeCount);
+    message += " nps " + std::to_string(nps);
+    message += " pv ";
     for (uint32_t i = 0; i < result.bestLine.size(); i++) {
-        std::cout << result.bestLine[i].uci();
+        message += result.bestLine[i].uci();
 
         if (i != result.bestLine.size() - 1) {
-            std::cout << " ";
+            message += " ";
         }
     }
-    std::cout << std::endl;
+    this->send(message);
 
     // Depth limit
     if (this->searchOptions_->depth.has_value() && result.depth >= this->searchOptions_->depth.value()) {
