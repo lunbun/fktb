@@ -110,9 +110,12 @@ int32_t evaluate(Color side, const NNUE::Accumulator &accumulator) {
     float hidden1[Hidden1Size];
 
     // Apply ReLU to the accumulator.
-    // TODO: Use AVX.
-    for (uint32_t i = 0; i < Hidden1Size; ++i) {
-        hidden1[i] = relu(accumulator[side][i]);
+    const float *accumulatorData = accumulator[side];
+    __m256 zero = _mm256_setzero_ps();
+    for (uint32_t i = 0; i < Hidden1Size; i += 8) {
+        __m256 vector = _mm256_load_ps(accumulatorData + i);
+        vector = _mm256_max_ps(vector, zero);
+        _mm256_store_ps(hidden1 + i, vector);
     }
 
     // Evaluate the board.
