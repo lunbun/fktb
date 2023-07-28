@@ -17,6 +17,7 @@ constexpr uint32_t Hidden2Size = 64;
 constexpr uint32_t Hidden3Size = 32;
 constexpr uint32_t OutputSize = 1;
 
+// Weights are by default stored in row-major order, where the weights are indexed by weights[output][input].
 extern const float *Hidden1Weights;
 extern const float *Hidden1Biases;
 extern const float *Hidden2Weights;
@@ -25,6 +26,9 @@ extern const float *Hidden3Weights;
 extern const float *Hidden3Biases;
 extern const float *OutputWeights;
 extern const float *OutputBiases;
+
+// Weights stored in column-major order, where the weights are indexed by weights[input][output].
+extern float Hidden1WeightsColumnMajor[InputSize * Hidden1Size];
 
 // Loads the neural network.
 void init();

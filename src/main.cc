@@ -6,7 +6,7 @@
 #include "uci.h"
 
 [[noreturn]] void uci() {
-    std::string name = "FKTB 0.0.77 nnue";
+    std::string name = "FKTB 0.0.78 nnue";
 #ifndef NDEBUG
     name += " Debug";
 #endif // #ifndef NDEBUG

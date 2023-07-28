@@ -2,7 +2,10 @@
 
 #include <cstring>
 
+#include <immintrin.h>
+
 #include "nnue.h"
+#include "engine/inline.h"
 #include "engine/board/color.h"
 #include "engine/board/piece.h"
 #include "engine/board/square.h"
@@ -36,26 +39,38 @@ void Accumulator::refresh(const Board &board) {
     }
 }
 
-void Accumulator::add(Piece piece, Square square) {
-    // TODO: At the moment, this is very cache inefficient since the weights are not contiguous in memory (also making the weights
-    //  contiguous would allow us to use SIMD).
-    uint32_t whiteFeature = featureIndex<Color::White>(piece, square);
-    uint32_t blackFeature = featureIndex<Color::Black>(piece, square);
-    for (uint32_t i = 0; i < Hidden1Size; ++i) {
-        this->hidden1_[0][i] += Hidden1Weights[i * InputSize + whiteFeature];
-        this->hidden1_[1][i] += Hidden1Weights[i * InputSize + blackFeature];
+
+
+namespace {
+
+// Computes the index of the feature for the given piece and square, then accumulates the feature's hidden1 weights into the given
+// float array.
+//
+// Operation determines how the weights are accumulated. It should be either _mm256_add_ps to add the weights, or _mm256_sub_ps to
+// subtract the weights.
+template<Color Perspective, __m256 (*Operation)(__m256, __m256)>
+INLINE void accumulateHidden1(Piece piece, Square square, float *hidden1) {
+    static_assert(Hidden1Size % 8 == 0, "Hidden1Size must be a multiple of 8");
+
+    uint32_t feature = featureIndex<Perspective>(piece, square);
+    const float *weights = Hidden1WeightsColumnMajor + feature * Hidden1Size;
+    for (uint32_t i = 0; i < Hidden1Size; i += 8) {
+        __m256 hidden1Vector = _mm256_load_ps(hidden1 + i);
+        __m256 weightsVector = _mm256_load_ps(weights + i);
+        _mm256_store_ps(hidden1 + i, Operation(hidden1Vector, weightsVector));
     }
 }
 
+} // namespace
+
+void Accumulator::add(Piece piece, Square square) {
+    accumulateHidden1<Color::White, _mm256_add_ps>(piece, square, this->hidden1_[0]);
+    accumulateHidden1<Color::Black, _mm256_add_ps>(piece, square, this->hidden1_[1]);
+}
+
 void Accumulator::remove(Piece piece, Square square) {
-    // TODO: At the moment, this is very cache inefficient since the weights are not contiguous in memory (also making the weights
-    //  contiguous would allow us to use SIMD).
-    uint32_t whiteFeature = featureIndex<Color::White>(piece, square);
-    uint32_t blackFeature = featureIndex<Color::Black>(piece, square);
-    for (uint32_t i = 0; i < Hidden1Size; ++i) {
-        this->hidden1_[0][i] -= Hidden1Weights[i * InputSize + whiteFeature];
-        this->hidden1_[1][i] -= Hidden1Weights[i * InputSize + blackFeature];
-    }
+    accumulateHidden1<Color::White, _mm256_sub_ps>(piece, square, this->hidden1_[0]);
+    accumulateHidden1<Color::Black, _mm256_sub_ps>(piece, square, this->hidden1_[1]);
 }
 
 } // namespace FKTB::NNUE

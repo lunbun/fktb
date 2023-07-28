@@ -1,7 +1,6 @@
 #include "nnue.h"
 
 #include <cstdint>
-#include <array>
 #include <cmath>
 
 #include <immintrin.h>
@@ -16,6 +15,7 @@
 
 namespace FKTB::NNUE {
 
+// Weights are by default stored in row-major order, where the weights are indexed by weights[output][input].
 const float *Hidden1Weights;
 const float *Hidden1Biases;
 const float *Hidden2Weights;
@@ -25,12 +25,25 @@ const float *Hidden3Biases;
 const float *OutputWeights;
 const float *OutputBiases;
 
+// Weights stored in column-major order, where the weights are indexed by weights[input][output].
+float Hidden1WeightsColumnMajor[InputSize * Hidden1Size];
+
 namespace {
 
 // TODO: Network quantization for more performance.
 
+INLINE void transpose(const float *src, float *dst, uint32_t srcRows, uint32_t srcCols) {
+    // Transpose the row-major weights to column-major.
+    for (uint32_t i = 0; i < srcRows; ++i) {
+        for (uint32_t j = 0; j < srcCols; ++j) {
+            dst[i * srcCols + j] = src[j * srcRows + i];
+        }
+    }
+}
+
 // Loads the neural network from the data embedded in the executable.
 INLINE void load() {
+    // The weights are stored by default in row-major order, where the weights are indexed by weights[output][input].
     Hidden1Weights = reinterpret_cast<const float *>(NNUE_NETWORK_START);
     Hidden1Biases = Hidden1Weights + Hidden1Size * InputSize;
     Hidden2Weights = Hidden1Biases + Hidden1Size;
@@ -39,6 +52,9 @@ INLINE void load() {
     Hidden3Biases = Hidden3Weights + Hidden3Size * Hidden2Size;
     OutputWeights = Hidden3Biases + Hidden3Size;
     OutputBiases = OutputWeights + OutputSize * Hidden3Size;
+
+    // Transpose the row-major weights to column-major.
+    transpose(Hidden1Weights, Hidden1WeightsColumnMajor, InputSize, Hidden1Size);
 }
 
 
