@@ -9,6 +9,7 @@
 #include <optional>
 #include <fstream>
 
+#include "engine/mutex.h"
 #include "engine/board/color.h"
 #include "engine/board/board.h"
 #include "engine/search/iterative_search.h"
@@ -64,6 +65,7 @@ private:
 
     std::unique_ptr<std::ofstream> logFile_;
 
+    ami::mutex mutex_;
     bool isSearching_ = false;
     std::optional<SearchOptions> searchOptions_;
     std::unique_ptr<SearchStopThread> searchStopThread_;
@@ -101,6 +103,11 @@ private:
     void startSearch(const SearchOptions &options);
     void stopSearch();
     void iterationCallback(const SearchResult &result);
+
+    // Locks the mutex and stops the search. This should be used when the search is being stopped from a different thread. This
+    // function also checks if another thread stopped the search between the time that this function was called and the time that
+    // the mutex was acquired. If the search was already stopped by another thread, this function does nothing.
+    void lockAndMaybeStopSearch();
 };
 
 } // namespace UCI
