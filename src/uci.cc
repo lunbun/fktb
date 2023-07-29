@@ -61,6 +61,8 @@ std::string TokenStream::readUntil(const std::string &token) {
 
 // Search stopping needs to be asynchronous from a separate thread so that the main thread can continue to process input while we
 // wait for a duration/node count to pass.
+//
+// Note: This thread does not handle limiting the search depth, since that is done in the search iteration callback.
 // TODO: Add a destructor to properly kill the thread.
 class Handler::SearchStopThread {
 public:
@@ -145,7 +147,7 @@ void Handler::SearchStopThread::disable() {
 
         // Stop the search if necessary.
         if (shouldStop) {
-            this->uci_.stopSearch();
+            this->uci_.lockAndMaybeStopSearch();
         }
     }
 }
@@ -201,6 +203,10 @@ void Handler::maybeLog(const std::string &message) {
 }
 
 void Handler::handleInput(const std::string &input) {
+    assert(!this->mutex_.locked_by_caller() && "Handler::handleInput() must not be called with the mutex locked.");
+
+    std::lock_guard lock(this->mutex_);
+
     TokenStream tokens(input);
     if (tokens.isEnd()) {
         return this->error("Empty input");
@@ -233,6 +239,8 @@ void Handler::handleInput(const std::string &input) {
 }
 
 void Handler::handleUci(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleUci() must be called with the mutex locked.");
+
     if (!tokens.isEnd()) {
         return this->error("uci command does not take arguments");
     }
@@ -244,10 +252,13 @@ void Handler::handleUci(TokenStream &tokens) {
 }
 
 void Handler::handleDebug(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleDebug() must be called with the mutex locked.");
     return this->error("Debug mode does not do anything");
 }
 
 void Handler::handleIsReady(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleIsReady() must be called with the mutex locked.");
+
     if (!tokens.isEnd()) {
         return this->error("isready command does not take arguments");
     }
@@ -256,6 +267,8 @@ void Handler::handleIsReady(TokenStream &tokens) {
 }
 
 void Handler::handleSetOption(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleSetOption() must be called with the mutex locked.");
+
     if (tokens.isEnd()) {
         return this->error("setoption command requires arguments");
     }
@@ -285,6 +298,8 @@ void Handler::handleSetOption(TokenStream &tokens) {
 }
 
 void Handler::handleUciNewGame(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleUciNewGame() must be called with the mutex locked.");
+
     if (!tokens.isEnd()) {
         return this->error("ucinewgame command does not take arguments");
     }
@@ -293,6 +308,8 @@ void Handler::handleUciNewGame(TokenStream &tokens) {
 }
 
 void Handler::handlePosition(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handlePosition() must be called with the mutex locked.");
+
     if (tokens.isEnd()) {
         return this->error("position command requires arguments");
     }
@@ -323,6 +340,8 @@ void Handler::handlePosition(TokenStream &tokens) {
 }
 
 void Handler::handleGo(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleGo() must be called with the mutex locked.");
+
     if (tokens.isEnd()) {
         return this->error("go command requires arguments");
     }
@@ -364,6 +383,8 @@ void Handler::handleGo(TokenStream &tokens) {
 }
 
 void Handler::handleStop(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleStop() must be called with the mutex locked.");
+
     if (!tokens.isEnd()) {
         return this->error("stop command does not take arguments");
     }
@@ -372,6 +393,8 @@ void Handler::handleStop(TokenStream &tokens) {
 }
 
 void Handler::handleQuit(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleQuit() must be called with the mutex locked.");
+
     if (!tokens.isEnd()) {
         return this->error("quit command does not take arguments");
     }
@@ -382,6 +405,8 @@ void Handler::handleQuit(TokenStream &tokens) {
 
 
 void Handler::handleSetLogFile(const std::string &path) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleSetLogFile() must be called with the mutex locked.");
+
     this->logFile_ = std::make_unique<std::ofstream>(path);
     if (!this->logFile_->is_open()) {
         this->logFile_ = nullptr;
@@ -394,6 +419,8 @@ void Handler::handleSetLogFile(const std::string &path) {
 
 
 void Handler::handleTest(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleTest() must be called with the mutex locked.");
+
     const std::string &command = tokens.next();
 
     if (command == "movegen") {
@@ -406,6 +433,8 @@ void Handler::handleTest(TokenStream &tokens) {
 }
 
 void Handler::handleTestMoveGen(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleTestMoveGen() must be called with the mutex locked.");
+
     if (this->board_ == nullptr) {
         return this->error("No board set");
     }
@@ -414,6 +443,8 @@ void Handler::handleTestMoveGen(TokenStream &tokens) {
 }
 
 void Handler::handleTestPrintFen(TokenStream &tokens) {
+    assert(this->mutex_.locked_by_caller() && "Handler::handleTestPrintFen() must be called with the mutex locked.");
+
     if (this->board_ == nullptr) {
         return this->error("No board set");
     }
@@ -424,6 +455,8 @@ void Handler::handleTestPrintFen(TokenStream &tokens) {
 
 
 void Handler::startSearch(const SearchOptions &options) {
+    assert(this->mutex_.locked_by_caller() && "Handler::startSearch() must be called with the mutex locked.");
+
     if (this->isSearching_) {
         return this->error("Already searching");
     }
@@ -466,6 +499,8 @@ void Handler::startSearch(const SearchOptions &options) {
 }
 
 void Handler::stopSearch() {
+    assert(this->mutex_.locked_by_caller() && "Handler::stopSearch() must be called with the mutex locked.");
+
     if (!this->isSearching_) {
         return this->error("Not searching");
     }
@@ -497,7 +532,25 @@ void Handler::stopSearch() {
     this->searchOptions_ = std::nullopt;
 }
 
+// Locks the mutex and stops the search. This should be used when the search is being stopped from a different thread. This
+// function also checks if another thread stopped the search between the time that this function was called and the time that
+// the mutex was acquired. If the search was already stopped by another thread, this function does nothing.
+void Handler::lockAndMaybeStopSearch() {
+    assert(!this->mutex_.locked_by_caller() && "Handler::lockAndStopSearch() must not be called with the mutex locked.");
+
+    std::lock_guard lock(this->mutex_);
+
+    // Check if another thread already stopped the search
+    if (!this->isSearching_) {
+        return;
+    }
+
+    this->stopSearch();
+}
+
 void Handler::iterationCallback(const SearchResult &result) {
+    assert(!this->mutex_.locked_by_caller() && "Handler::iterationCallback() must not be called with the mutex locked.");
+
     if (!this->isSearching_ || !this->searchOptions_.has_value()) {
         return this->error("Iteration callback somehow called when not searching");
     }
@@ -539,7 +592,7 @@ void Handler::iterationCallback(const SearchResult &result) {
         // Spawn a new thread to stop the search (cannot stop it from this thread because this thread IS the search
         // thread, since we are in the search callback). Trying to stop it from this thread would cause a deadlock.
         std::thread([this]() {
-            this->stopSearch();
+            this->lockAndMaybeStopSearch();
         }).detach();
     }
 }
