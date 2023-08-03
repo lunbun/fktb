@@ -42,6 +42,6 @@ function(embed_nnue_network path)
             NNUE_NETWORK_SIZE=${network_size})
 endfunction()
 
-embed_nnue_network("${CMAKE_SOURCE_DIR}/nnue/network.pt.bin")
+embed_nnue_network("${CMAKE_SOURCE_DIR}/nnue/network.bin")
 
 add_subdirectory(src)
