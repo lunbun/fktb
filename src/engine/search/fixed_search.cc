@@ -36,9 +36,6 @@ SearchLine FixedDepthSearcher::search(RootMoveList moves) {
     // Resize the killer table to the depth of the search
     this->heuristics_.killers.resize(this->depth_);
 
-    // Refresh the NNUE accumulator to alleviate any floating point errors that may have accumulated
-    this->board_.accumulator().refresh(this->board_);
-
     // Search the root node
     SearchRootNode node = SearchRootNode::invalid();
     if (this->board_.turn() == Color::White) {

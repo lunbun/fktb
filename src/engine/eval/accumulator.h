@@ -18,20 +18,21 @@ class Board;
 
 namespace FKTB::NNUE {
 
-class Accumulator {
+class alignas(ByteAlignment) Accumulator {
 public:
-    // Recomputes the accumulator from scratch. The accumulator can collect floating point errors over time, so this should be
-    // called at the start of every search.
-    void refresh(const Board &board);
+    // Initializes the accumulator. It is not initialized in the constructor because otherwise it would not be possible to leave
+    // the accumulator uninitialized.
+    void init();
 
     void add(Piece piece, Square square);
     void remove(Piece piece, Square square);
 
-    [[nodiscard]] INLINE const float *operator[](Color color) const { return this->hidden1_[static_cast<uint8_t>(color)]; }
+    // Applies the ReLU activation function to the accumulator.
+    void relu(Color color, int16_t *output) const;
 
 private:
     // Using raw arrays here rather than ColorMap<std::array<...>> so that we can allow the array to be uninitialized.
-    float hidden1_[2][Hidden1Size];
+    int16_t hidden1_[2][Hidden1Size];
 };
 
 } // namespace FKTB::NNUE

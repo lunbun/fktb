@@ -29,7 +29,7 @@ Board::Board(Color turn, CastlingRights castlingRights, Square enPassantSquare) 
 
     this->repetitionHashes_.reserve(64);
 
-    this->accumulator_.refresh(*this);
+    this->accumulator_.init();
 }
 
 Board::~Board() = default;

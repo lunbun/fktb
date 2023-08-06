@@ -57,8 +57,8 @@ namespace MakeMoveType {
 // @formatter:on
 
 struct MakeMoveInfo {
-    // TODO: Store the accumulator state here so that we don't have to recompute it when unmaking a move. Doing so will also help
-    //  alleviate some floating point errors that can accumulate over time.
+    // TODO: Store the accumulator state here so that we don't have to recompute it when unmaking a move. Might improve
+    //  performance a bit.
     uint64_t oldHash;
     uint32_t oldPliesSinceIrreversible;
     CastlingRights oldCastlingRights;
