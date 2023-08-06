@@ -20,12 +20,12 @@ constexpr uint32_t OutputSize = 1;
 // We're just going to assume that the 16-bit values are never going to overflow. They very well could if the unscaled equivalent
 // of the value exceeded INT16_MAX / InputsScale (at the moment is about 256), but that seems pretty unlikely.
 //
-// IMPORTANT NOTE: Do not increase InputsScaleLog2 above 7. It causes strange behavior in the network, which I believe is caused
+// IMPORTANT NOTE: Do not increase InputsScaleLog2 above 6. It causes strange behavior in the network, which I believe is caused
 // by the accumulator overflowing/underflowing (although I haven't confirmed this).
 //
 // Also, it may be dangerous to increase WeightsScaleLog2 too high, as it may cause the 32-bit accumulators to overflow/underflow
 // during linear layer propagation.
-constexpr uint32_t InputsScaleLog2 = 7;
+constexpr uint32_t InputsScaleLog2 = 6;
 constexpr uint32_t InputsScale = 1 << InputsScaleLog2;
 constexpr uint32_t WeightsScaleLog2 = 7;
 constexpr uint32_t WeightsScale = 1 << WeightsScaleLog2;
