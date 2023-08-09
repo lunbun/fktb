@@ -17,14 +17,14 @@ constexpr uint32_t Hidden2Size = 32;
 constexpr uint32_t Hidden3Size = 8;
 constexpr uint32_t OutputSize = 1;
 
-// We're just going to assume that the 16-bit values are never going to overflow. They very well could if the unscaled equivalent
-// of the value exceeded INT16_MAX / InputsScale (at the moment is about 256), but that seems pretty unlikely.
+// Care needs to be taken to prevent values from overflowing. No checks or clamping is done in release builds, so if the values
+// overflow, the neural network will be toast.
 //
-// IMPORTANT NOTE: Do not increase InputsScaleLog2 above 6. It causes strange behavior in the network, which I believe is caused
-// by the accumulator overflowing/underflowing (although I haven't confirmed this).
+// When increasing InputsScaleLog2, make sure that the accumulator does not overflow. The accumulator will report overflows in
+// debug builds.
 //
-// Also, it may be dangerous to increase WeightsScaleLog2 too high, as it may cause the 32-bit accumulators to overflow/underflow
-// during linear layer propagation.
+// Also, it may be dangerous to increase WeightsScaleLog2 too high, as it may cause the 32-bit accumulators to overflow during
+// hidden layer propagation (no overflows are reported here in debug builds, yet).
 constexpr uint32_t InputsScaleLog2 = 6;
 constexpr uint32_t InputsScale = 1 << InputsScaleLog2;
 constexpr uint32_t WeightsScaleLog2 = 7;

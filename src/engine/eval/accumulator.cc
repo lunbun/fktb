@@ -44,6 +44,20 @@ INLINE void accumulateHidden1(Piece piece, Square square, int16_t *hidden1) {
     for (uint32_t i = 0; i < Hidden1Size; i += RegisterWidth16) {
         __m256i hidden1Vector = _mm256_load_si256(reinterpret_cast<const __m256i *>(hidden1 + i));
         __m256i weightsVector = _mm256_load_si256(reinterpret_cast<const __m256i *>(weights + i));
+
+#ifndef NDEBUG
+        // Check for overflow.
+        __m256i result = Operation(hidden1Vector, weightsVector);
+
+        __m256i saturatedAdd = _mm256_adds_epi16(hidden1Vector, weightsVector);
+        __m256i saturatedSub = _mm256_subs_epi16(hidden1Vector, weightsVector);
+
+        // overflowMask will have a 0 in each position where an overflow occurred, and a -1 otherwise.
+        __m256i overflowMask = _mm256_or_si256(_mm256_cmpeq_epi16(result, saturatedAdd), _mm256_cmpeq_epi16(result, saturatedSub));
+
+        assert(_mm256_testc_si256(overflowMask, _mm256_set1_epi16(-1)) && "Accumulator overflow detected");
+#endif
+
         _mm256_store_si256(reinterpret_cast<__m256i *>(hidden1 + i), Operation(hidden1Vector, weightsVector));
     }
 }
