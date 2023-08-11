@@ -140,6 +140,7 @@ INLINE void Board::addKing(Color color, Square square) {
     }
 
     if constexpr (Flags & MakeMoveFlags::Hash) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Hash and Unmake flags are internally mutually exclusive");
         this->hash_ ^= Zobrist::piece(Piece::king(color), square);
     }
 }
@@ -159,6 +160,7 @@ INLINE void Board::addPiece(Piece piece, Square square) {
     }
 
     if constexpr (Flags & MakeMoveFlags::Hash) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Hash and Unmake flags are internally mutually exclusive");
         this->hash_ ^= Zobrist::piece(piece, square);
     }
 }
@@ -178,6 +180,7 @@ INLINE void Board::removePiece(Piece piece, Square square) {
     }
 
     if constexpr (Flags & MakeMoveFlags::Hash) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Hash and Unmake flags are internally mutually exclusive");
         this->hash_ ^= Zobrist::piece(piece, square);
     }
 }
@@ -186,11 +189,13 @@ INLINE void Board::removePiece(Piece piece, Square square) {
 template<uint32_t Flags>
 INLINE void Board::castlingRights(CastlingRights newCastlingRights) {
     if constexpr (Flags & MakeMoveFlags::Hash) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Hash and Unmake flags are internally mutually exclusive");
         this->hash_ ^= Zobrist::castlingRights(this->castlingRights_);
         this->hash_ ^= Zobrist::castlingRights(newCastlingRights);
     }
 
     if constexpr (Flags & MakeMoveFlags::Gameplay) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Gameplay and Unmake flags are internally mutually exclusive");
         this->castlingRights_ = newCastlingRights;
     }
 }
@@ -213,11 +218,13 @@ INLINE void Board::maybeRevokeCastlingRightsForRookSquare(Square square) {
 template<uint32_t Flags>
 INLINE void Board::enPassantSquare(Square newEnPassantSquare) {
     if constexpr (Flags & MakeMoveFlags::Hash) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Hash and Unmake flags are internally mutually exclusive");
         this->hash_ ^= Zobrist::enPassantSquare(this->enPassantSquare_);
         this->hash_ ^= Zobrist::enPassantSquare(newEnPassantSquare);
     }
 
     if constexpr (Flags & MakeMoveFlags::Gameplay) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Gameplay and Unmake flags are internally mutually exclusive");
         this->enPassantSquare_ = newEnPassantSquare;
     }
 }
@@ -225,8 +232,8 @@ INLINE void Board::enPassantSquare(Square newEnPassantSquare) {
 // Updates the repetition hashes for making a move.
 template<uint32_t Flags>
 INLINE void Board::updateRepetitionHashes(Move move) {
-    static_assert(!(Flags & MakeMoveFlags::Unmake), "Can only update repetition hashes for making a move");
-    static_assert(Flags & MakeMoveFlags::Repetition, "Can only update repetition hashes if repetition is enabled");
+    static_assert(!(Flags & MakeMoveFlags::Unmake), "Repetition and Unmake flags are internally mutually exclusive");
+    static_assert(Flags & MakeMoveFlags::Repetition, "Repetition flag must be set");
 
     // Push the current hash onto the repetition list
     this->repetitionHashes_.push_back(this->hash_);
@@ -282,6 +289,7 @@ INLINE Piece Board::movePiece(Square from, Square to) {
     }
 
     if constexpr (Flags & MakeMoveFlags::Hash) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Hash and Unmake flags are internally mutually exclusive");
         this->hash_ ^= Zobrist::piece(piece, from);
         this->hash_ ^= Zobrist::piece(piece, to);
     }
@@ -301,7 +309,8 @@ INLINE void Board::makeCastlingMove(Move move) {
     this->movePiece<Flags>(rookFrom, rookTo);
 
     // Update castling rights
-    if constexpr (!(Flags & MakeMoveFlags::Unmake) && (Flags & MakeMoveFlags::Gameplay)) {
+    if constexpr (Flags & MakeMoveFlags::Gameplay) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Gameplay and Unmake flags are internally mutually exclusive");
         this->castlingRights<Flags>(this->castlingRights_.without(king.color()));
     }
 }
@@ -337,7 +346,9 @@ INLINE void Board::makeQuietMove(Move move) {
 
     // Update gameplay information if necessary (don't need to update if unmaking since unmaking will just pull the old values
     // from the MakeMoveInfo)
-    if constexpr (!(Flags & MakeMoveFlags::Unmake) && (Flags & MakeMoveFlags::Gameplay)) {
+    if constexpr (Flags & MakeMoveFlags::Gameplay) {
+        static_assert(!(Flags & MakeMoveFlags::Unmake), "Gameplay and Unmake flags are internally mutually exclusive");
+
         switch (piece.type()) {
             case PieceType::Pawn: {
                 // Update en passant square if double pawn push
@@ -431,22 +442,23 @@ MakeMoveInfo Board::makeMove(Move move) {
 
 template<uint32_t Flags>
 void Board::unmakeMove(Move move, MakeMoveInfo info) {
-    constexpr uint32_t UnmakeFlags = Flags | MakeMoveFlags::Unmake;
+    // These flags are what should be passed to internal Board methods.
+    constexpr uint32_t InternalFlags = Flags & ~MakeMoveFlags::InternalUnmakeMutualExclusive | MakeMoveFlags::Unmake;
 
     // We don't need to do any hash, castling rights, or en passant square updates here since we just restore the old hash and
     // castling rights from MakeMoveInfo
 
     if (move.isCastle()) { // Castling
-        this->makeCastlingMove<UnmakeFlags>(move);
+        this->makeCastlingMove<InternalFlags>(move);
     } else if (move.isPromotion()) { // Promotions
-        this->makePromotionMove<UnmakeFlags>(move);
+        this->makePromotionMove<InternalFlags>(move);
     } else { // Normal moves
-        this->makeQuietMove<UnmakeFlags>(move);
+        this->makeQuietMove<InternalFlags>(move);
     }
 
     if (move.isCapture()) { // Captures
         // Add the captured piece back
-        this->addPiece<UnmakeFlags>(info.captured, move.capturedSquare());
+        this->addPiece<InternalFlags>(info.captured, move.capturedSquare());
     }
 
     // Restore the old repetition hashes
