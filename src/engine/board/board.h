@@ -36,8 +36,14 @@ namespace MakeMoveFlags {
     constexpr uint32_t Bitboards    = 0x10;             // Update the bitboards?
     constexpr uint32_t Repetition   = 0x20;             // Update the three-fold repetition hash list?
 
-    constexpr uint32_t Unmake       = 0x40;             // Flag used internally to indicate a move is being unmade. Do not pass this flag
-                                                        // to makeMove/unmakeMove.
+    constexpr uint32_t Unmake       = 0x40;             // Flag used internally to indicate a move is being unmade. Do not pass
+                                                        // this flag to makeMove/unmakeMove.
+
+    // For internal Board methods, some flags are mutually exclusive with the Unmake flag because their data is stored in the
+    // MakeMoveInfo and does not need to be incrementally updated by internal Board methods.
+    //
+    // External users of the Board class do not need to worry about this at all, it is all handled internally.
+    constexpr uint32_t InternalUnmakeMutualExclusive = Turn | Gameplay | Hash | Repetition;
 } // namespace MakeMoveFlags
 
 // Only these sets of flags will link properly with the makeMove/unmakeMove methods.
