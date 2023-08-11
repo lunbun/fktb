@@ -141,7 +141,7 @@ int32_t See::evaluate(Square square, const Board &board) {
     }
 
     // Traverse the "unary" tree and find the best score using negamax
-    while (depth--) {
+    while (--depth) {
         scores[depth - 1] = -std::max(-scores[depth - 1], scores[depth]);
     }
 
