@@ -20,6 +20,9 @@ namespace FKTB::NNUE {
 
 class alignas(ByteAlignment) Accumulator {
 public:
+    // The default constructor leaves the accumulator uninitialized. To initialize it, call init().
+    INLINE Accumulator() { }
+
     // Initializes the accumulator. It is not initialized in the constructor because otherwise it would not be possible to leave
     // the accumulator uninitialized.
     void init();

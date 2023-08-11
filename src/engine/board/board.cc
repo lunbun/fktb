@@ -393,6 +393,11 @@ MakeMoveInfo Board::makeMove(Move move) {
         oldEnPassantSquare = this->enPassantSquare();
     }
 
+    NNUE::Accumulator oldAccumulator;
+    if constexpr (Flags & MakeMoveFlags::Evaluation) {
+        oldAccumulator = this->accumulator();
+    }
+
     // Update the three-fold repetition hashes
     uint32_t oldPliesSinceIrreversible;
     if constexpr (Flags & MakeMoveFlags::Repetition) {
@@ -437,11 +442,11 @@ MakeMoveInfo Board::makeMove(Move move) {
         this->turn_ = ~this->turn_;
     }
 
-    return { oldHash, oldPliesSinceIrreversible, oldCastlingRights, oldEnPassantSquare, captured };
+    return { oldHash, oldPliesSinceIrreversible, oldCastlingRights, oldEnPassantSquare, oldAccumulator, captured };
 }
 
 template<uint32_t Flags>
-void Board::unmakeMove(Move move, MakeMoveInfo info) {
+void Board::unmakeMove(Move move, const MakeMoveInfo &info) {
     // These flags are what should be passed to internal Board methods.
     constexpr uint32_t InternalFlags = Flags & ~MakeMoveFlags::InternalUnmakeMutualExclusive | MakeMoveFlags::Unmake;
 
@@ -467,6 +472,11 @@ void Board::unmakeMove(Move move, MakeMoveInfo info) {
         this->pliesSinceIrreversible_ = info.oldPliesSinceIrreversible;
     }
 
+    // Restore the old NNUE accumulator
+    if constexpr (Flags & MakeMoveFlags::Evaluation) {
+        this->accumulator_ = info.oldAccumulator;
+    }
+
     // Restore the old hash
     if constexpr (Flags & MakeMoveFlags::Hash) {
         this->hash_ = info.oldHash;
@@ -485,9 +495,9 @@ void Board::unmakeMove(Move move, MakeMoveInfo info) {
 template MakeMoveInfo Board::makeMove<MakeMoveType::All>(Move);
 template MakeMoveInfo Board::makeMove<MakeMoveType::AllNoTurn>(Move);
 template MakeMoveInfo Board::makeMove<MakeMoveType::BitboardsOnly>(Move);
-template void Board::unmakeMove<MakeMoveType::All>(Move, MakeMoveInfo);
-template void Board::unmakeMove<MakeMoveType::AllNoTurn>(Move, MakeMoveInfo);
-template void Board::unmakeMove<MakeMoveType::BitboardsOnly>(Move, MakeMoveInfo);
+template void Board::unmakeMove<MakeMoveType::All>(Move move, const MakeMoveInfo &info);
+template void Board::unmakeMove<MakeMoveType::AllNoTurn>(Move move, const MakeMoveInfo &info);
+template void Board::unmakeMove<MakeMoveType::BitboardsOnly>(Move move, const MakeMoveInfo &info);
 
 
 // Makes/unmakes a null move.
@@ -503,10 +513,11 @@ MakeMoveInfo Board::makeNullMove() {
     // Switch the turn
     this->hash_ ^= Zobrist::blackToMove();
 
-    return { oldHash, oldPliesSinceIrreversible, oldCastlingRights, oldEnPassantSquare, Piece::empty() };
+    // Null moves don't affect the NNUE accumulator, so we don't need to save it.
+    return { oldHash, oldPliesSinceIrreversible, oldCastlingRights, oldEnPassantSquare, { }, Piece::empty() };
 }
 
-void Board::unmakeNullMove(MakeMoveInfo info) {
+void Board::unmakeNullMove(const MakeMoveInfo &info) {
     // Restore the old hash and gameplay info
     this->hash_ = info.oldHash;
     this->castlingRights_ = info.oldCastlingRights;

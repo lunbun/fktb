@@ -43,7 +43,7 @@ namespace MakeMoveFlags {
     // MakeMoveInfo and does not need to be incrementally updated by internal Board methods.
     //
     // External users of the Board class do not need to worry about this at all, it is all handled internally.
-    constexpr uint32_t InternalUnmakeMutualExclusive = Turn | Gameplay | Hash | Repetition;
+    constexpr uint32_t InternalUnmakeMutualExclusive = Turn | Gameplay | Hash | Evaluation | Repetition;
 } // namespace MakeMoveFlags
 
 // Only these sets of flags will link properly with the makeMove/unmakeMove methods.
@@ -63,15 +63,21 @@ namespace MakeMoveType {
 // @formatter:on
 
 struct MakeMoveInfo {
-    // TODO: Store the accumulator state here so that we don't have to recompute it when unmaking a move. Might improve
-    //  performance a bit.
     uint64_t oldHash;
     uint32_t oldPliesSinceIrreversible;
     CastlingRights oldCastlingRights;
     Square oldEnPassantSquare;
+    NNUE::Accumulator oldAccumulator;
     Piece captured;
 
     MakeMoveInfo() = delete;
+
+    // Both the copy and move constructors are deleted since NNUE::Accumulator is a very large trivially-copyable type, so we
+    // don't want to accidentally copy it around.
+    MakeMoveInfo(const MakeMoveInfo &) = delete;
+    MakeMoveInfo &operator=(const MakeMoveInfo &) = delete;
+    MakeMoveInfo(MakeMoveInfo &&) = delete;
+    MakeMoveInfo &operator=(MakeMoveInfo &&) = delete;
 };
 
 
@@ -147,11 +153,11 @@ public:
     template<uint32_t Flags>
     MakeMoveInfo makeMove(Move move);
     template<uint32_t Flags>
-    void unmakeMove(Move move, MakeMoveInfo info);
+    void unmakeMove(Move move, const MakeMoveInfo &info);
 
     // Makes/unmakes a null move without updating the turn.
     MakeMoveInfo makeNullMove();
-    void unmakeNullMove(MakeMoveInfo info);
+    void unmakeNullMove(const MakeMoveInfo &info);
 
 private:
     Color turn_;
