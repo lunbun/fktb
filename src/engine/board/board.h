@@ -133,7 +133,6 @@ public:
 
     // Returns true if this position has existed before in the game.
     [[nodiscard]] bool isTwofoldRepetition() const;
-    [[nodiscard]] bool isInsufficientMaterial() const;
 
     template<uint32_t Flags>
     void addKing(Color color, Square square);
