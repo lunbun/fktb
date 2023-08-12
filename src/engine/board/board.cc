@@ -122,6 +122,19 @@ bool Board::isTwofoldRepetition() const {
     return false;
 }
 
+bool Board::isInsufficientMaterial() const {
+    // If there are any pawns, rooks, or queens, then there is sufficient material.
+    if (this->composite(PieceType::Pawn) || this->composite(PieceType::Rook) || this->composite(PieceType::Queen)) {
+        return false;
+    }
+
+    uint8_t whiteMinor = this->bitboard(Piece::knight(Color::White)).count() + this->bitboard(Piece::bishop(Color::White)).count();
+    uint8_t blackMinor = this->bitboard(Piece::knight(Color::Black)).count() + this->bitboard(Piece::bishop(Color::Black)).count();
+
+    // Insufficient material if both sides have at most 1 minor piece.
+    return whiteMinor <= 1 && blackMinor <= 1;
+}
+
 
 
 template<uint32_t Flags>

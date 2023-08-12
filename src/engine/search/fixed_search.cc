@@ -398,6 +398,10 @@ int32_t FixedDepthSearcher::search(uint16_t depth, uint16_t ply, int32_t alpha, 
         return Score::Draw;
     }
 
+    if (board.isInsufficientMaterial()) {
+        return Score::Draw;
+    }
+
     TranspositionTable &table = this->table_;
 
     // Transposition table lookup
