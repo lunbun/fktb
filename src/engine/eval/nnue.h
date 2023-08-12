@@ -12,7 +12,7 @@ namespace FKTB::NNUE {
 class Accumulator;
 
 constexpr uint32_t InputSize = 768;
-constexpr uint32_t Hidden1Size = 256;
+constexpr uint32_t Hidden1Size = 96;
 constexpr uint32_t Hidden2Size = 32;
 constexpr uint32_t Hidden3Size = 8;
 constexpr uint32_t OutputSize = 1;
