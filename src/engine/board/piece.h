@@ -64,8 +64,6 @@ namespace PieceMaterial {
     constexpr int32_t Queen         = 900;
     constexpr std::array<int32_t, 5> Values = { Pawn, Knight, Bishop, Rook, Queen };
 
-    constexpr int32_t BishopPair    = 50;
-
     [[nodiscard]] INLINE constexpr int32_t value(PieceType type);
 } // namespace PieceMaterial
 

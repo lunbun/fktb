@@ -193,7 +193,7 @@ void init() {
 }
 
 // Evaluates the given board position from the perspective of the given side.
-int32_t evaluate(Color side, const NNUE::Accumulator &accumulator) {
+int32_t evaluate(Color side, const Accumulator &accumulator) {
     alignas(ByteAlignment) int16_t hidden1[InputSize];
 
     // Apply ReLU to the accumulator.

@@ -72,6 +72,6 @@ INLINE constexpr uint32_t featureIndex(Piece piece, Square square) {
 }
 
 // Evaluates the given board position from the perspective of the given side.
-int32_t evaluate(Color side, const NNUE::Accumulator &accumulator);
+int32_t evaluate(Color side, const Accumulator &accumulator);
 
 } // namespace FKTB::NNUE
