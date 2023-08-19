@@ -20,15 +20,15 @@ constexpr uint32_t OutputSize = 1;
 // Care needs to be taken to prevent values from overflowing. No checks or clamping is done in release builds, so if the values
 // overflow, the neural network will be toast.
 //
-// When increasing InputsScaleLog2, make sure that the accumulator does not overflow. The accumulator will report overflows in
+// When increasing UnitsScaleLog2, make sure that the accumulator does not overflow. The accumulator will report overflows in
 // debug builds.
 //
 // Also, it may be dangerous to increase WeightsScaleLog2 too high, as it may cause the 32-bit accumulators to overflow during
 // hidden layer propagation (no overflows are reported here in debug builds, yet).
-constexpr uint32_t InputsScaleLog2 = 6;
-constexpr uint32_t InputsScale = 1 << InputsScaleLog2;
+constexpr uint32_t UnitsScaleLog2 = 6;
+constexpr uint32_t UnitsScale = 1 << UnitsScaleLog2;        // Scale of NNUE quantized units to pawn units.
 constexpr uint32_t WeightsScaleLog2 = 7;
-constexpr uint32_t WeightsScale = 1 << WeightsScaleLog2;
+constexpr uint32_t WeightsScale = 1 << WeightsScaleLog2;    // Scale of quantized weights.
 
 constexpr uint32_t RegisterWidth8 = 32;         // Number of 8-bit values that fit into a 256-bit AVX register.
 constexpr uint32_t RegisterWidth16 = 16;        // Number of 16-bit values that fit into a 256-bit AVX register.

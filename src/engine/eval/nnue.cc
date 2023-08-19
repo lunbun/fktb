@@ -66,16 +66,16 @@ INLINE void load() {
 
     // The weights are stored by default in row-major order, where the weights are indexed by weights[output][input].
     //
-    // First layer weights need to be scaled by InputsScale, not WeightsScale since they are used by the accumulator (which does
-    // not have scaled inputs).
-    loadQuantizedParameters(data, Hidden1Weights, Hidden1Size * InputSize, InputsScale);
-    loadQuantizedParameters(data, Hidden1Biases, Hidden1Size, InputsScale);
+    // First layer weights need to be scaled by UnitsScale, not WeightsScale since they are used by the accumulator (which adds
+    // the weights together rather than multiplying them since the inputs are boolean values).
+    loadQuantizedParameters(data, Hidden1Weights, Hidden1Size * InputSize, UnitsScale);
+    loadQuantizedParameters(data, Hidden1Biases, Hidden1Size, UnitsScale);
     loadQuantizedParameters(data, Hidden2Weights, Hidden2Size * Hidden1Size, WeightsScale);
-    loadQuantizedParameters(data, Hidden2Biases, Hidden2Size, InputsScale);
+    loadQuantizedParameters(data, Hidden2Biases, Hidden2Size, UnitsScale);
     loadQuantizedParameters(data, Hidden3Weights, Hidden3Size * Hidden2Size, WeightsScale);
-    loadQuantizedParameters(data, Hidden3Biases, Hidden3Size, InputsScale);
+    loadQuantizedParameters(data, Hidden3Biases, Hidden3Size, UnitsScale);
     loadQuantizedParameters(data, OutputWeights, OutputSize * Hidden3Size, WeightsScale);
-    loadQuantizedParameters(data, OutputBiases, OutputSize, InputsScale);
+    loadQuantizedParameters(data, OutputBiases, OutputSize, UnitsScale);
 
     // Transpose the row-major weights to column-major.
     transpose(Hidden1Weights, Hidden1WeightsColumnMajor, InputSize, Hidden1Size);
@@ -203,7 +203,7 @@ int32_t evaluate(Color side, const Accumulator &accumulator) {
     int32_t eval = forward(hidden1);
 
     // Convert the evaluation to centipawns.
-    return (eval * 100) >> InputsScaleLog2;
+    return (eval * 100) >> UnitsScaleLog2;
 }
 
 } // namespace FKTB::NNUE
