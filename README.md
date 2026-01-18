@@ -6,7 +6,7 @@ Play me on Lichess! https://lichess.org/@/frogskittens_thebot
 ## Building
 
 A prebuilt Windows binary is available in the
-[Releases](https://github.com/lunbun/fktb/releases/tag/v0.0.76).
+[Releases](https://github.com/lunbun/fktb/releases).
 
 GCC or Clang is recommended. I have not tested MSVC; proceed at your own risk.
 
