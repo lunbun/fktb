@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <cstdint>
@@ -33,24 +32,24 @@ INLINE uint64_t bswap(uint64_t x) {
 
 // Rotate left: rotates the bits of the integer to the left.
 INLINE uint64_t rol(uint64_t x, uint8_t shift) {
-    return _rotl64(x, shift);
+    return x << shift | x >> 64 - shift;
 }
 
 // Rotate right: rotates the bits of the integer to the right.
 INLINE uint64_t ror(uint64_t x, uint8_t shift) {
-    return _rotr64(x, shift);
+    return x >> shift | x << 64 - shift;
 }
 
 // Reset lowest set bit: sets the least significant bit to zero.
 // Equivalent to x & (x - 1).
 INLINE uint64_t blsr(uint64_t x) {
-    return _blsr_u64(x);
+    return x & x - 1;
 }
 
 // Extract lowest set bit: returns the least significant bit.
 // Equivalent to x & (-x).
 INLINE uint64_t blsi(uint64_t x) {
-    return _blsi_u64(x);
+    return x & -x;
 }
 
 // Parallel bits deposit: deposits bits from x into the mask.
